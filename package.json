@@ -1,0 +1,42 @@
+{
+  "name": "screenreel",
+  "version": "0.1.0",
+  "description": "Record scripted user journeys of any running web app as a stitched demo video. Playwright CDP screencast + ffmpeg — zero integration required in the target app.",
+  "type": "module",
+  "bin": {
+    "screenreel": "bin/screenreel.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "skills/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alafazam/screenReels.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Alafazam/screenReels/issues"
+  },
+  "homepage": "https://github.com/Alafazam/screenReels#readme",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "playwright-core": "^1.56.1"
+  },
+  "keywords": [
+    "demo",
+    "screen-recording",
+    "playwright",
+    "product-video",
+    "launch-video",
+    "screencast"
+  ],
+  "license": "Apache-2.0",
+  "private": false
+}

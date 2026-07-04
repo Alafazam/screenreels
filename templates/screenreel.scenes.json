@@ -1,0 +1,17 @@
+{
+  "defaults": { "settleMs": 900, "leadInMs": 1400, "tailMs": 2000 },
+  "scenes": [
+    {
+      "id": "home",
+      "route": "index.html",
+      "waitFor": "body",
+      "title": "Journey 1 - Home",
+      "sub": "One line about what this journey shows",
+      "actions": [
+        { "type": "wait", "ms": 1000 },
+        { "type": "glow", "selector": ".card", "sequence": true, "stepMs": 800, "count": 3, "afterMs": 500 },
+        { "type": "click", "selector": "[data-action=\"primary-cta\"]", "afterMs": 1500 }
+      ]
+    }
+  ]
+}

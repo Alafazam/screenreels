@@ -1,0 +1,4 @@
+node_modules/
+.capture-tmp/
+screenreel-output/
+*.tgz

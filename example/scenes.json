@@ -1,0 +1,31 @@
+{
+  "defaults": { "settleMs": 900, "leadInMs": 1400, "tailMs": 2000 },
+  "scenes": [
+    {
+      "id": "systems-canvas",
+      "route": "dataflow-systems-canvas.html",
+      "waitFor": "[data-sys-node]",
+      "title": "Systems Canvas",
+      "sub": "Map the landscape, draft with AI, generate the pipeline backlog",
+      "actions": [
+        { "type": "wait", "ms": 1200 },
+        { "type": "glow", "selector": ".df-sys-node-group", "sequence": true, "stepMs": 700, "count": 4, "afterMs": 600 },
+        { "type": "call", "fn": "dfSysApplyDraft", "args": [], "cursorTo": "#dfSysAiInput", "afterMs": 3200 },
+        { "type": "click", "selector": "[data-action=\"confirm-draft\"]", "afterMs": 2000 }
+      ]
+    },
+    {
+      "id": "data-readiness",
+      "route": "dataflow-reconciliation.html",
+      "waitFor": "[data-rec-cell]",
+      "title": "Data Readiness",
+      "sub": "Cross-feed reconciliation with root-cause diagnosis",
+      "actions": [
+        { "type": "wait", "ms": 1200 },
+        { "type": "glow", "selector": "[data-rec-cell][data-issue-id]", "sequence": true, "stepMs": 800, "count": 3, "afterMs": 500 },
+        { "type": "call", "fn": "dfRecSelectIssue", "args": ["issue-3"], "cursorTo": "[data-rec-issue=\"issue-3\"]", "afterMs": 2200 },
+        { "type": "click", "selector": "[data-action=\"fix-pipeline\"]", "afterMs": 2400 }
+      ]
+    }
+  ]
+}
