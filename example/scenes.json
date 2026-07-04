@@ -3,7 +3,7 @@
   "scenes": [
     {
       "id": "systems-canvas",
-      "route": "dataflow-systems-canvas.html",
+      "route": "/systems-canvas",
       "waitFor": "[data-sys-node]",
       "title": "Systems Canvas",
       "sub": "Map the landscape, draft with AI, generate the pipeline backlog",
@@ -16,7 +16,7 @@
     },
     {
       "id": "data-readiness",
-      "route": "dataflow-reconciliation.html",
+      "route": "/data-readiness",
       "waitFor": "[data-rec-cell]",
       "title": "Data Readiness",
       "sub": "Cross-feed reconciliation with root-cause diagnosis",

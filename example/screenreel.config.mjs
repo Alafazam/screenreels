@@ -1,10 +1,10 @@
-// Example config: capture the Increff MS prototype (this repo) with screenreel.
-// Doubles as the package's end-to-end verification harness — it exercises the
-// injected director against an app WITHOUT any app-side capture hook.
-// Prereq: node app/server.js running on :8080 (dev auth) from
-// ui/increff-merchandising-system/.
+// Example config: a two-scene reel captured against your own running web app.
+// Shows the shape of a real config — the injected director drives the journey
+// with NO app-side capture hook required.
+// Point baseUrl at your dev server and set the scene routes in scenes.json to
+// real paths in your app; the selectors below are placeholders to replace.
 export default {
-  baseUrl: 'http://127.0.0.1:8080',
+  baseUrl: 'http://localhost:3000',
   scenes: './scenes.json',
 
   out: {
@@ -19,13 +19,14 @@ export default {
   videoSize: { w: 1920, h: 1080 },
 
   titleCards: {
-    open: { title: 'Dataflow Studio', sub: 'Captured with screenreel - zero app integration' },
+    open: { title: 'Your App', sub: 'Captured with screenreel - zero app integration' },
     perScene: true,
     durS: 2.2,
     openDurS: 2.6,
     bg: '0x0F172A',
   },
 
+  // Authenticate once per run — adjust the route and selectors to your app.
   async login(page, config) {
     await page.goto(config.baseUrl + '/login');
     await page.fill('input[name="username"]', 'demo');
@@ -33,6 +34,6 @@ export default {
     await page.waitForLoadState('networkidle');
   },
 
-  // Pin the light theme, same as the trailer rig does.
-  initScript: `try { localStorage.setItem('ms_theme', 'light'); } catch (e) {}`,
+  // Pin state before app scripts run (e.g. force a stable theme).
+  initScript: `try { localStorage.setItem('theme', 'light'); } catch (e) {}`,
 };
