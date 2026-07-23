@@ -2,6 +2,8 @@
 
 Author one scripted product journey, present it live inside the product, and capture the same flow as polished video.
 
+[Open the live ScreenReel demo](https://alafazam.com/screenreels/)
+
 ScreenReel contains two independent products backed by one action runtime:
 
 - **Projector + Studio** — a self-hosted browser integration for live demos, presenter notes, and browser-local authoring.
@@ -104,7 +106,7 @@ These commands return stable machine-readable scene, action, selector, match, er
 Install from GitHub or a local tarball, then scaffold a capture configuration:
 
 ```bash
-npm install --save-dev "git+ssh://git@github.com/Alafazam/screenReels.git"
+npm install --save-dev "git+ssh://git@github.com/Alafazam/screenreels.git"
 npx screenreel init
 ```
 

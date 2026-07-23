@@ -11,12 +11,13 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
     "release:prepare": "node scripts/release.mjs",
     "test": "node --test",
     "test:browser": "node scripts/browser-smoke.mjs",
     "example:serve": "node scripts/serve-example.mjs",
-    "example:validate": "node bin/screenreel.mjs flow validate --flow examples/action-showcase/screenreel.demo.json --base-url http://127.0.0.1:4173 --json",
-    "example:test": "node bin/screenreel.mjs flow test --flow examples/action-showcase/screenreel.demo.json --scene action-tour --base-url http://127.0.0.1:4173 --screenshots screenreel-output/test --json",
+    "example:validate": "node bin/screenreel.mjs flow validate --flow examples/action-showcase/screenreel.demo.json --base-url http://127.0.0.1:4173/examples/action-showcase/ --json",
+    "example:test": "node bin/screenreel.mjs flow test --flow examples/action-showcase/screenreel.demo.json --scene action-tour --base-url http://127.0.0.1:4173/examples/action-showcase/ --screenshots screenreel-output/test --json",
     "example:capture": "node bin/screenreel.mjs record --config examples/action-showcase/screenreel.config.mjs"
   },
   "files": [
@@ -35,12 +36,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Alafazam/screenReels.git"
+    "url": "git+https://github.com/Alafazam/screenreels.git"
   },
   "bugs": {
-    "url": "https://github.com/Alafazam/screenReels/issues"
+    "url": "https://github.com/Alafazam/screenreels/issues"
   },
-  "homepage": "https://github.com/Alafazam/screenReels#readme",
+  "homepage": "https://alafazam.com/screenreels/",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",

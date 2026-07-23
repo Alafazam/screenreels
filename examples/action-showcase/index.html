@@ -1,26 +1,152 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ScreenReel Action Showcase</title><link rel="icon" href="data:,">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ScreenReel — Live product demos from one reusable flow</title>
+  <meta name="description" content="Author one deterministic product flow, present it live with Projector, refine it in Studio, and capture it as polished video.">
+  <link rel="canonical" href="https://alafazam.com/screenreels/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ScreenReel — One flow for live demos and polished video">
+  <meta property="og:description" content="Build repeatable product demos with Projector, Studio, and Capture.">
+  <meta property="og:url" content="https://alafazam.com/screenreels/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ScreenReel — One flow for live demos and polished video">
+  <meta name="twitter:description" content="Build repeatable product demos with Projector, Studio, and Capture.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="index.html"><span>Screen</span>Reel Playground</a><nav><a href="#kpis">Overview</a><a href="#form">Controls</a><a href="#viewport">Viewport</a></nav><screenreel-projector project-id="action-showcase" flow-src="screenreel.demo.json"></screenreel-projector></header>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="ScreenReel home"><span class="brand-mark" aria-hidden="true">S</span>ScreenReel</a>
+    <nav aria-label="Primary navigation">
+      <a href="#why">Why</a>
+      <a href="#how">How it works</a>
+      <a href="#live-demo">Live demo</a>
+      <a href="https://github.com/Alafazam/screenreels">GitHub</a>
+    </nav>
+    <a class="header-cta" href="#live-demo">Explore demo</a>
+  </header>
+
   <main>
-    <section class="hero"><div><p class="eyebrow">Interactive demo toolkit</p><h1>Every ScreenReel action,<br>on one test surface.</h1><p>Use the projector to play the canonical flow or open Studio and author your own local copy.</p><button class="primary" data-action="show-message">Show a result</button></div><aside class="hero-card" data-demo-id="hero-card"><span>Shared runtime</span><strong id="hero-result">Ready for Projector or Capture</strong><div class="mini-chart"><i></i><i></i><i></i><i></i><i></i></div></aside></section>
-    <section id="kpis" class="section"><div class="section-head"><div><p class="eyebrow">Emphasis</p><h2>Nested KPI cards</h2></div><p>Pick the value, label, chart, or whitespace. Visual picking should resolve to the card.</p></div><div class="kpi-grid" data-panel="kpi-panel">
-      <article class="kpi-card" data-kpi="revenue"><span>Revenue</span><strong>$2.84M</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
-      <article class="kpi-card" data-kpi="margin"><span>Gross margin</span><strong>42.6%</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
-      <article class="kpi-card" data-kpi="sellthrough"><span>Sell-through</span><strong>68.1%</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
-      <article class="kpi-card" data-kpi="stock"><span>Weeks of stock</span><strong>7.4</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
-    </div></section>
-    <section id="form" class="section split"><div><p class="eyebrow">Interaction</p><h2>Controls and inputs</h2><p>Click, hover, focus, type, set, toggle, and move a range input.</p></div><form class="control-card" onsubmit="return false"><label>Name<input id="customer-name" placeholder="Type a customer name"></label><label>Region<select id="region"><option>North</option><option>South</option><option>West</option></select></label><label class="switch-row"><input id="priority" type="checkbox"><span>Priority account</span></label><label>Confidence <output id="confidence-output">45%</output><input id="confidence" type="range" min="0" max="100" value="45"></label><button id="submit-control" class="primary">Apply controls</button></form></section>
-    <section class="section"><div class="section-head"><div><p class="eyebrow">Drag and pointer</p><h2>Move work between stages</h2></div></div><div class="board"><div class="column"><h3>Backlog</h3><button class="work-card" data-demo-id="drag-source">Review assortment</button><button class="port" id="pointer-target" aria-label="Pointer target"></button></div><div class="column" data-demo-id="drag-destination"><h3>In review</h3><p>Drop work here</p></div></div></section>
-    <section id="viewport" class="section"><div class="section-head"><div><p class="eyebrow">Viewport and timing</p><h2>Scrollable activity</h2></div><button data-action="reveal-delayed">Reveal delayed target</button></div><div class="activity-scroll" id="activity-scroll">
-      <div class="activity"><b>09:00</b><span>Forecast imported</span></div><div class="activity"><b>09:12</b><span>Planner opened review</span></div><div class="activity"><b>09:20</b><span>Rules evaluated</span></div><div class="activity"><b>09:34</b><span>Exceptions grouped</span></div><div class="activity"><b>09:45</b><span>Approval requested</span></div><div class="activity"><b>10:02</b><span>Plan published</span></div><div id="delayed-target" class="delayed" hidden>Delayed state is now visible</div>
-    </div></section>
-    <section class="section final-card" data-demo-id="final-card"><p class="eyebrow">Navigation</p><h2>Continue to a second route</h2><p>The final scene verifies local navigation and cross-page playback state.</p><a class="primary link" data-action="destination" href="destination.html?from=showcase">Open destination</a></section>
-  </main><div id="toast" class="toast" hidden></div>
-  <script src="app.js"></script><script src="../../dist/projector/screenreel.js" defer></script>
-</body></html>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Open-source product demo toolkit</p>
+        <h1>One product flow.<br><span>Live demo, editable walkthrough, polished video.</span></h1>
+        <p class="hero-lede">Author a repeatable journey once. Present it with Projector, refine it locally in Studio, and capture the same flow for launch videos and walkthroughs.</p>
+        <div class="hero-actions">
+          <button id="demo-button" class="primary demo-cta" type="button">
+            <span>Open live demo</span>
+            <span aria-hidden="true">→</span>
+          </button>
+          <a class="secondary link" href="https://github.com/Alafazam/screenreels">View on GitHub</a>
+        </div>
+        <p class="hero-hint">No account or cloud service required. Press Play in the controls to run the tour.</p>
+      </div>
+      <aside class="hero-card" data-demo-id="hero-card" aria-label="ScreenReel workflow preview">
+        <div class="window-bar"><span></span><span></span><span></span><small>screenreel.demo.json</small></div>
+        <div class="flow-preview">
+          <div class="flow-row"><span class="flow-index">01</span><div><strong>Highlight the story</strong><small>Projector focuses the right card</small></div><span class="status">Ready</span></div>
+          <div class="flow-line"></div>
+          <div class="flow-row"><span class="flow-index">02</span><div><strong>Interact with the UI</strong><small>Type, scroll, toggle, and drag</small></div><span class="status">Ready</span></div>
+          <div class="flow-line"></div>
+          <div class="flow-row"><span class="flow-index">03</span><div><strong>Capture and share</strong><small>The same flow becomes video</small></div><span class="status accent">Export</span></div>
+        </div>
+        <div class="preview-result"><span>Shared runtime</span><strong id="hero-result">Ready for Projector or Capture</strong></div>
+      </aside>
+    </section>
+
+    <section class="proof-strip" aria-label="ScreenReel capabilities">
+      <p>One deterministic source of truth</p><span></span><p>Browser-local authoring</p><span></span><p>Framework independent</p><span></span><p>Capture ready</p>
+    </section>
+
+    <section id="why" class="section why-section">
+      <div class="section-intro">
+        <p class="eyebrow">Why we built it</p>
+        <h2>Demos should not drift every time the product changes.</h2>
+      </div>
+      <div class="why-copy">
+        <p>Live walkthroughs are hard to repeat. Recorded videos go stale. Automation scripts are rarely presenter-friendly.</p>
+        <p>ScreenReel keeps the product journey in one readable flow so teams can present it, edit it, test it, and record it without rebuilding the story for each format.</p>
+      </div>
+    </section>
+
+    <section class="section capabilities">
+      <div class="section-head">
+        <div><p class="eyebrow">Three connected tools</p><h2>From walkthrough to recording.</h2></div>
+        <p>Each surface uses the same scenes, selectors, actions, and presenter notes.</p>
+      </div>
+      <div class="capability-grid">
+        <article class="capability-card"><span class="capability-number">01</span><h3>Projector</h3><p>Run an uninterrupted live demo with highlights, controls, scrolling, and presenter notes.</p><small>Present confidently</small></article>
+        <article class="capability-card"><span class="capability-number">02</span><h3>Studio</h3><p>Duplicate a flow, reorder scenes, pick targets visually, and save a personal version locally.</p><small>Author without a backend</small></article>
+        <article class="capability-card"><span class="capability-number">03</span><h3>Capture</h3><p>Replay the exact flow in Chrome and assemble clean, repeatable video from selected scenes.</p><small>Record the same story</small></article>
+      </div>
+    </section>
+
+    <section id="how" class="section how-section">
+      <div class="section-head">
+        <div><p class="eyebrow">How it works</p><h2>A small contract, not another platform.</h2></div>
+      </div>
+      <div class="steps">
+        <article><span>1</span><div><h3>Author the flow</h3><p>Describe routes, stable selectors, actions, timing, and talking points in JSON.</p></div></article>
+        <article><span>2</span><div><h3>Present and refine</h3><p>Mount Projector in the product and use Studio to shape a personal walkthrough.</p></div></article>
+        <article><span>3</span><div><h3>Capture and share</h3><p>Use the CLI to validate targets, replay scenes, and render the product story.</p></div></article>
+      </div>
+      <div class="install-card">
+        <div><p class="eyebrow">Install from GitHub</p><h3>Start with the same flow in your app.</h3></div>
+        <code>npm install --save-dev "git+https://github.com/Alafazam/screenreels.git"</code>
+      </div>
+    </section>
+
+    <section id="live-demo" class="section demo-section">
+      <div class="demo-heading">
+        <div><p class="eyebrow">Live demo</p><h2>Watch the runtime operate a real page.</h2><p>Open the controls above and press Play. ScreenReel will highlight these cards, scroll the page, change the form, reveal delayed state, and continue onto a second page.</p></div>
+        <button class="secondary replay-demo" type="button" data-action="open-demo">Open demo controls</button>
+      </div>
+
+      <div id="kpis" class="demo-block">
+        <div class="block-head"><div><span>Scene 1</span><h3>Highlight product context</h3></div><p>Target a card, a nested value, or a sequence while the audience keeps its bearings.</p></div>
+        <div class="kpi-grid" data-panel="kpi-panel">
+          <article class="kpi-card" data-kpi="revenue"><span>Revenue</span><strong>$2.84M</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+          <article class="kpi-card" data-kpi="margin"><span>Gross margin</span><strong>42.6%</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+          <article class="kpi-card" data-kpi="sellthrough"><span>Sell-through</span><strong>68.1%</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+          <article class="kpi-card" data-kpi="stock"><span>Weeks of stock</span><strong>7.4</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+        </div>
+      </div>
+
+      <div id="form" class="demo-block split">
+        <div class="block-copy"><span>Scene 2</span><h3>Work with real controls</h3><p>Click, hover, focus, type, set, toggle, move a range input, and drag work between stages.</p></div>
+        <form class="control-card" onsubmit="return false">
+          <label>Name<input id="customer-name" placeholder="Type a customer name"></label>
+          <label>Region<select id="region"><option>North</option><option>South</option><option>West</option></select></label>
+          <label class="switch-row"><input id="priority" type="checkbox"><span>Priority account</span></label>
+          <label>Confidence <output id="confidence-output">45%</output><input id="confidence" type="range" min="0" max="100" value="45"></label>
+          <button id="submit-control" class="primary" type="button">Apply controls</button>
+        </form>
+        <div class="board">
+          <div class="column"><h4>Backlog</h4><button class="work-card" data-demo-id="drag-source" type="button">Review assortment</button><button class="port" id="pointer-target" aria-label="Pointer target" type="button"></button></div>
+          <div class="column" data-demo-id="drag-destination"><h4>In review</h4><p>Drop work here</p></div>
+        </div>
+      </div>
+
+      <div id="viewport" class="demo-block">
+        <div class="block-head"><div><span>Scene 3</span><h3>Control viewport and timing</h3></div><button class="secondary" type="button" data-action="reveal-delayed">Reveal delayed target</button></div>
+        <div class="activity-scroll" id="activity-scroll">
+          <div class="activity"><b>09:00</b><span>Forecast imported</span></div><div class="activity"><b>09:12</b><span>Planner opened review</span></div><div class="activity"><b>09:20</b><span>Rules evaluated</span></div><div class="activity"><b>09:34</b><span>Exceptions grouped</span></div><div class="activity"><b>09:45</b><span>Approval requested</span></div><div class="activity"><b>10:02</b><span>Plan published</span></div><div id="delayed-target" class="delayed" hidden>Delayed state is now visible</div>
+        </div>
+      </div>
+
+      <div class="demo-block final-card" data-demo-id="final-card">
+        <div><span>Scene 4</span><h3>Continue across routes</h3><p>The active flow and presenter state survive a full-page navigation.</p></div>
+        <a class="primary link" data-action="destination" href="destination.html?from=showcase">Open destination <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer><div><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">S</span>ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="https://github.com/Alafazam/screenreels">GitHub</a><a href="https://alafazam.com/">Made by Alafazam</a></nav></footer>
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+  <script src="../../dist/projector/screenreel.js" defer></script>
+</body>
+</html>

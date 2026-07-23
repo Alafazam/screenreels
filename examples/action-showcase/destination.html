@@ -1,1 +1,9 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScreenReel Destination</title><link rel="icon" href="data:,"><link rel="stylesheet" href="styles.css"></head><body><header class="topbar"><a class="brand" href="index.html"><span>Screen</span>Reel Playground</a><screenreel-projector project-id="action-showcase" flow-src="screenreel.demo.json"></screenreel-projector></header><main><section class="destination" data-demo-id="destination-card"><p class="eyebrow">Navigation complete</p><h1>The same flow continued across pages.</h1><p>Projector position and playback state are stored in the project-scoped session namespace.</p><a class="primary link" href="index.html">Return to showcase</a></section></main><script src="../../dist/projector/screenreel.js" defer></script></body></html>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Navigation complete — ScreenReel</title><meta name="theme-color" content="#ffffff"><link rel="icon" href="data:,"><link rel="stylesheet" href="styles.css"></head>
+<body>
+  <header class="topbar"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">S</span>ScreenReel</a><button id="demo-button" class="header-cta" type="button">Demo controls</button></header>
+  <main><section class="destination" data-demo-id="destination-card"><p class="eyebrow">Navigation complete</p><h1>The same flow continued across pages.</h1><p>Projector position and playback state stayed in the project-scoped session namespace while the browser moved to a new document.</p><a class="primary link" href="./">Return to ScreenReel</a></section></main>
+  <script src="../../dist/projector/screenreel.js"></script><script>ScreenReel.ready.then(function(api){return api.mount(document.getElementById('demo-button'),{projectId:'action-showcase',flow:{src:'screenreel.demo.json'}});});</script>
+</body>
+</html>

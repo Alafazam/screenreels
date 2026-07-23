@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core';
 import { resolveChrome } from '../lib/config.mjs';
 
 const baseUrl = process.env.SCREENREEL_EXAMPLE_URL || 'http://127.0.0.1:4173/examples/action-showcase/';
-const output = path.resolve('./screenreel-output/browser-smoke'); fs.mkdirSync(output, { recursive: true });
+const output = path.resolve('./screenreel-output/browser-smoke'); fs.rmSync(output, { recursive: true, force: true }); fs.mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: resolveChrome(), args: ['--hide-scrollbars'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 async function visiblePill(targetPage) {
@@ -21,8 +21,9 @@ try {
   page.on('response', (response) => { if (response.status() >= 400) console.error('[response]', response.status(), response.url()); });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }); await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => !!customElements.get('screenreel-projector'));
-  const trigger = page.locator('screenreel-projector').locator('button[aria-label="Toggle ScreenReel demo"]'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); await trigger.click();
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
+  assert.equal(await page.locator('h1').innerText(), 'One product flow.\nLive demo, editable walkthrough, polished video.');
+  const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
   await page.locator('button[title="Presenter notes"]').click(); assert.match(await page.locator('body').evaluate((node) => node.style.paddingBottom), /clamp/);
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
@@ -65,6 +66,7 @@ try {
   await spaPage.locator('button[title="Next scene"]').click(); await spaPage.waitForURL(/view=details/); await spaPage.locator('.sr-action-callout').waitFor({ state: 'visible', timeout: 5000 });
   assert.match(spaPage.url(), /view=details/); await spaPage.locator('button[title="Pause"]').click(); await spaPage.close();
   const inlinePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await inlinePage.goto(new URL('../inline-flow/', baseUrl).href, { waitUntil: 'domcontentloaded' }); const inlineTrigger = inlinePage.locator('#demo-button'); await inlineTrigger.waitFor(); await inlineTrigger.click(); const inlinePill = await visiblePill(inlinePage); assert.equal(await inlinePill.count(), 1); await inlinePage.close();
-  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('screenreel-projector').locator('button[aria-label="Toggle ScreenReel demo"]'); await darkTrigger.waitFor(); await darkTrigger.click(); await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(9, 9, 11)'); await darkPage.screenshot({ path: path.join(output, 'projector-dark-1440x900.png') }); await darkContext.close();
+  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } }); await mobilePage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await mobilePage.locator('#demo-button').waitFor(); assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true); await mobilePage.screenshot({ path: path.join(output, 'landing-mobile-390x844.png'), fullPage: true }); await mobilePage.close();
   console.log(JSON.stringify({ ok: true, screenshots: fs.readdirSync(output).map((name) => path.join(output, name)) }, null, 2));
 } finally { await browser.close(); }
