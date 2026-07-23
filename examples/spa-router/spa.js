@@ -1,0 +1,5 @@
+const app = document.getElementById('app'); const listeners = new Set();
+function route() { const view = new URLSearchParams(location.search).get('view') || 'overview'; app.innerHTML = `<section class="destination" data-demo-id="spa-view"><p class="eyebrow">History API adapter</p><h1>${view === 'details' ? 'Details view' : 'Overview view'}</h1><p>The host application renders this route without reloading the document.</p></section>`; listeners.forEach((listener) => listener()); }
+function navigate(value) { history.pushState({}, '', value); route(); }
+document.querySelectorAll('[data-route]').forEach((link) => link.onclick = (event) => { event.preventDefault(); navigate(link.href); }); addEventListener('popstate', route); route();
+const manifest = JSON.parse(document.getElementById('flow').textContent); await ScreenReel.ready; await ScreenReel.mount(document.getElementById('demo-button'), { projectId: 'spa-example', flow: { data: manifest }, router: { getRoute: () => `${location.pathname}${location.search}`, navigate, subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); } } });

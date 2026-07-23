@@ -1,14 +1,31 @@
 {
   "name": "screenreel",
-  "version": "0.1.0",
-  "description": "Record scripted user journeys of any running web app as a stitched demo video. Playwright CDP screencast + ffmpeg — zero integration required in the target app.",
+  "version": "0.2.0",
+  "description": "Author and present interactive product demos, then capture the same flows as polished video.",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "screenreel": "bin/screenreel.mjs"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "release:prepare": "node scripts/release.mjs",
+    "test": "node --test",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "example:serve": "node scripts/serve-example.mjs",
+    "example:validate": "node bin/screenreel.mjs flow validate --flow examples/action-showcase/screenreel.demo.json --base-url http://127.0.0.1:4173 --json",
+    "example:test": "node bin/screenreel.mjs flow test --flow examples/action-showcase/screenreel.demo.json --scene action-tour --base-url http://127.0.0.1:4173 --screenshots screenreel-output/test --json",
+    "example:capture": "node bin/screenreel.mjs record --config examples/action-showcase/screenreel.config.mjs"
   },
   "files": [
     "bin/",
     "lib/",
+    "packages/",
+    "dist/",
+    "scripts/",
+    "examples/",
     "templates/",
     "skills/",
     "README.md"
@@ -31,6 +48,8 @@
   },
   "keywords": [
     "demo",
+    "interactive-demo",
+    "demo-studio",
     "screen-recording",
     "playwright",
     "product-video",

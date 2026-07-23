@@ -1,0 +1,4 @@
+interface:
+  display_name: "ScreenReel Capture"
+  short_description: "Record scripted product journeys as video"
+  default_prompt: "Use $screenreel-capture to record and verify a polished demo video."

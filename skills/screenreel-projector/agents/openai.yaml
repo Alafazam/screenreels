@@ -1,0 +1,4 @@
+interface:
+  display_name: "ScreenReel Projector"
+  short_description: "Embed and author interactive product demos"
+  default_prompt: "Use $screenreel-projector to add and validate an interactive demo in this application."

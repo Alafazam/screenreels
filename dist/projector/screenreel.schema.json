@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScreenReel Manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "flows"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/flow"
+      }
+    }
+  },
+  "$defs": {
+    "flow": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "scenes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "defaults": {
+          "type": "object"
+        },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scene"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "scene": {
+      "type": "object",
+      "required": [
+        "id",
+        "route",
+        "actions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "route": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "talkingPoints": {
+          "type": "string"
+        },
+        "dwellMs": {
+          "type": "number"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "highlight",
+            "glow",
+            "spotlight",
+            "callout",
+            "click",
+            "hover",
+            "focus",
+            "type",
+            "set",
+            "toggle",
+            "lever",
+            "drag",
+            "scrollIntoView",
+            "scroll",
+            "wait",
+            "waitFor",
+            "goto",
+            "pointer",
+            "call",
+            "fill"
+          ]
+        },
+        "selector": {
+          "type": "string"
+        },
+        "afterMs": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

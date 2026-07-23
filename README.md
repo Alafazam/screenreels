@@ -1,95 +1,167 @@
-# screenreel
+# ScreenReel
 
-Record scripted user journeys of any running web app as a stitched demo video — a visible cursor performs clicks, highlights and agent moments on camera; every journey becomes an exact-seekable clip; title cards + one final MP4 come out the other end.
+Author one scripted product journey, present it live inside the product, and capture the same flow as polished video.
 
-Extracted from the ms-planning-brain trailer capture rig (`ui/increff-merchandising-system/trailer/scripts/capture-live.mjs`), inverted so the **target app needs zero integration**: screenreel injects the cursor, the action director, and the scene data through Playwright. The app only needs reachable routes and stable selectors.
+ScreenReel contains two independent products backed by one action runtime:
 
-**No HyperFrames required.** The stack is playwright-core + ffmpeg (both npm deps; ffmpeg binaries included). Clips are all-intra CFR H.264, so they stay compatible with HyperFrames or any editor if you later want a cinematic cut with music and camera moves.
+- **Projector + Studio** — a self-hosted browser integration for live demos, presenter notes, and browser-local authoring.
+- **Capture** — a Playwright/FFmpeg CLI that records the same scenes as exact-seekable H.264 clips and a stitched MP4.
 
-## Install
+No backend, account, analytics service, or model provider is required.
 
-Requires Node ≥ 20 and a local Chrome (or `CHROME_PATH` → any Chromium).
+## Projector quick start
 
-```bash
-# Straight from git (recommended — no tarball to manage):
-npm i -D "git+ssh://git@github.com/Alafazam/screenReels.git"
-
-# Or build a tarball from a checkout of this repo:
-npm pack                               # → screenreel-0.1.0.tgz
-npm i -D /path/to/screenreel-0.1.0.tgz # in any project
-```
-
-## Quickstart
+Build and copy the browser distribution into your application:
 
 ```bash
-npx screenreel init        # scaffolds screenreel.config.mjs + screenreel.scenes.json
-# 1. edit the config: baseUrl, login hook, title cards
-# 2. author scenes (see skills/screenreel/references/actions.md)
-# 3. start your app's dev server
-npx screenreel record      # capture all scenes + stitch the reel
+npm run build
+node bin/screenreel.mjs projector install --out /path/to/app/public/vendor/screenreel
 ```
 
-Outputs: `screenreel-output/clips/<scene>.mp4` per scene, `screenreel-output/reel.mp4` stitched.
+Add one script and the provided custom element:
 
-Partial workflow: `npx screenreel capture scene-a` re-captures one scene; `npx screenreel assemble` re-stitches from existing clips.
+```html
+<script src="/vendor/screenreel/screenreel.js" defer></script>
 
-## Configuration — `screenreel.config.mjs`
+<screenreel-projector
+  project-id="acme-sales"
+  flow-src="/demos/sales-demo.json">
+</screenreel-projector>
+```
 
-| Key | Default | Meaning |
-|---|---|---|
-| `baseUrl` | `http://localhost:3000` | Where the app runs — start it yourself before capturing |
-| `scenes` | `./screenreel.scenes.json` | The journeys file (relative to the config) |
-| `out.clips` / `out.video` / `out.tmp` | `./screenreel-output/…` | Outputs |
-| `viewport` / `deviceScaleFactor` | 1920×1080 @ 2× | Capture at 2×, encode smaller → crisp text |
-| `fps` / `videoSize` | 30 / 1920×1080 | Output timing and size |
-| `titleCards` | open + per-scene | `{ open: {title, sub}, perScene, durS, openDurS, bg, titleColor, subColor }` |
-| `font` | platform default | Absolute path to .ttf/.ttc for title cards (macOS Helvetica / Linux DejaVu found automatically) |
-| `login(page, config)` | — | Authenticate once per run (async Playwright page hook) |
-| `prepare(context)` | — | Context setup: route shims for blocked CDNs, etc. |
-| `initScript` | `''` | JS injected before app scripts on every page (pin theme/state) |
+Or attach ScreenReel to an existing application button:
 
-## Scenes — `screenreel.scenes.json`
+```js
+await ScreenReel.ready;
 
-One scene = one journey = one clip. Scene fields: `id`, `route`, `waitFor`, `settleMs`, `leadInMs`, `tailMs`, `endsInNavigation`, `title`/`sub` (title card), `actions[]`.
+const projector = await ScreenReel.mount(document.querySelector('#demo-button'), {
+  projectId: 'acme-sales',
+  flow: { src: '/demos/sales-demo.json' }
+});
+```
 
-Action vocabulary: `wait · click · hover · fill · glow · scroll · scrollIntoView · drag · pointer · lever · set · call · goto` — full schema and a worked example in [skills/screenreel/references/actions.md](skills/screenreel/references/actions.md).
+Projector provides flow selection, play/pause, previous/next, presenter notes, Capture Current Page, Studio, and Exit. Studio is a lazy-loaded full-screen overlay; personal flows stay in project-scoped local storage.
 
-The `call` action invokes a page-global function with the cursor first travelling to a UI element (`cursorTo`) — the cleanest way to stage agent/AI demo moments deterministically.
+## Flow format
 
-## What to take care of (the craft)
+```json
+{
+  "schemaVersion": 1,
+  "flows": [{
+    "id": "sales",
+    "name": "Sales walkthrough",
+    "scenes": [{
+      "id": "overview",
+      "enabled": true,
+      "route": "/dashboard?team=sales",
+      "title": "Start with the outcome",
+      "talkingPoints": "Explain what changed and why it matters.",
+      "dwellMs": 5000,
+      "actions": [
+        { "type": "glow", "selector": ".kpi-card", "sequence": true, "count": 4 },
+        { "type": "click", "selector": "[data-action=\"open-review\"]" }
+      ]
+    }]
+  }]
+}
+```
 
-The short version — the full reasoning lives in [skills/screenreel-video-craft/SKILL.md](skills/screenreel-video-craft/SKILL.md):
+Projector accepts a same-origin or CORS-enabled JSON URL, an inline object through `ScreenReel.mount`, or JSON stored in a `<script type="application/json">` referenced with `flow-data`.
 
-1. **Determinism**: fixture-driven screens, no `Date.now()`/randomness/live APIs; scenes idempotent across reloads; theme pinned.
-2. **One money moment per scene**, 8–20s, structured orient → act → land (`leadInMs` / actions / `tailMs`).
-3. **The cursor and toasts are the narration** — nothing happens "by magic"; route programmatic triggers through `call` + `cursorTo`; make sure the app acknowledges important actions visibly.
-4. **Stable selectors**: `data-action`/`data-*` attributes, never styling classes; add them to the app if missing.
-5. **Verify frames, not exit codes**: extract mid-action frames with ffmpeg and look at them before calling it done.
+Legacy `{ defaults, scenes }`, Increff-style `{ version, steps }`, `fill`, and existing Capture actions remain supported.
 
-## Claude skills
+## SPA routing
 
-`skills/` ships two agent skills. Copy them into a project's `.claude/skills/` (or your user skills directory) so Claude picks them up:
+MPAs work without an adapter. SPAs supply three small hooks:
 
-- **screenreel** — the end-to-end workflow: install → init → author scenes → record → verify.
-- **screenreel-video-craft** — the authoring craft above, in enforceable detail.
+```js
+ScreenReel.mount(button, {
+  projectId: 'sales-spa',
+  flow: { data: manifest },
+  router: {
+    getRoute: () => router.currentUrl,
+    navigate: (route) => router.navigate(route),
+    subscribe: (listener) => router.onChange(listener)
+  }
+});
+```
 
-## Relationship to the trailer rig
+See `examples/spa-router/` for a dependency-free History API implementation.
 
-The original rig (`trailer/scripts/capture-live.mjs` + the prototype's in-app `demo-director.js`) stays untouched — it also powers the in-app `?demo=1` guided tour, which screenreel deliberately does not include. Screenreel is the portable, injection-based extraction of the capture path only. The two share the action vocabulary, so scenes port between them with minimal edits (screenreel scenes carry `leadInMs`/`tailMs`/`title` inline instead of a separate scene map).
-
-## Develop
+## Agent-friendly flow commands
 
 ```bash
-git clone git@github.com:Alafazam/screenReels.git
-cd screenReels
-npm install          # installs playwright-core + bundled ffmpeg/ffprobe
-node bin/screenreel.mjs --help
+screenreel flow inspect --base-url http://localhost:3000 --route /dashboard --json
+screenreel flow validate --flow demos/sales.json --base-url http://localhost:3000 --json
+screenreel flow test --flow demos/sales.json --scene overview --base-url http://localhost:3000 --screenshots ./checks --json
+screenreel flow migrate --input legacy.json --output screenreel.demo.json --json
 ```
 
-Layout: `bin/` CLI entry · `lib/` capture + assemble + config loaders · `lib/inject/` the cursor and director injected into the target page · `templates/` files `init` scaffolds · `skills/` the two Claude skills · `example/` a runnable config + scenes that double as the end-to-end verification harness.
+These commands return stable machine-readable scene, action, selector, match, error, and screenshot data. They do not upload DOM or product data.
 
-Generated artifacts (`node_modules/`, `screenreel-output/`, `.capture-tmp/`, `*.tgz`) are git-ignored — don't commit recordings.
+## Capture
+
+Install from GitHub or a local tarball, then scaffold a capture configuration:
+
+```bash
+npm install --save-dev "git+ssh://git@github.com/Alafazam/screenReels.git"
+npx screenreel init
+```
+
+Set `baseUrl`, authentication hooks, output paths, and the shared flow file in `screenreel.config.mjs`. Start the application before recording.
+
+```bash
+npx screenreel record
+npx screenreel capture scene-a scene-b
+npx screenreel assemble
+```
+
+Capture uses local Chrome or `CHROME_PATH`. FFmpeg and ffprobe ship with the source installation. Projector's downloadable browser artifact contains none of these Node dependencies.
+
+## Examples
+
+```bash
+npm run build
+npm run example:serve
+```
+
+Open `http://127.0.0.1:4173/examples/action-showcase/`.
+
+- `action-showcase` exercises every action family, local Studio, Projector, CLI Test, and Capture.
+- `spa-router` demonstrates framework-independent SPA navigation.
+- `inline-flow` demonstrates an existing button and inline data without a build system.
+
+With the example server running:
+
+```bash
+npm run example:validate
+npm run example:test
+npm run example:capture
+```
+
+## Skills and AI enablement
+
+The repository ships an intent router and focused skills for Projector, Capture, and Demo Craft. AI tools operate through local files, the running application, screenshots, and structured CLI output. ScreenReel does not embed an LLM SDK or require API keys.
+
+Studio's **Copy AI context** command copies the current scene, actions, validation failures, and stable targets as JSON for use in Codex, Claude, Cursor, or another assistant.
+
+For an existing demo runtime, pass `legacyStorage` to copy old local/session keys once without deleting them. See `docs-increff-migration.md` for the current Increff adapter contract.
+
+## Local data and security
+
+ScreenReel keys are isolated under `screenreel:{projectId}:...:v1`. Clear Local Data removes only the current project namespace. Canonical flows are immutable; editing creates a personal copy.
+
+Navigation is same-origin by default. Page-function actions accept a named global plus JSON arguments and never evaluate arbitrary JavaScript. Remote flow files require HTTPS and CORS. Studio availability is not an authorization boundary; do not put secrets in demo flows.
+
+## Development
+
+```bash
+npm run build
+npm test
+```
+
+The build generates browser assets, JSON Schema, TypeScript declarations, and skill action references from the shared action registry. See `docs-architecture.md`, `CONTRIBUTING.md`, and `SECURITY.md`.
 
 ## License
 
-[Apache 2.0](LICENSE).
+Apache-2.0. Bundled Lucide icon paths are ISC-licensed; see `NOTICE`.

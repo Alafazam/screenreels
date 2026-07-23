@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { loadConfig, loadScenes } from '../lib/config.mjs';
 import { capture } from '../lib/capture.mjs';
 import { assemble } from '../lib/assemble.mjs';
+import { inspectFlow, validateFlow, testFlow, migrateFlow, installProjector } from '../lib/flow-tools.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -25,6 +26,13 @@ function opt(name, fallback) {
   return i !== -1 && argv[i + 1] ? argv[i + 1] : fallback;
 }
 const positional = argv.slice(1).filter((a, i, arr) => !a.startsWith('--') && arr[i - 1] !== '--config');
+const has = (name) => argv.includes(name);
+const printResult = (result) => {
+  if (has('--json')) console.log(JSON.stringify(result, null, 2));
+  else if (result.ok) console.log('OK', result);
+  else console.error('FAILED', result);
+  if (!result.ok) process.exitCode = 1;
+};
 
 const HELP = `screenreel — scripted user journeys of a running web app → demo video
 
@@ -33,6 +41,11 @@ Usage:
   screenreel capture [ids…] [--config …]   capture scenes as clips
   screenreel assemble [--config …]         stitch clips + title cards into the video
   screenreel record [ids…] [--config …]    capture + assemble
+  screenreel projector install --out <dir> copy self-hosted browser assets
+  screenreel flow inspect --base-url <url> --route <route> [--json]
+  screenreel flow validate --flow <file> --base-url <url> [--json]
+  screenreel flow test --flow <file> --scene <id> --base-url <url> [--screenshots <dir>] [--json]
+  screenreel flow migrate --input <file> --output <file> [--json]
 
 The app under capture must already be running (dev server); set baseUrl,
 login hook and output paths in screenreel.config.mjs.`;
@@ -52,6 +65,19 @@ async function main() {
       console.log(`created: ${dest}`);
     }
     console.log('\nNext: edit both files, start your dev server, then run "screenreel record".');
+    return;
+  }
+
+  if (command === 'projector' && argv[1] === 'install') {
+    printResult(installProjector({ output: opt('--out', './public/vendor/screenreel') })); return;
+  }
+  if (command === 'flow') {
+    const action = argv[1]; const baseUrl = opt('--base-url', 'http://127.0.0.1:3000');
+    if (action === 'inspect') printResult(await inspectFlow({ baseUrl, route: opt('--route', '/') }));
+    else if (action === 'validate') printResult(await validateFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json') }));
+    else if (action === 'test') printResult(await testFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json'), sceneId: opt('--scene'), screenshots: opt('--screenshots') }));
+    else if (action === 'migrate') printResult(migrateFlow({ input: opt('--input'), output: opt('--output', './screenreel.demo.json') }));
+    else throw new Error(`unknown flow command: ${action || '(missing)'}`);
     return;
   }
 

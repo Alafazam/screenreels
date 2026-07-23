@@ -1,0 +1,4 @@
+interface:
+  display_name: "ScreenReel Demo Craft"
+  short_description: "Shape clear interactive and recorded demos"
+  default_prompt: "Use $screenreel-demo-craft to turn this product story into focused demo scenes."

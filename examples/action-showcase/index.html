@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ScreenReel Action Showcase</title><link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="index.html"><span>Screen</span>Reel Playground</a><nav><a href="#kpis">Overview</a><a href="#form">Controls</a><a href="#viewport">Viewport</a></nav><screenreel-projector project-id="action-showcase" flow-src="screenreel.demo.json"></screenreel-projector></header>
+  <main>
+    <section class="hero"><div><p class="eyebrow">Interactive demo toolkit</p><h1>Every ScreenReel action,<br>on one test surface.</h1><p>Use the projector to play the canonical flow or open Studio and author your own local copy.</p><button class="primary" data-action="show-message">Show a result</button></div><aside class="hero-card" data-demo-id="hero-card"><span>Shared runtime</span><strong id="hero-result">Ready for Projector or Capture</strong><div class="mini-chart"><i></i><i></i><i></i><i></i><i></i></div></aside></section>
+    <section id="kpis" class="section"><div class="section-head"><div><p class="eyebrow">Emphasis</p><h2>Nested KPI cards</h2></div><p>Pick the value, label, chart, or whitespace. Visual picking should resolve to the card.</p></div><div class="kpi-grid" data-panel="kpi-panel">
+      <article class="kpi-card" data-kpi="revenue"><span>Revenue</span><strong>$2.84M</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+      <article class="kpi-card" data-kpi="margin"><span>Gross margin</span><strong>42.6%</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+      <article class="kpi-card" data-kpi="sellthrough"><span>Sell-through</span><strong>68.1%</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+      <article class="kpi-card" data-kpi="stock"><span>Weeks of stock</span><strong>7.4</strong><div class="spark"><i></i><i></i><i></i><i></i></div></article>
+    </div></section>
+    <section id="form" class="section split"><div><p class="eyebrow">Interaction</p><h2>Controls and inputs</h2><p>Click, hover, focus, type, set, toggle, and move a range input.</p></div><form class="control-card" onsubmit="return false"><label>Name<input id="customer-name" placeholder="Type a customer name"></label><label>Region<select id="region"><option>North</option><option>South</option><option>West</option></select></label><label class="switch-row"><input id="priority" type="checkbox"><span>Priority account</span></label><label>Confidence <output id="confidence-output">45%</output><input id="confidence" type="range" min="0" max="100" value="45"></label><button id="submit-control" class="primary">Apply controls</button></form></section>
+    <section class="section"><div class="section-head"><div><p class="eyebrow">Drag and pointer</p><h2>Move work between stages</h2></div></div><div class="board"><div class="column"><h3>Backlog</h3><button class="work-card" data-demo-id="drag-source">Review assortment</button><button class="port" id="pointer-target" aria-label="Pointer target"></button></div><div class="column" data-demo-id="drag-destination"><h3>In review</h3><p>Drop work here</p></div></div></section>
+    <section id="viewport" class="section"><div class="section-head"><div><p class="eyebrow">Viewport and timing</p><h2>Scrollable activity</h2></div><button data-action="reveal-delayed">Reveal delayed target</button></div><div class="activity-scroll" id="activity-scroll">
+      <div class="activity"><b>09:00</b><span>Forecast imported</span></div><div class="activity"><b>09:12</b><span>Planner opened review</span></div><div class="activity"><b>09:20</b><span>Rules evaluated</span></div><div class="activity"><b>09:34</b><span>Exceptions grouped</span></div><div class="activity"><b>09:45</b><span>Approval requested</span></div><div class="activity"><b>10:02</b><span>Plan published</span></div><div id="delayed-target" class="delayed" hidden>Delayed state is now visible</div>
+    </div></section>
+    <section class="section final-card" data-demo-id="final-card"><p class="eyebrow">Navigation</p><h2>Continue to a second route</h2><p>The final scene verifies local navigation and cross-page playback state.</p><a class="primary link" data-action="destination" href="destination.html?from=showcase">Open destination</a></section>
+  </main><div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script><script src="../../dist/projector/screenreel.js" defer></script>
+</body></html>
