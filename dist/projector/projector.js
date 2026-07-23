@@ -118,9 +118,11 @@ class Projector {
     }
     if (scene.settleMs && generation === this.playGeneration && this.store.playing()) await window.ScreenReelCore.sleep(Number(scene.settleMs), this.controller.signal);
     if (generation !== this.playGeneration || !this.store.playing()) return;
+    const { position: sceneIndex } = this.current();
     for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
       const action = scene.actions[actionIndex];
       if (generation !== this.playGeneration || !this.store.playing()) break;
+      event('step', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, sceneIndex, sceneTitle: scene.title, actionIndex, total: (scene.actions || []).length, action });
       let navigationSameDocument = false; let priorPosition = null;
       const result = await window.ScreenReelCore.runAction(action, {
         document, window, signal: this.controller.signal, resolveFunction: (name) => functions.get(name),
@@ -130,6 +132,7 @@ class Projector {
           if (position >= scenes.length - 1 && this.options.loop === false) this.complete(); else this.advancePosition();
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
+        announce: (message) => this.toast(message),
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
       if (result.navigated) {

@@ -16,8 +16,8 @@ class MemoryStorage {
   removeItem(key) { this.values.delete(key); }
 }
 
-test('registry exposes 20 catalog entries, recipes, and legacy aliases', () => {
-  assert.equal(ScreenReelCore.definitions.length, 20); assert.equal(ScreenReelCore.recipes.length, 6); assert.equal(ScreenReelCore.actionType({ type: 'fill' }), 'type'); assert(ScreenReelCore.supportedTypes.has('glow'));
+test('registry exposes 24 catalog entries, recipes, and legacy aliases', () => {
+  assert.equal(ScreenReelCore.definitions.length, 24); assert.equal(ScreenReelCore.recipes.length, 6); assert.equal(ScreenReelCore.actionType({ type: 'fill' }), 'type'); assert(ScreenReelCore.supportedTypes.has('glow'));
 });
 test('route normalization preserves functional query and rejects external routes', () => {
   assert.equal(ScreenReelCore.normalizeRoute('/orders?task=review&demo=1', 'https://app.test/home'), '/orders?task=review');

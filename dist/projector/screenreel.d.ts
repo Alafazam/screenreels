@@ -1,7 +1,7 @@
 export interface ScreenReelManifest { schemaVersion: 1; flows: ScreenReelFlow[] }
 export interface ScreenReelFlow { id: string; name: string; defaults?: Record<string, unknown>; scenes: ScreenReelScene[] }
 export interface ScreenReelScene { id: string; enabled?: boolean; route: string; title?: string; talkingPoints?: string; waitFor?: string; timeoutMs?: number; settleMs?: number; dwellMs?: number; leadInMs?: number; tailMs?: number; endsInNavigation?: boolean; actions: ScreenReelAction[] }
-export interface ScreenReelAction { id?: string; type: 'highlight' | 'glow' | 'spotlight' | 'callout' | 'click' | 'hover' | 'focus' | 'type' | 'set' | 'toggle' | 'lever' | 'drag' | 'scrollIntoView' | 'scroll' | 'wait' | 'waitFor' | 'goto' | 'pointer' | 'call' | 'fill'; selector?: string; index?: number; afterMs?: number; [key: string]: unknown }
+export interface ScreenReelAction { id?: string; type: 'highlight' | 'glow' | 'spotlight' | 'callout' | 'flash' | 'reel' | 'reveal' | 'countdown' | 'click' | 'hover' | 'focus' | 'type' | 'set' | 'toggle' | 'lever' | 'drag' | 'scrollIntoView' | 'scroll' | 'wait' | 'waitFor' | 'goto' | 'pointer' | 'call' | 'fill'; selector?: string; index?: number; afterMs?: number; [key: string]: unknown }
 export interface ScreenReelRouter { getRoute(): string; navigate(route: string): void | Promise<void>; subscribe?(listener: () => void): () => void }
 export interface ScreenReelLegacyStorage { id?: string; flowsKey?: string; activeFlowKey?: string; notesVisibleKey?: string; enabledKey?: string; session?: { positionKey?: string; playingKey?: string; navigationKey?: string } }
 export interface ScreenReelValidationAction { actionIndex: number; actionId?: string; type: string; selector?: string; errors: string[] }

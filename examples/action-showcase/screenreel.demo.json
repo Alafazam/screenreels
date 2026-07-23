@@ -1,41 +1,93 @@
 {
   "schemaVersion": 1,
-  "flows": [{
-    "id": "action-showcase", "name": "All actions showcase", "defaults": { "dwellMs": 1400, "settleMs": 500 },
-    "scenes": [
-      { "id": "action-tour", "enabled": true, "route": "./", "title": "Emphasise the product story", "talkingPoints": "Show a single target, a sequence, a spotlight, and an anchored callout.", "actions": [
-        { "type": "wait", "ms": 400 },
-        { "type": "highlight", "definitionId": "highlight", "selector": "[data-demo-id=\"hero-card\"]", "holdMs": 700 },
-        { "type": "glow", "definitionId": "highlight-sequence", "selector": ".kpi-card", "sequence": true, "count": 4, "stepMs": 450 },
-        { "type": "spotlight", "selector": "[data-kpi=\"margin\"]", "holdMs": 700, "dim": 0.55 },
-        { "type": "callout", "selector": "[data-kpi=\"sellthrough\"]", "text": "Callouts anchor the talking point.", "holdMs": 800 }
-      ]},
-      { "id": "interaction-tour", "enabled": true, "route": "./#form", "title": "Interact with real controls", "talkingPoints": "The same executor can click, hover, focus, type, set, toggle, move sliders, drag, and tap pointer-driven controls.", "actions": [
-        { "type": "scrollIntoView", "selector": "#form", "block": "start", "durMs": 350 },
-        { "type": "hover", "selector": "#customer-name", "holdMs": 250 },
-        { "type": "focus", "selector": "#customer-name" },
-        { "type": "type", "selector": "#customer-name", "text": "Northstar Retail", "clearFirst": true, "charMs": 18 },
-        { "type": "set", "selector": "#region", "value": "West" },
-        { "type": "toggle", "selector": "#priority", "checked": true },
-        { "type": "lever", "selector": "#confidence", "to": 82, "durMs": 550 },
-        { "type": "click", "selector": "#submit-control", "afterMs": 400 },
-        { "type": "drag", "selector": "[data-demo-id=\"drag-source\"]", "toSelector": "[data-demo-id=\"drag-destination\"]", "durMs": 600 },
-        { "type": "pointer", "selector": "#pointer-target", "afterMs": 350 }
-      ]},
-      { "id": "viewport-tour", "enabled": true, "route": "./#viewport", "title": "Control viewport and timing", "talkingPoints": "Scroll relative distances, jump to edges, and wait for asynchronous UI state.", "actions": [
-        { "type": "scrollIntoView", "selector": "#viewport", "block": "start", "durMs": 400 },
-        { "type": "scroll", "definitionId": "scroll-by", "selector": "#activity-scroll", "mode": "relative", "direction": "down", "amount": 60, "unit": "viewportPercent", "durMs": 350 },
-        { "type": "scroll", "definitionId": "scroll-edge", "selector": "#activity-scroll", "mode": "edge", "edge": "top", "durMs": 350 },
-        { "type": "click", "selector": "[data-action=\"reveal-delayed\"]" },
-        { "type": "waitFor", "selector": "#delayed-target", "condition": "visible", "timeoutMs": 3000 },
-        { "type": "highlight", "selector": "#delayed-target", "holdMs": 650 },
-        { "type": "call", "fn": "showScreenReelResult", "args": ["Safe page function called"], "cursorTo": "#demo-button", "afterMs": 450 }
-      ]},
-      { "id": "navigation-tour", "enabled": true, "route": "./", "title": "Continue across routes", "talkingPoints": "Navigation retains active flow and scene position in project-scoped session storage.", "actions": [
-        { "type": "scrollIntoView", "selector": "[data-demo-id=\"final-card\"]", "block": "center", "durMs": 450 },
-        { "type": "goto", "url": "destination.html?from=showcase" }
-      ]},
-      { "id": "destination", "enabled": true, "route": "destination.html?from=showcase", "title": "The destination", "talkingPoints": "The flow and notes continue after a full page navigation.", "actions": [{ "type": "highlight", "selector": "[data-demo-id=\"destination-card\"]", "holdMs": 900 }] }
-    ]
-  }]
+  "flows": [
+    {
+      "id": "guided-tour", "name": "Guided product tour", "defaults": { "dwellMs": 650, "settleMs": 150 },
+      "scenes": [
+        { "id": "tour-opening", "enabled": true, "route": "./", "title": "The story in one flow", "talkingPoints": "The hero card is the flow: highlight the story, interact with the UI, capture and share.", "actions": [
+          { "type": "countdown", "from": 3, "caption": "Your demo is about to play", "note": "Ready…" },
+          { "type": "highlight", "selector": "[data-flow-step=\"1\"]", "holdMs": 650, "note": "Highlight the story" },
+          { "type": "highlight", "selector": "[data-flow-step=\"2\"]", "holdMs": 650, "note": "Interact with the UI" },
+          { "type": "flash", "selector": "[data-flow-step=\"3\"]", "times": 3, "afterMs": 400, "note": "Capture and share" }
+        ]},
+        { "id": "tour-why", "enabled": true, "route": "./", "title": "Why we built it", "talkingPoints": "Demos should not drift every time the product changes.", "actions": [
+          { "type": "scrollIntoView", "selector": "#why", "block": "start", "note": "Why we built it" },
+          { "type": "highlight", "selector": "[data-word=\"demos\"]", "holdMs": 600, "note": "It starts with demos" },
+          { "type": "reel", "selector": "[data-reel=\"drift\"]", "frames": 8, "stepMs": 80, "holdMs": 500, "afterMs": 300, "note": "…that should not drift" },
+          { "type": "flash", "selector": "[data-flash=\"changes\"]", "times": 3, "afterMs": 400, "note": "every time the product changes" }
+        ]},
+        { "id": "tour-tools", "enabled": true, "route": "./", "title": "Three connected tools", "talkingPoints": "Projector presents, Studio authors, Capture records — one shared flow.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"cap-projector\"]", "holdMs": 750, "note": "Projector presents it live" },
+          { "type": "highlight", "selector": "[data-demo-id=\"cap-studio\"]", "holdMs": 450, "note": "Studio authors it" },
+          { "type": "reveal", "selector": "[data-demo-id=\"cap-studio\"]", "src": "studio-shot.png", "holdMs": 1500, "afterMs": 200, "note": "A peek inside Studio" },
+          { "type": "highlight", "selector": "[data-demo-id=\"cap-capture\"]", "holdMs": 750, "note": "Capture records it" }
+        ]},
+        { "id": "tour-kpis", "enabled": true, "route": "./", "title": "Highlight product context", "talkingPoints": "Walk the KPIs one by one while the audience keeps its bearings.", "actions": [
+          { "type": "scrollIntoView", "selector": "#kpis", "block": "start", "note": "Watch the runtime operate a real page" },
+          { "type": "glow", "selector": ".kpi-card", "sequence": true, "count": 4, "stepMs": 520, "note": "Revenue, margin, sell-through, stock" }
+        ]},
+        { "id": "tour-controls", "enabled": true, "route": "./#form", "title": "Work with real controls", "talkingPoints": "Type, select, toggle, and slide real inputs — then rock the demo.", "actions": [
+          { "type": "scrollIntoView", "selector": "#form", "block": "start", "note": "Work with real controls" },
+          { "type": "type", "selector": "#customer-name", "text": "Northstar Retail", "clearFirst": true, "charMs": 22, "note": "Typing a customer name" },
+          { "type": "set", "selector": "#region", "value": "West", "note": "Choosing a region" },
+          { "type": "toggle", "selector": "#priority", "checked": true, "note": "Marking it a priority account" },
+          { "type": "lever", "selector": "#confidence", "to": 95, "durMs": 700, "note": "Confidence up to 95%" },
+          { "type": "click", "selector": "#submit-control", "afterMs": 700, "note": "Rock the demo!" }
+        ]},
+        { "id": "tour-viewport", "enabled": true, "route": "./#viewport", "title": "Control viewport and timing", "talkingPoints": "Scroll the panel to the bottom and back to the top.", "actions": [
+          { "type": "scrollIntoView", "selector": "#viewport", "block": "start", "note": "Control viewport and timing" },
+          { "type": "scroll", "selector": "#activity-scroll", "mode": "edge", "edge": "bottom", "note": "Scroll to the bottom" },
+          { "type": "scroll", "selector": "#activity-scroll", "mode": "edge", "edge": "top", "afterMs": 400, "note": "…and back to the top" }
+        ]},
+        { "id": "tour-routes", "enabled": true, "route": "./", "title": "Continue across routes", "talkingPoints": "One click opens the next page and the flow keeps its place.", "actions": [
+          { "type": "scrollIntoView", "selector": "[data-demo-id=\"final-card\"]", "block": "center", "note": "One flow, across pages" },
+          { "type": "pointer", "selector": "[data-action=\"destination\"]", "afterMs": 600, "note": "Opening the next page" },
+          { "type": "goto", "url": "destination.html?from=showcase", "note": "Navigating across routes" }
+        ]},
+        { "id": "tour-home", "enabled": true, "route": "destination.html?from=showcase", "title": "Back to the start", "talkingPoints": "The flow and notes continued across a full navigation, then the tour returns home.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"destination-card\"]", "holdMs": 850, "note": "The flow survived the navigation" },
+          { "type": "pointer", "selector": "[data-demo-id=\"return-home\"]", "afterMs": 600, "note": "Clicking return to ScreenReel" },
+          { "type": "goto", "url": "./", "note": "Back to the ScreenReel home page" }
+        ]}
+      ]
+    },
+    {
+      "id": "action-showcase", "name": "All actions showcase", "defaults": { "dwellMs": 1400, "settleMs": 500 },
+      "scenes": [
+        { "id": "action-tour", "enabled": true, "route": "./", "title": "Emphasise the product story", "talkingPoints": "Show a single target, a sequence, a spotlight, and an anchored callout.", "actions": [
+          { "type": "wait", "ms": 400 },
+          { "type": "highlight", "definitionId": "highlight", "selector": "[data-demo-id=\"hero-card\"]", "holdMs": 700 },
+          { "type": "glow", "definitionId": "highlight-sequence", "selector": ".kpi-card", "sequence": true, "count": 4, "stepMs": 450 },
+          { "type": "spotlight", "selector": "[data-kpi=\"margin\"]", "holdMs": 700, "dim": 0.55 },
+          { "type": "callout", "selector": "[data-kpi=\"sellthrough\"]", "text": "Callouts anchor the talking point.", "holdMs": 800 }
+        ]},
+        { "id": "interaction-tour", "enabled": true, "route": "./#form", "title": "Interact with real controls", "talkingPoints": "The same executor can click, hover, focus, type, set, toggle, move sliders, drag, and tap pointer-driven controls.", "actions": [
+          { "type": "scrollIntoView", "selector": "#form", "block": "start", "durMs": 350 },
+          { "type": "hover", "selector": "#customer-name", "holdMs": 250 },
+          { "type": "focus", "selector": "#customer-name" },
+          { "type": "type", "selector": "#customer-name", "text": "Northstar Retail", "clearFirst": true, "charMs": 18 },
+          { "type": "set", "selector": "#region", "value": "West" },
+          { "type": "toggle", "selector": "#priority", "checked": true },
+          { "type": "lever", "selector": "#confidence", "to": 82, "durMs": 550 },
+          { "type": "click", "selector": "#submit-control", "afterMs": 400 },
+          { "type": "drag", "selector": "[data-demo-id=\"drag-source\"]", "toSelector": "[data-demo-id=\"drag-destination\"]", "durMs": 600 },
+          { "type": "pointer", "selector": "#pointer-target", "afterMs": 350 }
+        ]},
+        { "id": "viewport-tour", "enabled": true, "route": "./#viewport", "title": "Control viewport and timing", "talkingPoints": "Scroll relative distances, jump to edges, and wait for asynchronous UI state.", "actions": [
+          { "type": "scrollIntoView", "selector": "#viewport", "block": "start", "durMs": 400 },
+          { "type": "scroll", "definitionId": "scroll-by", "selector": "#activity-scroll", "mode": "relative", "direction": "down", "amount": 60, "unit": "viewportPercent", "durMs": 350 },
+          { "type": "scroll", "definitionId": "scroll-edge", "selector": "#activity-scroll", "mode": "edge", "edge": "top", "durMs": 350 },
+          { "type": "click", "selector": "[data-action=\"reveal-delayed\"]" },
+          { "type": "waitFor", "selector": "#delayed-target", "condition": "visible", "timeoutMs": 3000 },
+          { "type": "highlight", "selector": "#delayed-target", "holdMs": 650 },
+          { "type": "call", "fn": "showScreenReelResult", "args": ["Safe page function called"], "cursorTo": "#demo-button", "afterMs": 450 }
+        ]},
+        { "id": "navigation-tour", "enabled": true, "route": "./", "title": "Continue across routes", "talkingPoints": "Navigation retains active flow and scene position in project-scoped session storage.", "actions": [
+          { "type": "scrollIntoView", "selector": "[data-demo-id=\"final-card\"]", "block": "center", "durMs": 450 },
+          { "type": "goto", "url": "destination.html?from=showcase" }
+        ]},
+        { "id": "destination", "enabled": true, "route": "destination.html?from=showcase", "title": "The destination", "talkingPoints": "The flow and notes continue after a full page navigation.", "actions": [{ "type": "highlight", "selector": "[data-demo-id=\"destination-card\"]", "holdMs": 900 }] }
+      ]
+    }
+  ]
 }

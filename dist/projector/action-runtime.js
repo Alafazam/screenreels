@@ -8,6 +8,10 @@
     { id: 'highlight-sequence', type: 'glow', category: 'Emphasis', label: 'Highlight target sequence', picker: 'collection', defaults: { sequence: true, count: 6, stepMs: 1050, afterMs: 400 }, fields: [field('count', 'Maximum targets', 'number', { min: 1, max: 30 }), field('stepMs', 'Time per target (ms)', 'number', { min: 100, max: 10000 })] },
     { id: 'spotlight', type: 'spotlight', category: 'Emphasis', label: 'Spotlight target', picker: 'visual', defaults: { holdMs: 1800, dim: 0.62 }, fields: [field('holdMs', 'Spotlight time (ms)', 'number', { min: 100, max: 30000 }), field('dim', 'Background dimming', 'number', { min: 0.1, max: 0.9, step: 0.05 })] },
     { id: 'callout', type: 'callout', category: 'Emphasis', label: 'Target callout', picker: 'visual', defaults: { text: 'Add your callout', placement: 'auto', holdMs: 2200 }, fields: [field('text', 'Callout text', 'textarea'), field('placement', 'Placement', 'select', { options: ['auto', 'top', 'right', 'bottom', 'left'] }), field('holdMs', 'Callout time (ms)', 'number', { min: 100, max: 30000 })] },
+    { id: 'flash', type: 'flash', category: 'Emphasis', label: 'Flash target', picker: 'visual', defaults: { times: 2 }, fields: [field('times', 'Flash count', 'number', { min: 1, max: 10 })] },
+    { id: 'reel', type: 'reel', category: 'Emphasis', label: 'Reel text into place', picker: 'visual', defaults: { frames: 7, stepMs: 80, holdMs: 500 }, fields: [field('frames', 'Spin frames', 'number', { min: 2, max: 30 }), field('stepMs', 'Time per frame (ms)', 'number', { min: 20, max: 500 }), field('holdMs', 'Hold after landing (ms)', 'number', { min: 0, max: 10000 })] },
+    { id: 'reveal', type: 'reveal', category: 'Emphasis', label: 'Reveal image over target', picker: 'visual', defaults: { holdMs: 1600 }, fields: [field('src', 'Image URL', 'text'), field('holdMs', 'Hold time (ms)', 'number', { min: 100, max: 30000 })] },
+    { id: 'countdown', type: 'countdown', category: 'Timing', label: 'Play countdown', picker: 'none', defaults: { from: 3, stepMs: 720, caption: 'Your demo is about to play' }, fields: [field('from', 'Start number', 'number', { min: 1, max: 9 }), field('caption', 'Caption', 'text'), field('stepMs', 'Time per number (ms)', 'number', { min: 200, max: 3000 })] },
     { id: 'click', type: 'click', category: 'Interaction', label: 'Click target', picker: 'interactive', defaults: { afterMs: 700 }, fields: [] },
     { id: 'hover', type: 'hover', category: 'Interaction', label: 'Hover target', picker: 'interactive', defaults: { holdMs: 800 }, fields: [field('holdMs', 'Hover time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'focus', type: 'focus', category: 'Interaction', label: 'Focus target', picker: 'interactive', defaults: { afterMs: 500 }, fields: [] },
@@ -74,17 +78,82 @@
   function ensureStyles(doc) {
     if (doc.getElementById('__screenreelActionStyles')) return;
     const style = doc.createElement('style'); style.id = '__screenreelActionStyles';
-    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}';
+    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}';
     doc.head.appendChild(style);
   }
   function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - 5}px`, top: `${rect.top - 5}px`, width: `${rect.width + 10}px`, height: `${rect.height + 10}px` }); }
+  const SCROLL_SETTLE_FRAMES = 3, SCROLL_SETTLE_MAX_MS = 1200;
+  function scrollOffset(box, win) {
+    const doc = win.document; const scroller = doc?.scrollingElement || doc?.documentElement;
+    if (box && box !== win && box !== scroller && box !== doc?.body) return { top: box.scrollTop, left: box.scrollLeft };
+    return { top: win.scrollY ?? scroller?.scrollTop ?? 0, left: win.scrollX ?? scroller?.scrollLeft ?? 0 };
+  }
+  function waitForScrollEnd(ctx, box) {
+    const win = ctx.window; const raf = win.requestAnimationFrame ? (fn) => win.requestAnimationFrame(fn) : (fn) => setTimeout(fn, 16);
+    return new Promise((resolve) => {
+      let last = scrollOffset(box, win); let stable = 0; const started = Date.now();
+      const tick = () => {
+        if (ctx.signal?.aborted) return resolve();
+        const now = scrollOffset(box, win);
+        stable = Math.abs(now.top - last.top) < 1 && Math.abs(now.left - last.left) < 1 ? stable + 1 : 0;
+        last = now;
+        if (stable >= SCROLL_SETTLE_FRAMES || Date.now() - started > SCROLL_SETTLE_MAX_MS) return resolve();
+        raf(tick);
+      };
+      raf(tick);
+    });
+  }
+  function isInView(el, win) {
+    const rect = el.getBoundingClientRect(); const vh = win.innerHeight || 0; const vw = win.innerWidth || 0;
+    return rect.top >= 0 && rect.left >= 0 && rect.bottom <= vh && rect.right <= vw;
+  }
+  async function ensureInView(el, ctx) {
+    if (!el || el === true || isInView(el, ctx.window)) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    await waitForScrollEnd(ctx);
+  }
+  const REEL_GLYPHS = '#@$%&*0123456789ABCDEF';
+  async function runFlash(action, ctx, el) {
+    ensureStyles(ctx.document); const times = Math.max(1, Number(action.times) || 2);
+    for (let i = 0; i < times; i++) { if (ctx.signal?.aborted) break; el.classList.add('sr-flash-on'); await sleep(190, ctx.signal); el.classList.remove('sr-flash-on'); await sleep(150, ctx.signal); }
+  }
+  async function runReel(action, ctx, el) {
+    const original = el.textContent; const frames = Math.max(2, Number(action.frames) || 7); const stepMs = Number(action.stepMs) || 80;
+    el.classList.add('sr-reel');
+    for (let f = 0; f < frames - 1; f++) { if (ctx.signal?.aborted) break; el.textContent = [...original].map((ch, idx) => ch === ' ' ? ' ' : REEL_GLYPHS[(idx * 3 + f * 7 + ch.charCodeAt(0)) % REEL_GLYPHS.length]).join(''); await sleep(stepMs, ctx.signal); }
+    el.textContent = original; el.classList.remove('sr-reel'); el.classList.add('sr-reel-landed');
+    await sleep(action.holdMs ?? 500, ctx.signal); el.classList.remove('sr-reel-landed');
+  }
+  async function runReveal(action, ctx, el) {
+    if (!action.src) { ctx.warn('reveal requires an image src'); return; }
+    ensureStyles(ctx.document); const doc = ctx.document; const win = ctx.window; const rect = el.getBoundingClientRect(); const margin = 24;
+    const width = Math.min(win.innerWidth - margin * 2, Math.max(rect.width, 640));
+    const height = Math.min(win.innerHeight - margin * 2, Math.round(width * 10 / 16));
+    const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, win.innerWidth - margin - width));
+    const top = Math.max(margin, Math.min(rect.top + rect.height / 2 - height / 2, win.innerHeight - margin - height));
+    const img = doc.createElement('img'); img.className = 'sr-reveal';
+    try { img.src = new URL(action.src, win.location.href).href; } catch { img.src = action.src; }
+    Object.assign(img.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` });
+    doc.body.appendChild(img); await sleep(20, ctx.signal); img.classList.add('show');
+    await sleep(action.holdMs || 1600, ctx.signal); img.classList.remove('show'); await sleep(320, ctx.signal); img.remove();
+  }
+  async function runCountdown(action, ctx) {
+    ensureStyles(ctx.document); const doc = ctx.document; const from = Math.max(1, Number(action.from) || 3);
+    const overlay = doc.createElement('div'); overlay.className = 'sr-countdown-overlay';
+    const num = doc.createElement('div'); num.className = 'sr-count-num';
+    const cap = doc.createElement('div'); cap.className = 'sr-count-cap'; cap.textContent = action.caption || 'Your demo is about to play';
+    overlay.appendChild(num); overlay.appendChild(cap); doc.body.appendChild(overlay);
+    const labels = []; for (let n = from; n >= 1; n--) labels.push(String(n)); labels.push(action.goText || 'Go');
+    for (const label of labels) { if (ctx.signal?.aborted) break; num.textContent = label; num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop'); await sleep(Number(action.stepMs) || 720, ctx.signal); }
+    overlay.remove();
+  }
   function dispatchValue(el, value) { const EventCtor = el.ownerDocument.defaultView.Event; el.value = value; el.dispatchEvent(new EventCtor('input', { bubbles: true })); el.dispatchEvent(new EventCtor('change', { bubbles: true })); }
   function ripple(doc, el) { ensureStyles(doc); const rect = el.getBoundingClientRect(); const dot = doc.createElement('div'); dot.className = 'sr-click-ripple'; dot.style.left = `${rect.left + rect.width / 2}px`; dot.style.top = `${rect.top + rect.height / 2}px`; doc.body.appendChild(dot); setTimeout(() => dot.remove(), 700); }
   async function runGlow(action, ctx) {
     const elements = queryAll(ctx.document, action.selector).slice(0, Number(action.count) || 12); if (!elements.length) return false;
     ensureStyles(ctx.document); const box = ctx.document.createElement('div'); box.className = 'sr-glow-box'; ctx.document.body.appendChild(box);
-    if (action.sequence) for (const el of elements) { placeBox(box, el); await ctx.moveCursor?.(el); await sleep(action.stepMs || 1100, ctx.signal); }
-    else { placeBox(box, elements[0]); await ctx.moveCursor?.(elements[0]); await sleep(action.holdMs || 1600, ctx.signal); }
+    if (action.sequence) for (const el of elements) { await ensureInView(el, ctx); placeBox(box, el); await ctx.moveCursor?.(el); await sleep(action.stepMs || 1100, ctx.signal); }
+    else { await ensureInView(elements[0], ctx); placeBox(box, elements[0]); await ctx.moveCursor?.(elements[0]); await sleep(action.holdMs || 1600, ctx.signal); }
     if (action.keep) setTimeout(() => box.remove(), action.keepMs || 4000); else box.remove(); return true;
   }
   async function animateLever(el, target, durMs, ctx) {
@@ -102,14 +171,20 @@
   async function runAction(source, context = {}) {
     const action = { ...source, type: actionType(source) }; const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
     if (!doc) return { ok: false, error: 'document' };
+    if (action.note && ctx.announce) ctx.announce(action.note);
     if (action.type === 'wait') { await sleep(action.ms || 500, ctx.signal); return { ok: true }; }
+    if (action.type === 'countdown') { await runCountdown(action, ctx); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'waitFor') { const found = await waitFor(doc, action.selector, action.condition || 'visible', action.timeoutMs || 8000, ctx.signal); if (!found) return { ok: false, error: 'timeout' }; if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'highlight' || action.type === 'glow') { const ok = await runGlow(action, ctx); if (!ok) ctx.warn(`Selector not found: ${action.selector}`); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok }; }
     if (action.type === 'goto') { await ctx.navigate?.(action.url); return { ok: true, navigated: true }; }
     if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', 6000, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || win[action.fn]; if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || 8000, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
+    if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
     if (action.type === 'spotlight') { ensureStyles(doc); const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); box.style.boxShadow = `0 0 0 2px rgba(255,255,255,.85),0 0 0 9999px rgba(9,9,11,${Number(action.dim) || .62})`; doc.body.appendChild(box); await ctx.moveCursor?.(el); await sleep(action.holdMs || 1800, ctx.signal); box.remove(); }
     else if (action.type === 'callout') { ensureStyles(doc); const tip = doc.createElement('div'); tip.className = 'sr-action-callout'; tip.textContent = action.text || 'Callout'; doc.body.appendChild(tip); const rect = el.getBoundingClientRect(); const left = action.placement === 'right' ? rect.right + 8 : action.placement === 'left' ? Math.max(8, rect.left - 288) : Math.max(8, Math.min(rect.left, win.innerWidth - 288)); const top = action.placement === 'top' ? rect.top - 48 : rect.bottom + 8; Object.assign(tip.style, { left: `${left}px`, top: `${Math.max(8, top)}px` }); await sleep(action.holdMs || 2200, ctx.signal); tip.remove(); }
+    else if (action.type === 'flash') await runFlash(action, ctx, el);
+    else if (action.type === 'reel') await runReel(action, ctx, el);
+    else if (action.type === 'reveal') await runReveal(action, ctx, el);
     else if (action.type === 'click') { await ctx.moveCursor?.(el); ripple(doc, el); el.click(); }
     else if (action.type === 'hover') { await ctx.moveCursor?.(el); ['pointerover', 'mouseover', 'mouseenter'].forEach((type) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== 'mouseenter', view: win }))); await sleep(action.holdMs || 800, ctx.signal); }
     else if (action.type === 'focus') { await ctx.moveCursor?.(el); el.focus({ preventScroll: false }); }
@@ -119,8 +194,8 @@
     else if (action.type === 'lever') await animateLever(el, action.to, action.durMs, ctx);
     else if (action.type === 'drag') await runDrag(action, ctx, el);
     else if (action.type === 'pointer') { await ctx.moveCursor?.(el); ripple(doc, el); const rect = el.getBoundingClientRect(); const Pointer = win.PointerEvent || win.MouseEvent; const opts = { bubbles: true, cancelable: true, composed: true, view: win, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, button: 0, pointerId: 1, isPrimary: true, pointerType: 'mouse' }; el.dispatchEvent(new Pointer('pointerdown', { ...opts, buttons: 1 })); el.dispatchEvent(new Pointer('pointerup', opts)); }
-    else if (action.type === 'scrollIntoView') { el.scrollIntoView({ behavior: 'smooth', block: action.block || 'center' }); await sleep(action.durMs || 700, ctx.signal); }
-    else if (action.type === 'scroll') { const box = el || doc.scrollingElement; let top = box.scrollTop; let left = box.scrollLeft; if (action.mode === 'relative') { const direction = ['up', 'left'].includes(action.direction) ? -1 : 1; const horizontal = ['left', 'right'].includes(action.direction); const basis = action.unit === 'pixels' ? 1 : action.unit === 'pagePercent' ? (horizontal ? box.scrollWidth : box.scrollHeight) / 100 : (horizontal ? win.innerWidth : win.innerHeight) / 100; if (horizontal) left += direction * Number(action.amount || 0) * basis; else top += direction * Number(action.amount || 0) * basis; } else if (action.mode === 'edge') { if (action.edge === 'bottom') top = box.scrollHeight; else if (action.edge === 'right') left = box.scrollWidth; else if (action.edge === 'left') left = 0; else top = 0; } else { top = action.top ?? top; left = action.left ?? left; } box.scrollTo({ top, left, behavior: 'smooth' }); await sleep(action.durMs || 800, ctx.signal); }
+    else if (action.type === 'scrollIntoView') { el.scrollIntoView({ behavior: 'smooth', block: action.block || 'center' }); await waitForScrollEnd(ctx); }
+    else if (action.type === 'scroll') { const box = el || doc.scrollingElement; let top = box.scrollTop; let left = box.scrollLeft; if (action.mode === 'relative') { const direction = ['up', 'left'].includes(action.direction) ? -1 : 1; const horizontal = ['left', 'right'].includes(action.direction); const basis = action.unit === 'pixels' ? 1 : action.unit === 'pagePercent' ? (horizontal ? box.scrollWidth : box.scrollHeight) / 100 : (horizontal ? win.innerWidth : win.innerHeight) / 100; if (horizontal) left += direction * Number(action.amount || 0) * basis; else top += direction * Number(action.amount || 0) * basis; } else if (action.mode === 'edge') { if (action.edge === 'bottom') top = box.scrollHeight; else if (action.edge === 'right') left = box.scrollWidth; else if (action.edge === 'left') left = 0; else top = 0; } else { top = action.top ?? top; left = action.left ?? left; } box.scrollTo({ top, left, behavior: 'smooth' }); await waitForScrollEnd(ctx, box); }
     else return { ok: false, error: 'unsupported' };
     if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true };
   }

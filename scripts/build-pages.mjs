@@ -13,7 +13,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 fs.rmSync(site, { recursive: true, force: true });
 fs.mkdirSync(site, { recursive: true });
-for (const name of ['index.html', 'destination.html', 'styles.css', 'app.js', 'screenreel.demo.json']) {
+for (const name of ['index.html', 'destination.html', 'styles.css', 'app.js', 'screenreel.demo.json', 'logo.svg', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
   fs.copyFileSync(path.join(example, name), path.join(site, name));
 }
 fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), { recursive: true });
@@ -34,6 +34,10 @@ const required = [
   'styles.css',
   'app.js',
   'screenreel.demo.json',
+  'logo.svg',
+  'favicon.svg',
+  'og-image.png',
+  'apple-touch-icon.png',
   'dist/projector/screenreel.js',
   'dist/projector/projector.js',
   'dist/projector/screenreel.css',
