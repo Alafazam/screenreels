@@ -4,9 +4,8 @@ document.getElementById('confidence')?.addEventListener('input', (event) => { do
 document.getElementById('submit-control')?.addEventListener('click', () => toast('Controls applied'));
 document.getElementById('pointer-target')?.addEventListener('pointerdown', () => toast('Raw pointer event received'));
 window.showScreenReelResult = (message = 'Page function called') => { document.getElementById('hero-result').textContent = message; toast(message); };
-window.addEventListener('DOMContentLoaded', () => {
-  const demoButton = document.getElementById('demo-button');
-  if (!demoButton) return;
-  window.ScreenReel.ready.then((api) => api.mount(demoButton, { projectId: 'action-showcase', flow: { src: 'screenreel.demo.json' } }));
+const demoButton = document.getElementById('demo-button');
+if (demoButton) {
+  window.ScreenReel.mount(demoButton, { projectId: 'action-showcase', flow: { src: 'screenreel.demo.json' } });
   document.querySelector('[data-action="open-demo"]')?.addEventListener('click', () => demoButton.click());
-});
+}

@@ -43,6 +43,7 @@ const stagedText = ['index.html', 'destination.html', 'screenreel.demo.json']
   .join('\n');
 if (stagedText.includes('../../dist/projector/')) throw new Error('Pages artifact contains a broken projector asset path');
 if (stagedText.includes('/examples/action-showcase')) throw new Error('Pages artifact contains an old absolute example route');
+if (!stagedText.includes('data-cfasync="false"')) throw new Error('Pages scripts must opt out of Cloudflare Rocket Loader');
 if (fs.existsSync(path.join(site, 'CNAME'))) throw new Error('Pages artifact must not claim the user-site custom domain');
 
 console.log(`Built GitHub Pages artifact with ${required.length} validated entries in ${site}`);
