@@ -3,9 +3,9 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 class Studio {
-  constructor(options) { this.projector = options.projector; this.store = options.store; this.assetBase = options.assetBase; this.flowId = options.flowId; this.sceneId = options.sceneId; this.view = this.flowId ? (this.sceneId ? 'editor' : 'scenes') : 'flows'; this.dirty = false; this.failedAction = -1; }
+  constructor(options) { this.projector = options.projector; this.store = options.store; this.assetBase = options.assetBase; this.assetVersion = options.assetVersion; this.flowId = options.flowId; this.sceneId = options.sceneId; this.view = this.flowId ? (this.sceneId ? 'editor' : 'scenes') : 'flows'; this.dirty = false; this.failedAction = -1; }
   open() {
-    this.host = document.createElement('div'); document.body.appendChild(this.host); this.shadow = this.host.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('screenreel.css', this.assetBase).href; this.shadow.appendChild(link);
+    this.host = document.createElement('div'); document.body.appendChild(this.host); this.shadow = this.host.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; const styleUrl = new URL('screenreel.css', this.assetBase); if (this.assetVersion) styleUrl.search = this.assetVersion; link.href = styleUrl.href; this.shadow.appendChild(link);
     this.shell = document.createElement('div'); this.shell.className = 'sr-studio'; this.shadow.appendChild(this.shell); this.beforeUnload = (event) => { if (this.dirty) { event.preventDefault(); event.returnValue = ''; } }; addEventListener('beforeunload', this.beforeUnload); this.loadDraft(); this.render(); return this;
   }
   loadDraft() { const flow = this.store.getFlow(this.flowId) || this.store.activeFlow(); this.flowId = flow?.id; this.draft = flow ? clone(flow) : null; if (this.sceneId && !this.draft?.scenes.some((scene) => scene.id === this.sceneId)) this.sceneId = null; }

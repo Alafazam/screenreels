@@ -15,11 +15,12 @@ function defaultRouter() {
 }
 
 class Projector {
-  constructor(target, options, assetBase) {
-    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, ...options }; this.assetBase = options.assetBase || assetBase;
+  constructor(target, options, assetBase, assetVersion) {
+    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
   }
+  assetUrl(name) { const url = new URL(name, this.assetBase); if (this.assetVersion) url.search = this.assetVersion; return url.href; }
   async init() {
     await this.store.ready(); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
     if (this.store.enabled() && !new URLSearchParams(location.search).has('screenreelPreview')) { this.enable(false); if (this.store.playing()) queueMicrotask(() => this.play()); } instances.add(this); event('ready', { projectId: this.store.projectId }); return this;
@@ -34,7 +35,7 @@ class Projector {
   mountUi() {
     if (this.rootHost) return;
     this.rootHost = document.createElement('div'); this.rootHost.id = `screenreel-projector-${this.store.projectId}`; document.body.appendChild(this.rootHost); this.shadow = this.rootHost.attachShadow({ mode: 'open' });
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('screenreel.css', this.assetBase).href; this.shadow.appendChild(link);
+    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = this.assetUrl('screenreel.css'); this.shadow.appendChild(link);
     const shell = document.createElement('div'); shell.className = 'sr-shell'; shell.innerHTML = '<div class="sr-pill" role="toolbar" aria-label="ScreenReel projector"></div><section class="sr-notes" hidden></section><div class="sr-toast" hidden></div>'; this.shadow.appendChild(shell);
     this.pill = shell.querySelector('.sr-pill'); this.notes = shell.querySelector('.sr-notes'); this.toastNode = shell.querySelector('.sr-toast'); this.render();
   }
@@ -157,15 +158,15 @@ class Projector {
     const route = window.ScreenReelCore.normalizeRoute(this.router.getRoute(), location.href) || '/'; const scene = { id: window.ScreenReelStore.makeId('scene'), enabled: true, route, title: document.title || 'Captured scene', talkingPoints: '', dwellMs: 6000, actions: [] };
     flow.scenes.push(scene); flow = this.store.save(flow); this.toast('Scene captured locally'); this.openStudio({ flowId: flow.id, sceneId: scene.id });
   }
-  async openStudio(selection = {}) { const module = await import(new URL('studio.js', this.assetBase).href); return module.openStudio({ projector: this, store: this.store, assetBase: this.assetBase, ...selection }); }
+  async openStudio(selection = {}) { const module = await import(this.assetUrl('studio.js')); return module.openStudio({ projector: this, store: this.store, assetBase: this.assetBase, assetVersion: this.assetVersion, ...selection }); }
   destroy() { this.disable(); this.target.removeEventListener('click', this.clickHandler); this.unsubscribe?.(); instances.delete(this); }
 }
 
-export function createPublicApi(assetBase) {
+export function createPublicApi(assetBase, assetVersion = '') {
   if (publicApi) return publicApi;
   publicApi = {
     assetBase,
-    async mount(target, options) { if (!target) throw new Error('ScreenReel.mount requires a target element'); return new Projector(target, options, assetBase).init(); },
+    async mount(target, options) { if (!target) throw new Error('ScreenReel.mount requires a target element'); return new Projector(target, options, assetBase, assetVersion).init(); },
     async openStudio(options = {}) { const instance = [...instances][0]; if (!instance) throw new Error('Mount a ScreenReel projector before opening Studio'); return instance.openStudio(options); },
     registerFn(name, fn) { if (!/^[A-Za-z_$][\w$]*$/.test(name || '') || typeof fn !== 'function') throw new Error('ScreenReel.registerFn requires a valid name and function'); functions.set(name, fn); return () => publicApi.unregisterFn(name, fn); },
     unregisterFn(name, fn) { if (!fn || functions.get(name) === fn) functions.delete(name); },
@@ -174,7 +175,7 @@ export function createPublicApi(assetBase) {
   };
   class ScreenReelElement extends HTMLElement {
     async connectedCallback() {
-      if (this.instance) return; const shadow = this.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('screenreel.css', assetBase).href; shadow.appendChild(link);
+      if (this.instance) return; const shadow = this.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; const styleUrl = new URL('screenreel.css', assetBase); if (assetVersion) styleUrl.search = assetVersion; link.href = styleUrl.href; shadow.appendChild(link);
       const button = document.createElement('button'); button.className = 'sr-trigger'; button.title = 'Toggle ScreenReel demo'; button.setAttribute('aria-label', 'Toggle ScreenReel demo'); button.innerHTML = icon('presentation', 18); shadow.appendChild(button);
       let data; const inlineId = this.getAttribute('flow-data'); if (inlineId) { const node = document.getElementById(inlineId); if (node) data = JSON.parse(node.textContent); }
       this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict') });

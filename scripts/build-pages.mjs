@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const site = path.join(root, '_site');
 const example = path.join(root, 'examples/action-showcase');
+const releaseVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 
 const build = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status ?? 1);
@@ -19,7 +20,10 @@ fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), 
 
 for (const name of ['index.html', 'destination.html']) {
   const target = path.join(site, name);
-  const html = fs.readFileSync(target, 'utf8').replaceAll('../../dist/projector/', './dist/projector/');
+  const html = fs.readFileSync(target, 'utf8')
+    .replaceAll('../../dist/projector/', './dist/projector/')
+    .replaceAll('src="./dist/projector/screenreel.js"', `src="./dist/projector/screenreel.js?v=${releaseVersion}"`)
+    .replaceAll('src="app.js"', `src="app.js?v=${releaseVersion}"`);
   fs.writeFileSync(target, html);
 }
 fs.writeFileSync(path.join(site, '.nojekyll'), '');
@@ -44,6 +48,7 @@ const stagedText = ['index.html', 'destination.html', 'screenreel.demo.json']
 if (stagedText.includes('../../dist/projector/')) throw new Error('Pages artifact contains a broken projector asset path');
 if (stagedText.includes('/examples/action-showcase')) throw new Error('Pages artifact contains an old absolute example route');
 if (!stagedText.includes('data-cfasync="false"')) throw new Error('Pages scripts must opt out of Cloudflare Rocket Loader');
+if (!stagedText.includes(`screenreel.js?v=${releaseVersion}`)) throw new Error('Pages runtime assets must be release-versioned');
 if (fs.existsSync(path.join(site, 'CNAME'))) throw new Error('Pages artifact must not claim the user-site custom domain');
 
 console.log(`Built GitHub Pages artifact with ${required.length} validated entries in ${site}`);
