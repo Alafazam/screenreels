@@ -3,9 +3,10 @@ document.querySelector('[data-action="reveal-delayed"]')?.addEventListener('clic
 document.getElementById('confidence')?.addEventListener('input', (event) => { document.getElementById('confidence-output').textContent = `${event.target.value}%`; });
 document.getElementById('submit-control')?.addEventListener('click', () => toast('Controls applied'));
 document.getElementById('pointer-target')?.addEventListener('pointerdown', () => toast('Raw pointer event received'));
-window.showScreenReelResult = (message = 'Page function called') => { document.getElementById('hero-result').textContent = message; toast(message); };
+window.showScreenReelResult = async (message = 'Page function called') => { await new Promise((resolve) => setTimeout(resolve, 120)); document.getElementById('hero-result').textContent = message; toast(message); };
 const demoButton = document.getElementById('demo-button');
 if (demoButton) {
-  window.ScreenReel.mount(demoButton, { projectId: 'action-showcase', flow: { src: 'screenreel.demo.json' } });
+  window.ScreenReel.registerFn('showScreenReelResult', window.showScreenReelResult);
+  window.ScreenReel.mount(demoButton, { projectId: 'action-showcase', flow: { src: 'screenreel.demo.json' }, loop: false });
   document.querySelector('[data-action="open-demo"]')?.addEventListener('click', () => demoButton.click());
 }

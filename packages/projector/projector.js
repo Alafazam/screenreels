@@ -1,6 +1,7 @@
 import { icon } from './icons.js';
 
 const instances = new Set();
+const functions = new Map();
 let publicApi;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const event = (name, detail) => window.dispatchEvent(new CustomEvent(`screenreel:${name}`, { detail }));
@@ -15,7 +16,7 @@ function defaultRouter() {
 
 class Projector {
   constructor(target, options, assetBase) {
-    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', ...options }; this.assetBase = options.assetBase || assetBase;
+    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, ...options }; this.assetBase = options.assetBase || assetBase;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
   }
@@ -63,7 +64,13 @@ class Projector {
   enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
   disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
   current() { const scenes = this.store.enabledScenes(); return { scenes, position: Math.min(this.store.position(), Math.max(0, scenes.length - 1)), scene: scenes[Math.min(this.store.position(), Math.max(0, scenes.length - 1))] }; }
-  routeMatches(scene) { return window.ScreenReelCore.normalizeRoute(this.router.getRoute(), location.href) === window.ScreenReelCore.normalizeRoute(scene.route, location.href); }
+  routeMatches(scene) {
+    const currentRoute = this.router.getRoute();
+    if (typeof this.options.routesEqual === 'function') {
+      try { return !!this.options.routesEqual(currentRoute, scene.route); } catch (error) { console.warn('[screenreel] routesEqual failed', error); return false; }
+    }
+    return window.ScreenReelCore.normalizeRoute(currentRoute, location.href) === window.ScreenReelCore.normalizeRoute(scene.route, location.href);
+  }
   async navigate(route) {
     const before = new URL(location.href); await this.router.navigate(route);
     if (!this.usesDefaultNavigation) return true;
@@ -73,6 +80,26 @@ class Projector {
     const { scenes, position } = this.current(); if (!scenes.length) return null;
     const next = (position + 1) % scenes.length; this.store.setPosition(next); this.render(); return scenes[next];
   }
+  complete() {
+    this.pause(); const { scene, position, scenes } = this.current(); event('complete', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene?.id, position, sceneCount: scenes.length }); return this;
+  }
+  validateScene(sceneId) {
+    const flow = this.store.activeFlow(); const scene = sceneId ? flow.scenes.find((item) => item.id === sceneId) : this.current().scene;
+    if (!scene) return { ok: false, flowId: flow.id, sceneId: sceneId || null, route: null, sceneErrors: ['Scene not found'], actions: [] };
+    const sceneErrors = []; if (!this.routeMatches(scene)) sceneErrors.push(`Current route does not match ${scene.route}`);
+    if (scene.waitFor) { try { if (!document.querySelector(scene.waitFor)) sceneErrors.push(`waitFor has no matches: ${scene.waitFor}`); } catch { sceneErrors.push(`waitFor is invalid: ${scene.waitFor}`); } }
+    const actions = (scene.actions || []).map((action, actionIndex) => {
+      const errors = window.ScreenReelCore.validate(action, document, location.href);
+      if (action.type === 'call' && !functions.has(action.fn) && typeof window[action.fn] !== 'function') errors.push(`Function is not registered: ${action.fn}`);
+      return { actionIndex, actionId: action.id, type: action.type, selector: action.selector, errors };
+    });
+    const report = { ok: !sceneErrors.length && actions.every((item) => !item.errors.length), flowId: flow.id, sceneId: scene.id, route: scene.route, sceneErrors, actions };
+    event('validation', { projectId: this.store.projectId, report }); return report;
+  }
+  actionFailed(scene, action, actionIndex, result) {
+    const report = { ok: false, flowId: this.store.activeFlow().id, sceneId: scene.id, route: scene.route, sceneErrors: [], actions: [{ actionIndex, actionId: action.id, type: action.type, selector: action.selector, errors: [result.error || 'Action failed'] }] };
+    event('validation', { projectId: this.store.projectId, report }); this.toast(actionIndex < 0 ? 'Scene readiness failed' : `Scene stopped at action ${actionIndex + 1}`); this.pause(); return report;
+  }
   async play() {
     const { scene } = this.current(); if (!scene) return; const generation = ++this.playGeneration; clearTimeout(this.timer); this.timer = null; this.store.setPlaying(true); this.render();
     if (!this.routeMatches(scene)) {
@@ -81,14 +108,25 @@ class Projector {
       return;
     }
     this.controller?.abort(); this.controller = new AbortController();
-    for (const action of scene.actions || []) {
+    if (scene.waitFor) {
+      const ready = await window.ScreenReelCore.waitFor(document, scene.waitFor, 'visible', Number(scene.timeoutMs) || 8000, this.controller.signal);
+      if (!ready) {
+        const result = { ok: false, error: `Scene readiness timed out: ${scene.waitFor}` };
+        console.warn('[screenreel]', result.error); if (this.options.strict) return this.actionFailed(scene, { id: null, type: 'waitFor', selector: scene.waitFor }, -1, result);
+      }
+    }
+    if (scene.settleMs && generation === this.playGeneration && this.store.playing()) await window.ScreenReelCore.sleep(Number(scene.settleMs), this.controller.signal);
+    if (generation !== this.playGeneration || !this.store.playing()) return;
+    for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
+      const action = scene.actions[actionIndex];
       if (generation !== this.playGeneration || !this.store.playing()) break;
       let navigationSameDocument = false; let priorPosition = null;
       const result = await window.ScreenReelCore.runAction(action, {
-        document, window, signal: this.controller.signal,
+        document, window, signal: this.controller.signal, resolveFunction: (name) => functions.get(name),
         navigate: async (route) => {
           // Navigation actions are terminal: persist the next scene before a hard navigation can unload this document.
-          priorPosition = this.store.position(); this.advancePosition();
+          const { scenes, position } = this.current(); priorPosition = position;
+          if (position >= scenes.length - 1 && this.options.loop === false) this.complete(); else this.advancePosition();
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
@@ -98,12 +136,14 @@ class Projector {
         if (navigationSameDocument && generation === this.playGeneration && this.store.playing() && nextScene && this.routeMatches(nextScene)) return this.play();
         return;
       }
+      if (!result.ok && this.options.strict) return this.actionFailed(scene, action, actionIndex, result);
     }
     if (generation !== this.playGeneration || !this.store.playing()) return; const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
   pause() { this.playGeneration++; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
+    const current = this.current(); if (autoPlay && this.options.loop === false && current.position >= current.scenes.length - 1) return this.complete();
     const shouldPlay = autoPlay || this.store.playing(); const scene = this.advancePosition(); if (!scene) return;
     const generation = ++this.playGeneration; this.controller?.abort(); clearTimeout(this.timer); this.timer = null;
     if (!this.routeMatches(scene)) {
@@ -127,6 +167,9 @@ export function createPublicApi(assetBase) {
     assetBase,
     async mount(target, options) { if (!target) throw new Error('ScreenReel.mount requires a target element'); return new Projector(target, options, assetBase).init(); },
     async openStudio(options = {}) { const instance = [...instances][0]; if (!instance) throw new Error('Mount a ScreenReel projector before opening Studio'); return instance.openStudio(options); },
+    registerFn(name, fn) { if (!/^[A-Za-z_$][\w$]*$/.test(name || '') || typeof fn !== 'function') throw new Error('ScreenReel.registerFn requires a valid name and function'); functions.set(name, fn); return () => publicApi.unregisterFn(name, fn); },
+    unregisterFn(name, fn) { if (!fn || functions.get(name) === fn) functions.delete(name); },
+    validateScene(sceneId) { const instance = [...instances][0]; if (!instance) throw new Error('Mount a ScreenReel projector before validating a scene'); return instance.validateScene(sceneId); },
     instances,
   };
   class ScreenReelElement extends HTMLElement {
@@ -134,7 +177,7 @@ export function createPublicApi(assetBase) {
       if (this.instance) return; const shadow = this.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('screenreel.css', assetBase).href; shadow.appendChild(link);
       const button = document.createElement('button'); button.className = 'sr-trigger'; button.title = 'Toggle ScreenReel demo'; button.setAttribute('aria-label', 'Toggle ScreenReel demo'); button.innerHTML = icon('presentation', 18); shadow.appendChild(button);
       let data; const inlineId = this.getAttribute('flow-data'); if (inlineId) { const node = document.getElementById(inlineId); if (node) data = JSON.parse(node.textContent); }
-      this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve' });
+      this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict') });
     }
     disconnectedCallback() { this.instance?.destroy(); this.instance = null; }
   }

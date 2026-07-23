@@ -25,6 +25,7 @@ try {
   assert.equal(await page.locator('h1').innerText(), 'One product flow.\nLive demo, editable walkthrough, polished video.');
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
+  const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'action-tour');
   await page.locator('button[title="Presenter notes"]').click(); assert.match(await page.locator('body').evaluate((node) => node.style.paddingBottom), /clamp/);
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
   await page.locator('button[title="Presenter notes"]').click();
@@ -37,7 +38,7 @@ try {
   await page.waitForURL(/destination\.html\?from=showcase/, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await visiblePill(page); await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
   assert.equal(await page.locator('.sr-count').innerText(), '5/5');
-  await page.locator('button[title="Pause"]').click();
+  await page.locator('button[title="Play"]').waitFor({ state: 'visible', timeout: 5000 });
   await page.screenshot({ path: path.join(output, 'projector-destination-1280x720.png') });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await visiblePill(page);
   await page.locator('button[title="Open ScreenReel Studio"]').click(); const heading = page.getByRole('heading', { name: 'Demo flows', exact: true }); await heading.waitFor();
@@ -63,9 +64,16 @@ try {
   const spaPage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await spaPage.goto(new URL('../spa-router/', baseUrl).href, { waitUntil: 'domcontentloaded' });
   const spaTrigger = spaPage.locator('#demo-button'); await spaTrigger.waitFor(); await spaTrigger.click(); await visiblePill(spaPage);
   await spaPage.locator('button[title="Play"]').click(); await spaPage.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
-  await spaPage.locator('button[title="Next scene"]').click(); await spaPage.waitForURL(/view=details/); await spaPage.locator('.sr-action-callout').waitFor({ state: 'visible', timeout: 5000 });
+  await spaPage.locator('button[title="Next scene"]').click(); await spaPage.waitForURL(/view=details/); await spaPage.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
   assert.match(spaPage.url(), /view=details/); await spaPage.locator('button[title="Pause"]').click(); await spaPage.close();
-  const inlinePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await inlinePage.goto(new URL('../inline-flow/', baseUrl).href, { waitUntil: 'domcontentloaded' }); const inlineTrigger = inlinePage.locator('#demo-button'); await inlineTrigger.waitFor(); await inlineTrigger.click(); const inlinePill = await visiblePill(inlinePage); assert.equal(await inlinePill.count(), 1); await inlinePage.close();
+  const inlinePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await inlinePage.goto(new URL('../inline-flow/', baseUrl).href, { waitUntil: 'domcontentloaded' }); const inlineTrigger = inlinePage.locator('#demo-button'); await inlineTrigger.waitFor(); await inlineTrigger.click(); const inlinePill = await visiblePill(inlinePage); assert.equal(await inlinePill.count(), 1);
+  const contracts = await inlinePage.evaluate(async () => {
+    const target = document.createElement('button'); target.id = 'strict-demo'; document.body.appendChild(target);
+    const projector = await window.ScreenReel.mount(target, { projectId: 'strict-example', strict: true, loop: false, routesEqual: (current, scene) => current.includes('/inline-flow/') && scene === '/legacy.html', flow: { data: { schemaVersion: 1, flows: [{ id: 'strict', name: 'Strict', scenes: [{ id: 'missing', route: '/legacy.html', actions: [{ type: 'highlight', selector: '#does-not-exist' }] }] }] } } });
+    const report = projector.validateScene(); projector.enable(); await projector.play(); const playing = projector.store.playing(); const matched = projector.routeMatches({ route: '/legacy.html' }); projector.destroy(); target.remove();
+    return { report, playing, matched };
+  });
+  assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false); await inlinePage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } }); await mobilePage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await mobilePage.locator('#demo-button').waitFor(); assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true); await mobilePage.screenshot({ path: path.join(output, 'landing-mobile-390x844.png'), fullPage: true }); await mobilePage.close();
   console.log(JSON.stringify({ ok: true, screenshots: fs.readdirSync(output).map((name) => path.join(output, name)) }, null, 2));

@@ -11,6 +11,15 @@ await ScreenReel.mount(document.querySelector('[data-action="toggle-demo"]'), {
   projectId: 'increff-ms',
   flow: { src: '_assets/data/demo-script.json' },
   activationQueryParam: 'demo',
+  loop: false,
+  strict: true,
+  routesEqual: (currentRoute, sceneRoute) => {
+    const comparable = (route) => {
+      const url = new URL(route, location.href);
+      return `${url.pathname.replace(/\.html$/, '')}${url.search}${url.hash}`;
+    };
+    return comparable(currentRoute) === comparable(sceneRoute);
+  },
   legacyStorage: {
     id: 'ms-demo-v1',
     flowsKey: 'ms_demo_flows_v1',
@@ -25,5 +34,7 @@ await ScreenReel.mount(document.querySelector('[data-action="toggle-demo"]'), {
   }
 });
 ```
+
+Add `waitFor`, `timeoutMs`, and optional `settleMs` to scenes whose route becomes active before Angular finishes rendering. Register component-owned `call` targets with `ScreenReel.registerFn(name, fn)` and dispose them when the component is destroyed.
 
 Migration copies values only when the destination key is absent, records `screenreel:increff-ms:migration:v1`, and never deletes the legacy keys. Keep the old implementation available for one rollback checkpoint. Trailer capture must continue reading the checked-in canonical script and must not read browser-local flows.

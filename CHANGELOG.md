@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Added scene-level readiness waits and settle times to Projector playback, Studio previews, and CLI validation.
+- Added configurable stop-at-end playback, completion and validation events, strict playback, and per-scene DOM validation.
+- Added pluggable SPA route matching for legacy `.html` manifests.
+- Added a page-function registry and deterministic awaiting of asynchronous `call` actions.
+
 ## 0.2.0
 
 - Added self-hosted ScreenReel Projector and browser-local Studio.

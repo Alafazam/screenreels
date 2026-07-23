@@ -9,7 +9,7 @@
   const ready = (async () => {
     await loadScript('action-runtime.js'); await loadScript('flow-store.js');
     const module = await import(new URL('projector.js', assetBase).href);
-    const api = module.createPublicApi(assetBase); window.ScreenReel = api; return api;
+    const api = module.createPublicApi(assetBase); api.ready = ready; window.ScreenReel = api; return api;
   })();
-  window.ScreenReel = { ready, mount: (...args) => ready.then((api) => api.mount(...args)), openStudio: (...args) => ready.then((api) => api.openStudio(...args)) };
+  window.ScreenReel = { ready, mount: (...args) => ready.then((api) => api.mount(...args)), openStudio: (...args) => ready.then((api) => api.openStudio(...args)), registerFn: (...args) => ready.then((api) => api.registerFn(...args)), unregisterFn: (...args) => ready.then((api) => api.unregisterFn(...args)), validateScene: (...args) => ready.then((api) => api.validateScene(...args)) };
 })();

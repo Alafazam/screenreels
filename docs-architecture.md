@@ -10,4 +10,6 @@ ScreenReel is one repository with two independently consumable products.
 
 Canonical flows belong to the host application and are immutable at runtime. Personal copies use a `screenreel:{projectId}:...:v1` namespace. Browser assets never import Capture dependencies.
 
+Projector waits for optional scene readiness before executing actions, can delegate route equality to the host router, and resolves named page functions through a lifecycle-safe registry before falling back to globals. Browser validation and strict playback share the core per-action validator. Completion and validation are observable through `screenreel:complete` and `screenreel:validation` window events.
+
 The first public release is distributed as GitHub source plus self-hosted browser artifacts. There is no backend, collaboration layer, embedded model, or analytics service.

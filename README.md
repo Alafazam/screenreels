@@ -38,7 +38,9 @@ await ScreenReel.ready;
 
 const projector = await ScreenReel.mount(document.querySelector('#demo-button'), {
   projectId: 'acme-sales',
-  flow: { src: '/demos/sales-demo.json' }
+  flow: { src: '/demos/sales-demo.json' },
+  loop: false,
+  strict: true
 });
 ```
 
@@ -56,6 +58,9 @@ Projector provides flow selection, play/pause, previous/next, presenter notes, C
       "id": "overview",
       "enabled": true,
       "route": "/dashboard?team=sales",
+      "waitFor": "[data-page-ready]",
+      "timeoutMs": 12000,
+      "settleMs": 300,
       "title": "Start with the outcome",
       "talkingPoints": "Explain what changed and why it matters.",
       "dwellMs": 5000,
@@ -72,11 +77,18 @@ Projector accepts a same-origin or CORS-enabled JSON URL, an inline object throu
 
 Legacy `{ defaults, scenes }`, Increff-style `{ version, steps }`, `fill`, and existing Capture actions remain supported.
 
+`waitFor` delays all scene actions until its selector is visible. `timeoutMs` defaults to `8000`; `settleMs` adds an optional render buffer after readiness. In `strict` mode, a failed action pauses playback and emits `screenreel:validation`. `loop` defaults to `true` for 0.2.x compatibility; set it to `false` to stop on the final enabled scene and receive `screenreel:complete`.
+
 ## SPA routing
 
 MPAs work without an adapter. SPAs supply three small hooks:
 
 ```js
+const comparableRoute = (route) => {
+  const url = new URL(route, location.href);
+  return `${url.pathname.replace(/\.html$/, '')}${url.search}${url.hash}`;
+};
+
 ScreenReel.mount(button, {
   projectId: 'sales-spa',
   flow: { data: manifest },
@@ -84,11 +96,41 @@ ScreenReel.mount(button, {
     getRoute: () => router.currentUrl,
     navigate: (route) => router.navigate(route),
     subscribe: (listener) => router.onChange(listener)
-  }
+  },
+  routesEqual: (currentRoute, sceneRoute) =>
+    comparableRoute(currentRoute) === comparableRoute(sceneRoute)
 });
 ```
 
-See `examples/spa-router/` for a dependency-free History API implementation.
+`getRoute()` and `navigate()` must describe the same route space as `scene.route`. For a legacy flow containing `ai-workbench.html?task=x` while the SPA exposes `/ai-workbench?task=x`, either map both directions in the router bridge or provide `routesEqual`. The matcher receives the raw current and scene routes; normalized same-origin equality remains the fallback when it is absent.
+
+See `examples/spa-router/` for a dependency-free History API implementation with asynchronous scene readiness.
+
+## Registered page functions
+
+Register component-owned functions instead of relying on globals. ScreenReel awaits returned promises before continuing:
+
+```js
+const unregister = ScreenReel.registerFn('loadReview', async (reviewId) => {
+  await reviewStore.load(reviewId);
+});
+
+// Component cleanup:
+unregister();
+```
+
+`call` actions resolve the registry first and retain `window[action.fn]` as a compatibility fallback.
+
+## Browser validation
+
+Validate the active or named scene against the current document:
+
+```js
+const report = projector.validateScene();
+const another = ScreenReel.validateScene('review-scene');
+```
+
+Reports include route/readiness errors and per-action failures for `selector`, `toSelector`, `cursorTo`, and registered functions. Validation is a current-DOM dry run; targets intentionally created by earlier actions may not exist yet.
 
 ## Agent-friendly flow commands
 

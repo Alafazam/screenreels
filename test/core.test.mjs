@@ -23,12 +23,23 @@ test('route normalization preserves functional query and rejects external routes
   assert.equal(ScreenReelCore.normalizeRoute('/orders?task=review&demo=1', 'https://app.test/home'), '/orders?task=review');
   assert.equal(ScreenReelCore.normalizeRoute('https://evil.test/x', 'https://app.test/home'), null); assert.equal(ScreenReelCore.normalizeRoute('../secret', 'https://app.test/home'), null);
 });
+test('call actions resolve registered functions and await async completion', async () => {
+  let complete = false;
+  const result = await ScreenReelCore.runAction({ type: 'call', fn: 'loadDetails', args: ['ready'] }, {
+    document: {},
+    window: {},
+    resolveFunction: (name) => name === 'loadDetails' ? async (value) => { await ScreenReelCore.sleep(10); complete = value === 'ready'; } : null,
+  });
+  assert.equal(result.ok, true); assert.equal(complete, true);
+});
 test('normalizes Increff steps, CLI scenes, and canonical manifests', () => {
   const legacy = ScreenReelStore.normalizeManifest({ name: 'Legacy', steps: [{ id: 'one', route: '/one', caption: { title: 'One', body: 'Talk' }, actions: [] }] }, 'https://app.test/');
   assert.equal(legacy.flows[0].scenes[0].talkingPoints, 'Talk');
   const cli = ScreenReelStore.normalizeManifest({ scenes: [{ id: 'two', route: '/two', actions: [{ type: 'fill', selector: '#x', value: 'A' }] }] }, 'https://app.test/');
   assert.equal(cli.flows[0].scenes[0].actions[0].type, 'fill');
   const canonical = ScreenReelStore.normalizeManifest({ schemaVersion: 1, flows: [{ id: 'f', name: 'Flow', scenes: [] }] }, 'https://app.test/'); assert.equal(canonical.flows[0].id, 'f');
+  const ready = ScreenReelStore.normalizeManifest({ schemaVersion: 1, flows: [{ id: 'ready', name: 'Ready', scenes: [{ id: 'async', route: '/async', waitFor: '#ready', timeoutMs: 5000, settleMs: 120, actions: [] }] }] }, 'https://app.test/');
+  assert.deepEqual({ waitFor: ready.flows[0].scenes[0].waitFor, timeoutMs: ready.flows[0].scenes[0].timeoutMs, settleMs: ready.flows[0].scenes[0].settleMs }, { waitFor: '#ready', timeoutMs: 5000, settleMs: 120 });
 });
 test('project namespaces isolate local data and clear only their own keys', async () => {
   const local = new MemoryStorage(); const session = new MemoryStorage(); const source = { data: { schemaVersion: 1, flows: [{ id: 'standard', name: 'Standard', scenes: [] }] } };

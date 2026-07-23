@@ -4,6 +4,6 @@
 <body>
   <header class="topbar"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">S</span>ScreenReel</a><button id="demo-button" class="header-cta" type="button">Demo controls</button></header>
   <main><section class="destination" data-demo-id="destination-card"><p class="eyebrow">Navigation complete</p><h1>The same flow continued across pages.</h1><p>Projector position and playback state stayed in the project-scoped session namespace while the browser moved to a new document.</p><a class="primary link" href="./">Return to ScreenReel</a></section></main>
-  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script><script data-cfasync="false">ScreenReel.mount(document.getElementById('demo-button'),{projectId:'action-showcase',flow:{src:'screenreel.demo.json'}});</script>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script><script data-cfasync="false">ScreenReel.mount(document.getElementById('demo-button'),{projectId:'action-showcase',flow:{src:'screenreel.demo.json'},loop:false});</script>
 </body>
 </html>

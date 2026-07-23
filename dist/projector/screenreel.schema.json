@@ -67,6 +67,17 @@
         "talkingPoints": {
           "type": "string"
         },
+        "waitFor": {
+          "type": "string"
+        },
+        "timeoutMs": {
+          "type": "number",
+          "minimum": 100
+        },
+        "settleMs": {
+          "type": "number",
+          "minimum": 0
+        },
         "dwellMs": {
           "type": "number"
         },
