@@ -204,6 +204,23 @@ npx screenreel capture scene-a scene-b
 npx screenreel assemble
 ```
 
+### Voiceover
+
+`--voice` (or `voice.enabled: true` in the config) narrates each scene from `scene.narration ?? scene.talkingPoints` — the script you already write for presenter notes becomes the voice track. No account or model provider is required: the default provider is macOS `say`, and `command` runs any CLI template, local or cloud:
+
+```js
+voice: {
+  enabled: true,
+  provider: 'say',            // macOS built-in; voiceName/rate optional
+  // provider: 'command',     // any TTS CLI, e.g. piper or espeak:
+  // command: 'espeak -f {textFile} -w {outFile}',
+  // provider: { synthesize: async (text, outFile) => { /* your own engine */ } },
+  overflow: 'extend',         // narration longer than the clip freezes the last frame
+}
+```
+
+Every stitched part carries the same AAC 48 kHz stereo shape (silence on title cards and unnarrated scenes), so the concat stays in sync; assemble refuses to stitch if any part's audio shape is wrong. A cloud engine drops in through `command` (e.g. an `openai speech`-style CLI) or a custom `synthesize` — the choice, and the API key, stay yours.
+
 Capture uses local Chrome or `CHROME_PATH`. FFmpeg and ffprobe ship with the source installation. Projector's downloadable browser artifact contains none of these Node dependencies.
 
 ## Examples

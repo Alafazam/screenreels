@@ -67,6 +67,9 @@
         "talkingPoints": {
           "type": "string"
         },
+        "narration": {
+          "type": "string"
+        },
         "waitFor": {
           "type": "string"
         },

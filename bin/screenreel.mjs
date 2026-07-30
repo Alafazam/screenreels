@@ -40,8 +40,9 @@ const HELP = `screenreel — scripted user journeys of a running web app → dem
 Usage:
   screenreel init [--config <path>]        scaffold config + scenes templates
   screenreel capture [ids…] [--config …]   capture scenes as clips
-  screenreel assemble [--config …]         stitch clips + title cards into the video
-  screenreel record [ids…] [--config …]    capture + assemble
+  screenreel assemble [--config …] [--voice]  stitch clips + title cards into the video
+  screenreel record [ids…] [--config …] [--voice]  capture + assemble
+                                           --voice narrates scenes from narration/talkingPoints
   screenreel projector install --out <dir> copy self-hosted browser assets
   screenreel flow inspect --base-url <url> --route <route> [--json]
   screenreel flow validate --flow <file> --base-url <url> [--json]
@@ -85,6 +86,7 @@ async function main() {
   }
 
   const config = await loadConfig(opt('--config', './screenreel.config.mjs'));
+  if (has('--voice')) config.voice.enabled = true;
   const allScenes = loadScenes(config);
   const scenes = positional.length
     ? positional.map(id => {
@@ -104,7 +106,7 @@ async function main() {
   if (command === 'assemble' || command === 'record') {
     // Assemble always walks the FULL scene list so a partial re-capture still
     // stitches the complete reel from existing clips.
-    assemble(config, allScenes);
+    await assemble(config, allScenes);
   }
   if (!['capture', 'assemble', 'record'].includes(command)) {
     console.error(`unknown command: ${command}\n\n${HELP}`);
