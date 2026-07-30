@@ -1,4 +1,5 @@
 import { icon } from './icons.js';
+import { createAnalytics } from './analytics.js';
 
 const instances = new Set();
 const functions = new Map();
@@ -31,7 +32,13 @@ class Projector {
     return cursor.configure({ glyph: this.options.cursor === true ? 'dot' : this.options.cursor });
   }
   async init() {
-    await this.store.ready(); window.ScreenReelCore.setTimeScale(this.options.timeScale); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
+    await this.store.ready(); window.ScreenReelCore.setTimeScale(this.options.timeScale); this.analytics = createAnalytics({ store: this.store, options: this.options.analytics || {} }); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
+    // drop_off means "left the page while playing" — pagehide covers navigation/close, the
+    // visibility change covers tab switches; only the first per session fires unless playback resumes.
+    this.dropOffHandler = () => { if (this.store.playing() && !this.dropOffSent) { this.dropOffSent = true; this.analytics.emit('drop_off'); } };
+    this.visibilityHandler = () => { if (document.visibilityState === 'hidden') this.dropOffHandler(); else if (this.store.playing()) this.dropOffSent = false; };
+    addEventListener('pagehide', this.dropOffHandler);
+    document.addEventListener('visibilitychange', this.visibilityHandler);
     if (this.store.enabled() && !new URLSearchParams(location.search).has('screenreelPreview')) { this.enable(false); if (this.store.playing()) queueMicrotask(() => this.play()); } instances.add(this); event('ready', { projectId: this.store.projectId }); return this;
   }
   bindTarget() {
@@ -41,6 +48,9 @@ class Projector {
     const params = new URLSearchParams(location.search);
     const value = params.get(this.options.activationQueryParam);
     if (value === '1') this.store.setEnabled(true); if (value === '0') { this.store.setEnabled(false); this.store.clearRun(); }
+    // Share mode: ?demo=play arms enabled+share+playing from scene 0, and the existing
+    // "resume playback after navigation" path in init() auto-plays it — no new play logic.
+    if (value === 'play' && !this.store.share()) { this.store.setEnabled(true); this.store.setShare(true); this.store.setPosition(0); this.store.setPlaying(true); }
     // Share-link personalization: ?srv_company=Acme feeds {{company}}. Captured once into the
     // session so it survives cross-route navigation; fresh params override the stored copy.
     const fromUrl = {};
@@ -64,10 +74,16 @@ class Projector {
   }
   render() {
     if (!this.pill) return; const flow = this.store.activeFlow(); const scenes = this.store.enabledScenes(flow); const position = Math.min(this.store.position(), Math.max(0, scenes.length - 1)); const scene = scenes[position];
-    this.pill.innerHTML = `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button><button data-cmd="play" class="sr-play" title="${this.store.playing() ? 'Pause' : 'Play'}">${icon(this.store.playing() ? 'pause' : 'play')}</button><button data-cmd="next" title="Next scene">${icon('right')}</button><button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><button data-cmd="capture" title="Capture this page as a scene">${icon('capture')}</button><button data-cmd="studio" title="Open ScreenReel Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
-    this.pill.querySelector('.sr-flow').onchange = (e) => { this.pause(); this.store.setActive(e.target.value); this.store.setPosition(0); this.render(); };
+    // Share mode is a viewer, not a presenter: progress, play/pause, and exit only.
+    const share = this.store.share();
+    this.pill.classList.toggle('sr-pill--share', share);
+    const playButton = `<button data-cmd="play" class="sr-play" title="${this.store.playing() ? 'Pause' : 'Play'}">${icon(this.store.playing() ? 'pause' : 'play')}</button>`;
+    this.pill.innerHTML = share
+      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${playButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
+      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button>${playButton}<button data-cmd="next" title="Next scene">${icon('right')}</button><button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><button data-cmd="capture" title="Capture this page as a scene">${icon('capture')}</button><button data-cmd="studio" title="Open ScreenReel Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
+    const flowSelect = this.pill.querySelector('.sr-flow'); if (flowSelect) flowSelect.onchange = (e) => { this.pause(); this.store.setActive(e.target.value); this.store.setPosition(0); this.render(); };
     this.pill.querySelectorAll('[data-cmd]').forEach((button) => { button.onclick = () => this.command(button.dataset.cmd); });
-    this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(scene);
+    this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(share ? null : scene);
   }
   renderNotes(scene) {
     const visible = this.store.notesVisible() && !!scene; this.notes.hidden = !visible;
@@ -107,7 +123,7 @@ class Projector {
     const next = (position + 1) % scenes.length; this.store.setPosition(next); this.render(); return scenes[next];
   }
   complete() {
-    this.pause(); const { scene, position, scenes } = this.current(); event('complete', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene?.id, position, sceneCount: scenes.length }); return this;
+    this.pause(); const { scene, position, scenes } = this.current(); this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene?.id, position, sceneCount: scenes.length }); return this;
   }
   validateScene(sceneId) {
     const flow = this.store.activeFlow(); const scene = sceneId ? flow.scenes.find((item) => item.id === sceneId) : this.current().scene;
@@ -133,6 +149,9 @@ class Projector {
       if (sameDocument && generation === this.playGeneration && this.store.playing() && this.routeMatches(scene)) return this.play();
       return;
     }
+    if (!this.analytics.viewStarted()) { this.analytics.markViewStarted(); this.analytics.emit('view_start'); }
+    this.analytics.emit('scene_enter');
+    this.dropOffSent = false;
     this.controller?.abort(); this.controller = new AbortController();
     if (scene.waitFor) {
       const ready = await window.ScreenReelCore.waitFor(document, scene.waitFor, 'visible', Number(scene.timeoutMs) || 8000, this.controller.signal);
@@ -177,7 +196,7 @@ class Projector {
       }
       if (!result.ok && this.options.strict) return this.actionFailed(scene, action, actionIndex, result);
     }
-    if (generation !== this.playGeneration || !this.store.playing()) return; const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
+    if (generation !== this.playGeneration || !this.store.playing()) return; this.analytics.emit('scene_complete'); const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
   /* Introduce the control pill before the first action runs, so the viewer sees which flow is
      about to play and where the controls are. Resolves when the beat is over. */
@@ -207,7 +226,7 @@ class Projector {
     flow.scenes.push(scene); flow = this.store.save(flow); this.toast('Scene captured locally'); this.openStudio({ flowId: flow.id, sceneId: scene.id });
   }
   async openStudio(selection = {}) { const module = await import(this.assetUrl('studio.js')); return module.openStudio({ projector: this, store: this.store, assetBase: this.assetBase, assetVersion: this.assetVersion, ...selection }); }
-  destroy() { this.disable(); this.target.removeEventListener('click', this.clickHandler); this.unsubscribe?.(); instances.delete(this); }
+  destroy() { this.disable(); this.target.removeEventListener('click', this.clickHandler); removeEventListener('pagehide', this.dropOffHandler); document.removeEventListener('visibilitychange', this.visibilityHandler); this.unsubscribe?.(); instances.delete(this); }
 }
 
 export function createPublicApi(assetBase, assetVersion = '') {

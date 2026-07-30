@@ -89,6 +89,25 @@ try {
   });
   assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false); await inlinePage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
+  // stable session id. Fresh context so presenter-mode session state can't leak in.
+  const shareContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const sharePage = await shareContext.newPage();
+  await sharePage.addInitScript(() => { window.__analyticsEvents = []; addEventListener('screenreel:analytics', (e) => window.__analyticsEvents.push(e.detail)); });
+  await sharePage.goto(`${baseUrl}?demo=play`, { waitUntil: 'domcontentloaded' });
+  const sharePill = await visiblePill(sharePage);
+  assert.equal(await sharePill.evaluate((node) => node.classList.contains('sr-pill--share')), true);
+  assert.equal(await sharePage.locator('.sr-flow').count(), 0);
+  assert.equal(await sharePage.locator('button[title="Open ScreenReel Studio"]').count(), 0);
+  await sharePage.waitForFunction(() => (window.__analyticsEvents || []).some((item) => item.event === 'scene_enter'), null, { timeout: 9000 });
+  const funnel = await sharePage.evaluate(() => window.__analyticsEvents);
+  assert.equal(funnel[0].event, 'view_start');
+  assert.equal(funnel[1].event, 'scene_enter');
+  assert.equal(funnel[0].sessionId, funnel[1].sessionId);
+  assert.equal(funnel[0].share, true);
+  await sharePage.locator('button[title="Exit demo mode"]').click();
+  await sharePage.locator('.sr-pill').waitFor({ state: 'detached' });
+  await shareContext.close();
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } }); await mobilePage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await mobilePage.locator('#demo-button').waitFor(); assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true); await mobilePage.screenshot({ path: path.join(output, 'landing-mobile-390x844.png'), fullPage: true }); await mobilePage.close();
   // The deployed artifact is _site/, not examples/: it has rewritten asset paths and cache-busting
   // queries, and its page scripts share one global scope. Exercising only examples/ once let a

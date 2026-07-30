@@ -177,6 +177,39 @@ Declare variables on a flow and reference them as `{{name}}` in action `text`, `
 
 Values resolve in priority order: URL parameters (`?demo=1&srv_company=Northstar` — one link personalizes the whole run and survives cross-page navigation), then the `variables` mount option, then flow defaults. Unknown names stay literal and raise a one-time warning. Selectors, function names, and `goto` URLs are never interpolated — URL-supplied values must not steer targeting or navigation. Capture reads flow defaults automatically (`config.variables` overrides), and Studio edits the declaration via the **Variables** button on the scene list.
 
+## Sharing a demo and measuring it
+
+Send `?demo=play` (optionally with `srv_` variables) and the tour auto-plays with viewer chrome only — progress, play/pause, and exit; no flow picker, notes, capture, or Studio:
+
+```
+https://your-app.example/product?demo=play&srv_company=Northstar
+```
+
+Playback emits funnel events — `view_start` (once per session), `scene_enter`, `scene_complete`, `flow_complete`, and `drop_off` (left while playing) — each enriched with a session id, scene position, and percent complete. **Nothing leaves the page by default.** Consume them in-page or send them wherever you already do analytics:
+
+```js
+await ScreenReel.mount(button, {
+  projectId: 'acme-sales',
+  flow: { src: '/demos/sales-demo.json' },
+  analytics: {
+    onEvent: (event) => posthog?.capture(`screenreel_${event.event}`, event),
+    beaconUrl: 'https://collector.example/events',   // optional: POST each event as JSON
+  },
+});
+```
+
+Payloads carry manifest identifiers only (scene ids, indices) — no URLs, page content, or PII. A collector can be ten lines:
+
+```js
+import http from 'node:http';
+import fs from 'node:fs';
+http.createServer((req, res) => {
+  let body = '';
+  req.on('data', (chunk) => { body += chunk; });
+  req.on('end', () => { fs.appendFileSync('events.jsonl', body + '\n'); res.writeHead(204).end(); });
+}).listen(8787);
+```
+
 ## Keeping demos in sync: doctor and CI
 
 Because ScreenReel drives the live app, a renamed selector is the one way a demo can rot. Two tools close that loop:
