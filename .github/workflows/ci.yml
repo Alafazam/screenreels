@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          # Node 22: resolveChrome() uses fs.globSync (22+) when CHROME_PATH is unset.
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # dist/ is committed; a diff here means a PR changed packages/ without rebuilding dist.
+      - run: git diff --exit-code dist/
+      - run: npm test
+
+  flows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: /opt/pw-browsers
+          key: pw-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium
+        # /opt/pw-browsers is where resolveChrome() looks on Linux.
+        run: PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start example server
+        run: |
+          node scripts/serve-example.mjs &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/examples/action-showcase/ >/dev/null && break
+            sleep 1
+          done
+      - name: Validate demo flows against the live DOM
+        run: node scripts/annotate-validate.mjs --flow examples/action-showcase/screenreel.demo.json --base-url http://127.0.0.1:4173/examples/action-showcase/
+      - run: npm run build:pages
+      - name: Browser smoke test
+        run: npm run test:browser

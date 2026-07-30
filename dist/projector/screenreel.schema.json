@@ -35,6 +35,28 @@
         "defaults": {
           "type": "object"
         },
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "default": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
         "scenes": {
           "type": "array",
           "items": {
@@ -65,6 +87,9 @@
           "type": "string"
         },
         "talkingPoints": {
+          "type": "string"
+        },
+        "narration": {
           "type": "string"
         },
         "waitFor": {
@@ -123,6 +148,7 @@
             "wait",
             "waitFor",
             "goto",
+            "choice",
             "pointer",
             "call",
             "fill"
@@ -133,6 +159,21 @@
         },
         "afterMs": {
           "type": "number"
+        },
+        "fingerprint": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": true

@@ -27,6 +27,7 @@
     { id: 'wait', type: 'wait', category: 'Timing', label: 'Wait duration', picker: 'none', defaults: { ms: 1000 }, fields: [field('ms', 'Wait time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'wait-for', type: 'waitFor', category: 'Timing', label: 'Wait for target or state', picker: 'visual', defaults: { condition: 'visible', timeoutMs: 8000 }, fields: [field('condition', 'Condition', 'select', { options: ['appear', 'disappear', 'visible', 'enabled', 'selected'] }), field('timeoutMs', 'Timeout (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'goto', type: 'goto', category: 'Navigation', label: 'Navigate', picker: 'none', defaults: { url: '/' }, fields: [field('url', 'Local route', 'text')] },
+    { id: 'choice', type: 'choice', category: 'Navigation', label: 'Viewer choice', picker: 'none', defaults: { prompt: 'What do you want to see next?', options: [], timeoutMs: 0, defaultScene: '' }, fields: [field('prompt', 'Prompt', 'text'), field('options', 'Options (JSON array of {label, scene})', 'json'), field('timeoutMs', 'Auto-continue after (ms, 0 = wait)', 'number', { min: 0, max: 120000 }), field('defaultScene', 'Default scene on timeout / capture', 'text')] },
     { id: 'pointer', type: 'pointer', category: 'Advanced', label: 'Pointer tap', picker: 'interactive', advanced: true, defaults: { afterMs: 700 }, fields: [] },
     { id: 'call', type: 'call', category: 'Advanced', label: 'Call page function', picker: 'none', advanced: true, defaults: { fn: '', args: [], afterMs: 700 }, fields: [field('fn', 'Function name', 'text'), field('args', 'Arguments (JSON array)', 'json'), field('cursorTo', 'Cursor target selector (optional)', 'text')] },
   ];
@@ -91,7 +92,7 @@
   function ensureStyles(doc) {
     if (doc.getElementById('__screenreelActionStyles')) return;
     const style = doc.createElement('style'); style.id = '__screenreelActionStyles';
-    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}';
+    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(9,9,11,.52);pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#18181b;font:700 15px/1.35 system-ui,sans-serif;cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid #7c3aed}';
     doc.head.appendChild(style);
   }
   function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - 5}px`, top: `${rect.top - 5}px`, width: `${rect.width + 10}px`, height: `${rect.height + 10}px` }); }
@@ -100,6 +101,7 @@
   const REVEAL_FADE_IN_MS = 20, REVEAL_FADE_OUT_MS = 320;
   const REEL_LANDED_MS = 500;
   const SNIPPET_KEEP_MS = 6000, SNIPPET_MARGIN_PX = 20;
+  const CHOICE_MIN_OPTIONS = 1, CHOICE_MAX_OPTIONS = 4, CHOICE_AUTOPICK_HOLD_MS = 900;
   function scrollOffset(box, win) {
     const doc = win.document; const scroller = doc?.scrollingElement || doc?.documentElement;
     if (box && box !== win && box !== scroller && box !== doc?.body) return { top: box.scrollTop, left: box.scrollLeft };
@@ -189,6 +191,44 @@
     if (action.keep) { setTimeout(() => panel.remove(), scaled(action.keepMs || SNIPPET_KEEP_MS)); return; }
     await sleep(action.holdMs || 2600, ctx.signal); panel.classList.remove('show'); await sleep(REVEAL_FADE_OUT_MS, ctx.signal); panel.remove();
   }
+  /* Viewer-facing choice cards. Unlike every other overlay these accept pointer events —
+     the viewer clicks a card and playback jumps to its scene (via the jumpTo result channel).
+     Deterministic contexts (capture) pass ctx.chooseOption to auto-pick; a pause/disable abort
+     removes the overlay and continues linearly, which is not an error. */
+  function runChoice(action, ctx) {
+    ensureStyles(ctx.document); const doc = ctx.document;
+    const options = (Array.isArray(action.options) ? action.options : []).slice(0, CHOICE_MAX_OPTIONS)
+      .map((option) => ({ label: String(option?.label ?? ''), scene: String(option?.scene ?? '') }))
+      .filter((option) => option.label && option.scene);
+    if (options.length < CHOICE_MIN_OPTIONS) { ctx.warn('choice needs at least one { label, scene } option'); return Promise.resolve({ ok: false, error: 'options' }); }
+    const overlay = doc.createElement('div'); overlay.className = 'sr-choice-overlay';
+    const prompt = doc.createElement('div'); prompt.className = 'sr-choice-prompt'; prompt.textContent = action.prompt || 'What do you want to see next?';
+    const cards = doc.createElement('div'); cards.className = 'sr-choice-cards';
+    overlay.appendChild(prompt); overlay.appendChild(cards);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => { if (settled) return; settled = true; ctx.signal?.removeEventListener('abort', onAbort); overlay.remove(); resolve(result); };
+      const onAbort = () => finish({ ok: true });
+      const buttons = options.map((option) => {
+        const button = doc.createElement('button'); button.type = 'button'; button.className = 'sr-choice-card'; button.textContent = option.label;
+        button.addEventListener('click', () => finish({ ok: true, jumpTo: option.scene }));
+        cards.appendChild(button); return { button, option };
+      });
+      doc.body.appendChild(overlay);
+      const raf = ctx.window?.requestAnimationFrame;
+      raf ? raf(() => overlay.classList.add('show')) : overlay.classList.add('show');
+      ctx.signal?.addEventListener('abort', onAbort, { once: true });
+      if (ctx.chooseOption) {
+        // Capture/deterministic path: show the cards, visually pick one, continue.
+        const scene = String(ctx.chooseOption(action) || options[0].scene);
+        const picked = buttons.find(({ option }) => option.scene === scene) || buttons[0];
+        picked.button.classList.add('picked');
+        sleep(CHOICE_AUTOPICK_HOLD_MS, ctx.signal).then(() => finish({ ok: true, jumpTo: picked.option.scene }));
+      } else if (Number(action.timeoutMs) > 0) {
+        sleep(action.timeoutMs, ctx.signal).then(() => finish(action.defaultScene ? { ok: true, jumpTo: String(action.defaultScene) } : { ok: true }));
+      }
+    });
+  }
   async function runCountdown(action, ctx) {
     ensureStyles(ctx.document); const doc = ctx.document; const from = Math.max(1, Number(action.from) || 3);
     const overlay = doc.createElement('div'); overlay.className = 'sr-countdown-overlay';
@@ -220,12 +260,53 @@
     await ctx.moveCursor?.(el); el.dispatchEvent(event('pointerdown', Pointer, sx, sy, true)); el.dispatchEvent(event('mousedown', Mouse, sx, sy, true)); const started = performance.now(); const duration = Number(action.durMs) || 900;
     await new Promise((resolve) => { const frame = (now) => { const p = Math.min(1, (now - started) / duration); const x = sx + dx * p; const y = sy + dy * p; ctx.window.dispatchEvent(event('pointermove', Pointer, x, y, true)); ctx.window.dispatchEvent(event('mousemove', Mouse, x, y, true)); ctx.window.__screenreelCursor?.moveToPoint?.(x, y, 1); if (!ctx.signal?.aborted && p < 1) ctx.window.requestAnimationFrame(frame); else { ctx.window.dispatchEvent(event('pointerup', Pointer, x, y, false)); ctx.window.dispatchEvent(event('mouseup', Mouse, x, y, false)); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
   }
+  /* Flow variables. {{name}} placeholders resolve against ctx.variables in DISPLAY/VALUE fields
+     only — the allowlist below. Selectors, function names, and goto urls are deliberately
+     excluded: variables can arrive from the share-link URL, and a URL-controlled selector would
+     break validation guarantees while a URL-controlled goto is an open redirect (the projector's
+     default router assigns location.href without re-normalizing at play time). Single pass, no
+     recursive expansion; unknown names stay literal so flows without variables are byte-identical. */
+  const INTERPOLATED_FIELDS = ['text', 'note', 'value', 'label', 'code', 'caption', 'goText'];
+  const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_]\w*)\s*\}\}/g;
+  function interpolate(value, variables) {
+    const missing = [];
+    if (typeof value !== 'string' || !value.includes('{{')) return { value, missing };
+    const resolved = value.replace(VARIABLE_PATTERN, (whole, name) => {
+      if (variables && Object.prototype.hasOwnProperty.call(variables, name)) return String(variables[name]);
+      missing.push(name);
+      return whole;
+    });
+    return { value: resolved, missing };
+  }
+  /* Flattens a flow's variables declaration ({ name: 'default' } or { name: { label, default } })
+     into a plain { name: default } map, dropping invalid names. */
+  function variableDefaults(declared) {
+    const defaults = {};
+    for (const [name, spec] of Object.entries(declared || {})) {
+      if (!/^[A-Za-z_]\w*$/.test(name)) continue;
+      defaults[name] = typeof spec === 'object' && spec !== null ? String(spec.default ?? '') : String(spec ?? '');
+    }
+    return defaults;
+  }
+  function resolveActionVariables(action, variables, warn) {
+    if (!variables) return action;
+    const resolved = { ...action };
+    const unresolved = new Set();
+    for (const field of INTERPOLATED_FIELDS) {
+      const { value, missing } = interpolate(resolved[field], variables);
+      resolved[field] = value;
+      missing.forEach((name) => unresolved.add(name));
+    }
+    if (unresolved.size && warn) warn(`Unresolved demo variable(s): ${[...unresolved].join(', ')}`);
+    return resolved;
+  }
   async function runAction(source, context = {}) {
-    const action = { ...source, type: actionType(source) }; const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
+    const action = resolveActionVariables({ ...source, type: actionType(source) }, context.variables, context.warn); const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
     if (!doc) return { ok: false, error: 'document' };
     if (action.note && ctx.announce) ctx.announce(action.note);
     if (action.type === 'wait') { await sleep(action.ms || 500, ctx.signal); return { ok: true }; }
     if (action.type === 'countdown') { await runCountdown(action, ctx); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
+    if (action.type === 'choice') { const result = await runChoice(action, ctx); if (result.ok && action.afterMs) await sleep(action.afterMs, ctx.signal); return result; }
     if (action.type === 'waitFor') { const found = await waitFor(doc, action.selector, action.condition || 'visible', action.timeoutMs || 8000, ctx.signal); if (!found) return { ok: false, error: 'timeout' }; if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'highlight' || action.type === 'glow') { const ok = await runGlow(action, ctx); if (!ok) ctx.warn(`Selector not found: ${action.selector}`); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok }; }
     if (action.type === 'goto') { await ctx.navigate?.(action.url); return { ok: true, navigated: true }; }
@@ -257,9 +338,34 @@
     if (definition.picker !== 'none' && !action.selector) errors.push('Choose a target');
     if (definition.picker === 'source-destination' && !action.toSelector && action.dx == null && action.dy == null) errors.push('Choose a destination or provide a drag distance');
     if (actionType(action) === 'goto' && !normalizeRoute(action.url, baseHref)) errors.push('Use a valid local route');
+    if (actionType(action) === 'choice') {
+      const options = Array.isArray(action.options) ? action.options : [];
+      if (options.length < CHOICE_MIN_OPTIONS || options.length > CHOICE_MAX_OPTIONS) errors.push(`Provide ${CHOICE_MIN_OPTIONS}-${CHOICE_MAX_OPTIONS} options`);
+      if (options.some((option) => !String(option?.label ?? '').trim() || !String(option?.scene ?? '').trim())) errors.push('Every option needs a label and a scene id');
+      if (Number(action.timeoutMs) > 0 && !String(action.defaultScene ?? '').trim()) errors.push('Set a default scene when auto-continue is enabled');
+    }
     if (actionType(action) === 'call' && !/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) errors.push('Use a valid function name');
     for (const key of ['selector', 'toSelector', 'cursorTo']) { if (!action[key] || !doc) continue; const count = queryAll(doc, action[key]).length; const collection = key === 'selector' && definition.picker === 'collection'; if (!count) errors.push(`${key} has no matches`); else if (!collection && count > 1 && action.index == null) errors.push(`${key} matches multiple elements`); }
     for (const spec of [...(definition.fields || []), { key: 'afterMs', min: 0, max: 30000 }]) if (spec.type === 'number' && action[spec.key] != null && action[spec.key] !== '') { const value = Number(action[spec.key]); if (!Number.isFinite(value) || (spec.min != null && value < spec.min) || (spec.max != null && value > spec.max)) errors.push(`${spec.label || spec.key} is outside the allowed range`); }
+    return errors;
+  }
+  /* Flow-level graph validation: every choice target must be a real, ENABLED scene. A target
+     filtered out by enabledScenes() would be a silent no-op at runtime, so it's an error here.
+     Pure — usable from Studio save(), CLI validate, and unit tests without a browser. */
+  function validateFlowGraph(flow) {
+    const errors = [];
+    const enabled = new Set((flow?.scenes || []).filter((scene) => scene.enabled !== false).map((scene) => scene.id));
+    const known = new Set((flow?.scenes || []).map((scene) => scene.id));
+    for (const scene of flow?.scenes || []) {
+      (scene.actions || []).forEach((action, index) => {
+        if (actionType(action) !== 'choice') return;
+        const targets = [...(Array.isArray(action.options) ? action.options.map((option) => option?.scene) : []), action.defaultScene].filter(Boolean).map(String);
+        for (const target of targets) {
+          if (!known.has(target)) errors.push(`${scene.id} action ${index + 1}: choice targets unknown scene "${target}"`);
+          else if (!enabled.has(target)) errors.push(`${scene.id} action ${index + 1}: choice targets disabled scene "${target}"`);
+        }
+      });
+    }
     return errors;
   }
   const interactiveSelector = 'button,a[href],input,select,textarea,[role="button"],[role="switch"],[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
@@ -286,5 +392,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, 500).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 120), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, sleep, setTimeScale, timeScale: () => timeScale, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

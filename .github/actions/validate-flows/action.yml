@@ -1,0 +1,41 @@
+# Composite action for repos that ship ScreenReel flows: validates a flow file against the
+# consumer's running app and annotates the PR with any scene/action that broke.
+#
+# The consumer must have `screenreel` installed (a git devDependency works) and must start
+# their own app server first — their stack, their command:
+#
+#   - run: npm ci
+#   - name: Start my app
+#     run: npm run dev & npx wait-on http://localhost:3000
+#   - uses: Alafazam/screenreels/.github/actions/validate-flows@main
+#     with:
+#       flow: demos/sales-demo.json
+#       base-url: http://localhost:3000
+name: Validate ScreenReel flows
+description: Validate a ScreenReel flow file against a running app and annotate failures on the PR.
+inputs:
+  flow:
+    description: Path to the flow manifest (screenreel.demo.json / screenreel.scenes.json)
+    required: true
+  base-url:
+    description: Base URL of the running app the flow's routes resolve against
+    required: true
+  node-version:
+    description: Node version (22+ required unless CHROME_PATH is provided)
+    required: false
+    default: '22'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: Install Chromium for ScreenReel
+      shell: bash
+      run: PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+    - name: Validate flows
+      shell: bash
+      # Resolves the consumer's installed screenreel so its playwright-core dependency is present.
+      run: |
+        SCREENREEL_DIR=$(node -e "console.log(require('node:path').dirname(require.resolve('screenreel/package.json', { paths: [process.cwd()] })))")
+        node "$SCREENREEL_DIR/scripts/annotate-validate.mjs" --flow "${{ inputs.flow }}" --base-url "${{ inputs.base-url }}"

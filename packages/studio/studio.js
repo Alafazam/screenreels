@@ -1,9 +1,11 @@
 import { icon } from './icons.js';
+import { Recorder } from './recorder.js';
 
 let activeStudio;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const clone = (value) => JSON.parse(JSON.stringify(value));
-const ACTION_ICONS = { highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
+const CHOICE_ESTIMATE_MS = 5000; // a viewer choice has no fixed duration; assume a beat for planning
+const ACTION_ICONS = { choice: 'right', highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
 const flowCounts = (flow) => ({ scenes: flow.scenes.length, enabled: flow.scenes.filter((scene) => scene.enabled !== false).length, actions: flow.scenes.reduce((total, scene) => total + scene.actions.length, 0) });
 function formatUpdated(flow) { if (flow.readonly) return 'Standard'; try { return new Date(flow.updatedAt).toLocaleDateString('en-GB'); } catch { return '—'; } }
 function estimateSceneSeconds(scene, defaults) {
@@ -13,6 +15,7 @@ function estimateSceneSeconds(scene, defaults) {
     if (action.type === 'glow' && action.sequence) ms += Number(action.stepMs || 1050) * Number(action.count || 6);
     else ms += Number(action.holdMs || action.durMs || action.ms || action.stepMs || 0);
     if (action.type === 'type') ms += Number(action.charMs ?? 45) * String(action.text || '').length;
+    if (action.type === 'choice') ms += Number(action.timeoutMs) || CHOICE_ESTIMATE_MS;
   }
   return Math.max(1, Math.round(ms / 1000));
 }
@@ -40,8 +43,8 @@ class Studio {
   ensureEditable() { if (!this.draft.readonly) return; const sceneIndex = this.draft.scenes.findIndex((scene) => scene.id === this.sceneId); this.draft = this.store.createCopy(this.draft, `My ${this.draft.name}`); this.flowId = this.draft.id; if (sceneIndex >= 0) this.sceneId = this.draft.scenes[sceneIndex].id; this.dirty = true; this.toast('Created a local copy'); }
   renderScenes() {
     if (!this.draft) return this.backToFlows();
-    this.body.innerHTML = `<section class="sr-page"><div class="sr-page-title"><div><button class="sr-back" data-back aria-label="Back to flows">${icon('left')}</button><h1>${esc(this.draft.name)}</h1><p>${flowCounts(this.draft).scenes} scenes · ${flowCounts(this.draft).enabled} enabled · reorder, enable, or open a scene to edit its sequence.</p></div><div class="sr-toolbar"><button data-add>${icon('plus')} Add scene</button><button data-dup>${icon('copy')} Duplicate</button><button data-export>${icon('upload')} Export</button>${this.draft.readonly ? '' : `<button data-reset>${icon('rotate')} Reset</button>`}<button data-play>${icon('play')} Play flow</button><button data-save class="sr-primary">${icon('check')} Save</button></div></div><div class="sr-panel"><table class="sr-scene-table"><thead><tr><th>Order</th><th>Scene</th><th>Talking points</th><th>Sequence</th><th>Time</th><th>Enabled</th><th aria-hidden="true"></th></tr></thead><tbody>${this.draft.scenes.map((scene, index) => `<tr draggable="true" data-index="${index}"><td class="sr-order"><span class="sr-grip" title="Drag to reorder" aria-hidden="true">${icon('grip')}</span><span class="sr-order-num">${String(index + 1).padStart(2, '0')}</span></td><td><div class="sr-scene-name"><strong>${esc(scene.title)}</strong><small class="sr-route">${esc(scene.route)}</small></div></td><td class="sr-notes-preview">${esc(scene.talkingPoints)}</td><td><span class="sr-chip">${scene.actions.length} actions</span></td><td class="sr-muted sr-time">${estimateSceneSeconds(scene, this.draft.defaults)} sec</td><td><label class="sr-toggle"><input type="checkbox" data-enabled ${scene.enabled !== false ? 'checked' : ''}><span></span></label></td><td class="sr-row"><button data-up title="Move up" aria-label="Move up">${icon('up')}</button><button data-down title="Move down" aria-label="Move down">${icon('down')}</button><button data-edit>${icon('pencil')} Edit</button><button data-remove class="sr-danger" title="Delete scene" aria-label="Delete scene">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></section>`;
-    this.body.querySelector('[data-back]').onclick = () => this.backToFlows(); this.body.querySelector('[data-save]').onclick = () => this.save(); this.body.querySelector('[data-export]').onclick = () => this.exportFlow(); this.body.querySelector('[data-dup]').onclick = () => { const flow = this.store.save(this.store.createCopy(this.draft)); this.flowId = flow.id; this.sceneId = null; this.view = 'scenes'; this.dirty = false; this.loadDraft(); this.render(); }; this.body.querySelector('[data-play]').onclick = () => { if (!this.save()) return; this.close(); this.projector.enable(); this.projector.store.setPosition(0); this.projector.play(); };
+    this.body.innerHTML = `<section class="sr-page"><div class="sr-page-title"><div><button class="sr-back" data-back aria-label="Back to flows">${icon('left')}</button><h1>${esc(this.draft.name)}</h1><p>${flowCounts(this.draft).scenes} scenes · ${flowCounts(this.draft).enabled} enabled · reorder, enable, or open a scene to edit its sequence.</p></div><div class="sr-toolbar"><button data-add>${icon('plus')} Add scene</button><button data-dup>${icon('copy')} Duplicate</button><button data-variables>${icon('sliders')} Variables</button><button data-export>${icon('upload')} Export</button>${this.draft.readonly ? '' : `<button data-reset>${icon('rotate')} Reset</button>`}<button data-play>${icon('play')} Play flow</button><button data-save class="sr-primary">${icon('check')} Save</button></div></div><div class="sr-panel"><table class="sr-scene-table"><thead><tr><th>Order</th><th>Scene</th><th>Talking points</th><th>Sequence</th><th>Time</th><th>Enabled</th><th aria-hidden="true"></th></tr></thead><tbody>${this.draft.scenes.map((scene, index) => `<tr draggable="true" data-index="${index}"><td class="sr-order"><span class="sr-grip" title="Drag to reorder" aria-hidden="true">${icon('grip')}</span><span class="sr-order-num">${String(index + 1).padStart(2, '0')}</span></td><td><div class="sr-scene-name"><strong>${esc(scene.title)}</strong><small class="sr-route">${esc(scene.route)}</small></div></td><td class="sr-notes-preview">${esc(scene.talkingPoints)}</td><td><span class="sr-chip">${scene.actions.length} actions</span></td><td class="sr-muted sr-time">${estimateSceneSeconds(scene, this.draft.defaults)} sec</td><td><label class="sr-toggle"><input type="checkbox" data-enabled ${scene.enabled !== false ? 'checked' : ''}><span></span></label></td><td class="sr-row"><button data-up title="Move up" aria-label="Move up">${icon('up')}</button><button data-down title="Move down" aria-label="Move down">${icon('down')}</button><button data-edit>${icon('pencil')} Edit</button><button data-remove class="sr-danger" title="Delete scene" aria-label="Delete scene">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></section>`;
+    this.body.querySelector('[data-back]').onclick = () => this.backToFlows(); this.body.querySelector('[data-save]').onclick = () => this.save(); this.body.querySelector('[data-export]').onclick = () => this.exportFlow(); this.body.querySelector('[data-variables]').onclick = () => this.editVariables(); this.body.querySelector('[data-dup]').onclick = () => { const flow = this.store.save(this.store.createCopy(this.draft)); this.flowId = flow.id; this.sceneId = null; this.view = 'scenes'; this.dirty = false; this.loadDraft(); this.render(); }; this.body.querySelector('[data-play]').onclick = () => { if (!this.save()) return; this.close(); this.projector.enable(); this.projector.store.setPosition(0); this.projector.play(); };
     this.body.querySelector('[data-add]').onclick = () => { this.ensureEditable(); const scene = { id: window.ScreenReelStore.makeId('scene'), enabled: true, route: window.ScreenReelCore.normalizeRoute(this.projector.router.getRoute(), location.href) || '/', title: 'New scene', talkingPoints: '', dwellMs: 6000, actions: [] }; this.draft.scenes.push(scene); this.sceneId = scene.id; this.view = 'editor'; this.dirty = true; this.render(); };
     const reset = this.body.querySelector('[data-reset]'); if (reset) reset.onclick = () => { if (!confirm('Replace this flow’s scenes with the first canonical flow?')) return; const standard = clone(this.store.standardFlows[0]); this.draft.scenes = standard.scenes; this.draft.defaults = standard.defaults; this.dirty = true; this.render(); };
     this.body.querySelectorAll('tbody tr').forEach((row) => {
@@ -52,16 +55,81 @@ class Studio {
       row.ondragstart = () => { this.dragIndex = index; row.classList.add('dragging'); }; row.ondragend = () => row.classList.remove('dragging'); row.ondragover = (e) => e.preventDefault(); row.ondrop = () => this.moveScene(this.dragIndex, index);
     });
   }
+  /* Flow-level {{variable}} declarations. v1 edits the JSON map directly (the field system has no
+     repeatable-row type); names are validated so a typo can't silently never resolve. */
+  editVariables() {
+    const modal = this.modal(`<h2>Flow variables</h2><p class="sr-muted">Use <code>{{name}}</code> in action text, notes, values, and scene talking points. Viewers can override per link with <code>?srv_name=value</code>.</p><div class="sr-fields">${this.fieldHtml({ key: 'variables', label: 'Variables — { "name": "default" } or { "name": { "label": "…", "default": "…" } }', type: 'json' }, this.draft.variables ?? {})}</div><div class="sr-modal-actions"><button data-cancel>Cancel</button><button data-apply class="sr-primary">Apply</button></div>`);
+    modal.querySelector('[data-cancel]').onclick = () => modal.remove();
+    modal.querySelector('[data-apply]').onclick = () => {
+      let parsed;
+      try { parsed = JSON.parse(modal.querySelector('[data-key="variables"]').value || '{}'); } catch { return this.toast('Variables must be valid JSON'); }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return this.toast('Variables must be a JSON object');
+      const invalid = Object.keys(parsed).find((name) => !/^[A-Za-z_]\w*$/.test(name));
+      if (invalid) return this.toast(`Invalid variable name: ${invalid}`);
+      this.ensureEditable(); this.draft.variables = parsed; this.dirty = true; modal.remove(); this.render();
+    };
+  }
   moveScene(from, to) { if (to < 0 || to >= this.draft.scenes.length || from === to) return; this.ensureEditable(); const [scene] = this.draft.scenes.splice(from, 1); this.draft.scenes.splice(to, 0, scene); this.dirty = true; this.render(); }
   scene() { return this.draft?.scenes.find((scene) => scene.id === this.sceneId); }
   previewRoute(route) { const url = new URL(route, location.href); url.searchParams.set('screenreelPreview', '1'); return `${url.pathname}${url.search}${url.hash}`; }
   renderEditor() {
     const scene = this.scene(); if (!scene) { this.view = 'scenes'; return this.render(); }
-    this.body.innerHTML = `<section class="sr-page"><div class="sr-page-title"><div><button class="sr-back" data-back aria-label="Back to scenes">${icon('left')}</button><h1>${esc(scene.title)}</h1><p>${esc(this.draft.name)} · ${esc(scene.route)}</p></div><div class="sr-toolbar"><button data-play-scene>${icon('play')} Play scene</button><button data-save class="sr-primary">${icon('check')} Save</button></div></div><div class="sr-fields"><div class="sr-field"><label>Scene title</label><input data-field="title" value="${esc(scene.title)}"></div><div class="sr-field"><label>Route</label><input data-field="route" value="${esc(scene.route)}"></div><div class="sr-field"><label>Scene time (ms)</label><input type="number" min="100" max="120000" data-field="dwellMs" value="${Number(scene.dwellMs || 6000)}"></div><div class="sr-field"><label>Ready selector (optional)</label><input data-field="waitFor" value="${esc(scene.waitFor || '')}" placeholder="#page-ready"></div><div class="sr-field"><label>Ready timeout (ms)</label><input type="number" min="100" max="120000" data-field="timeoutMs" value="${scene.timeoutMs ?? ''}" placeholder="8000"></div><div class="sr-field"><label>Settle time (ms)</label><input type="number" min="0" max="30000" data-field="settleMs" value="${scene.settleMs ?? ''}" placeholder="0"></div><div class="sr-field wide"><label>Talking points</label><textarea data-field="talkingPoints">${esc(scene.talkingPoints)}</textarea></div></div><div class="sr-editor-grid"><section class="sr-preview-panel"><div class="sr-preview-tools"><strong>Product preview</strong><input readonly value="${esc(scene.route)}"><button data-reload aria-label="Reload preview" title="Reload">${icon('rotate')}</button></div><div class="sr-preview-frame-wrap"><div class="sr-picker-banner" hidden>Pick a target · ↑ parent · ↓ child · Esc cancel</div><iframe class="sr-preview-frame" src="${esc(this.previewRoute(scene.route))}" title="Scene preview"></iframe></div></section><aside class="sr-timeline"><div class="sr-timeline-head"><div><strong>Scene sequence</strong><span>${scene.actions.length} actions · drag to reorder</span></div><button data-add-action class="sr-primary sr-add-action">${icon('plus')} Add action</button></div><div class="sr-actions">${scene.actions.length ? scene.actions.map((action, index) => this.actionRow(action, index)).join('') : '<div class="sr-empty">Add the first action to this scene.</div>'}</div></aside></div></section>`;
-    this.frame = this.body.querySelector('.sr-preview-frame'); this.body.querySelector('[data-back]').onclick = () => { this.view = 'scenes'; this.render(); }; this.body.querySelector('[data-save]').onclick = () => this.save(); this.body.querySelector('[data-reload]').onclick = () => this.frame.contentWindow.location.reload(); this.body.querySelector('[data-add-action]').onclick = () => this.openCatalog(); this.body.querySelector('[data-play-scene]').onclick = () => this.playScene();
+    this.body.innerHTML = `<section class="sr-page"><div class="sr-page-title"><div><button class="sr-back" data-back aria-label="Back to scenes">${icon('left')}</button><h1>${esc(scene.title)}</h1><p>${esc(this.draft.name)} · ${esc(scene.route)}</p></div><div class="sr-toolbar"><button data-record class="sr-record">${icon('record')} Record</button><button data-play-scene>${icon('play')} Play scene</button><button data-save class="sr-primary">${icon('check')} Save</button></div></div><div class="sr-fields"><div class="sr-field"><label>Scene title</label><input data-field="title" value="${esc(scene.title)}"></div><div class="sr-field"><label>Route</label><input data-field="route" value="${esc(scene.route)}"></div><div class="sr-field"><label>Scene time (ms)</label><input type="number" min="100" max="120000" data-field="dwellMs" value="${Number(scene.dwellMs || 6000)}"></div><div class="sr-field"><label>Ready selector (optional)</label><input data-field="waitFor" value="${esc(scene.waitFor || '')}" placeholder="#page-ready"></div><div class="sr-field"><label>Ready timeout (ms)</label><input type="number" min="100" max="120000" data-field="timeoutMs" value="${scene.timeoutMs ?? ''}" placeholder="8000"></div><div class="sr-field"><label>Settle time (ms)</label><input type="number" min="0" max="30000" data-field="settleMs" value="${scene.settleMs ?? ''}" placeholder="0"></div><div class="sr-field wide"><label>Talking points</label><textarea data-field="talkingPoints">${esc(scene.talkingPoints)}</textarea></div></div><div class="sr-editor-grid"><section class="sr-preview-panel"><div class="sr-preview-tools"><strong>Product preview</strong><input readonly value="${esc(scene.route)}"><button data-reload aria-label="Reload preview" title="Reload">${icon('rotate')}</button></div><div class="sr-preview-frame-wrap"><div class="sr-picker-banner" hidden>Pick a target · ↑ parent · ↓ child · Esc cancel</div><iframe class="sr-preview-frame" src="${esc(this.previewRoute(scene.route))}" title="Scene preview"></iframe></div></section><aside class="sr-timeline"><div class="sr-timeline-head"><div><strong>Scene sequence</strong><span data-action-count>${scene.actions.length} actions · drag to reorder</span></div><button data-add-action class="sr-primary sr-add-action">${icon('plus')} Add action</button></div><div class="sr-actions">${scene.actions.length ? scene.actions.map((action, index) => this.actionRow(action, index)).join('') : '<div class="sr-empty">Add the first action to this scene.</div>'}</div></aside></div></section>`;
+    this.frame = this.body.querySelector('.sr-preview-frame'); this.body.querySelector('[data-back]').onclick = () => { this.view = 'scenes'; this.render(); }; this.body.querySelector('[data-save]').onclick = () => this.save(); this.body.querySelector('[data-reload]').onclick = () => this.frame.contentWindow.location.reload(); this.body.querySelector('[data-add-action]').onclick = () => this.openCatalog(); this.body.querySelector('[data-play-scene]').onclick = () => this.playScene(); this.body.querySelector('[data-record]').onclick = () => this.toggleRecording();
     this.body.querySelectorAll('[data-field]').forEach((input) => input.oninput = () => { this.ensureEditable(); const value = input.type === 'number' ? (input.value === '' ? undefined : Number(input.value)) : input.value; this.scene()[input.dataset.field] = value; this.dirty = true; });
-    this.body.querySelectorAll('[data-action-index]').forEach((row) => { const index = Number(row.dataset.actionIndex); row.querySelector('[data-action-edit]').onclick = () => this.editAction(index); row.querySelector('[data-action-up]').onclick = () => this.moveAction(index, index - 1); row.querySelector('[data-action-down]').onclick = () => this.moveAction(index, index + 1); row.querySelector('[data-action-delete]').onclick = () => { this.ensureEditable(); this.scene().actions.splice(index, 1); this.dirty = true; this.render(); }; });
+    this.body.querySelectorAll('[data-action-index]').forEach((row) => this.bindActionRow(row));
   }
+  bindActionRow(row) { const index = Number(row.dataset.actionIndex); row.querySelector('[data-action-edit]').onclick = () => this.editAction(index); row.querySelector('[data-action-up]').onclick = () => this.moveAction(index, index - 1); row.querySelector('[data-action-down]').onclick = () => this.moveAction(index, index + 1); row.querySelector('[data-action-delete]').onclick = () => { this.ensureEditable(); this.scene().actions.splice(index, 1); this.dirty = true; this.render(); }; }
+  /* Record-by-doing. The recorder's teardown is installed into this.cancelPicker — the same slot
+     the selector picker uses — so any destructive render() (row edits, back, save, close) stops
+     recording cleanly before the preview iframe is torn down. */
+  toggleRecording() {
+    if (this.recorder?.active) { this.cancelPicker(); return; }
+    if (!this.frame?.contentDocument) return this.toast('Preview is not available for recording');
+    this.cancelPicker();
+    this.ensureEditable();
+    const button = this.body.querySelector('[data-record]');
+    const recorder = new Recorder({
+      frame: this.frame, core: window.ScreenReelCore, banner: this.body.querySelector('.sr-picker-banner'),
+      route: this.scene().route,
+      onOp: (op) => this.applyRecordedOp(op),
+      onStop: (reason) => {
+        this.recorder = null; this.cancelPicker = () => {};
+        const node = this.body?.querySelector('[data-record]');
+        if (node) { node.classList.remove('recording'); node.innerHTML = `${icon('record')} Record`; }
+        if (reason) this.toast(reason);
+      },
+    });
+    if (!recorder.start()) return this.toast('Preview is not available for recording');
+    this.recorder = recorder;
+    this.cancelPicker = () => recorder.stop();
+    if (button) { button.classList.add('recording'); button.innerHTML = `${icon('record')} Stop`; }
+  }
+  /* Applies recorder ops without render(): a re-render would recreate the preview iframe, losing
+     page state and the recorder's listeners mid-session. Rows are appended incrementally instead. */
+  applyRecordedOp(op) {
+    const scene = this.scene(); if (!scene) return;
+    if (op.op === 'append') {
+      const action = { id: window.ScreenReelStore.makeId('action'), ...op.action };
+      scene.actions.push(action); this.dirty = true; this.markDirty();
+      const list = this.body?.querySelector('.sr-actions'); if (!list) return;
+      list.querySelector('.sr-empty')?.remove();
+      list.insertAdjacentHTML('beforeend', this.actionRow(action, scene.actions.length - 1));
+      this.bindActionRow(list.lastElementChild);
+      const count = this.body.querySelector('[data-action-count]'); if (count) count.textContent = `${scene.actions.length} actions · drag to reorder`;
+    } else if (op.op === 'patchLast') {
+      const last = scene.actions[scene.actions.length - 1]; if (!last) return;
+      Object.assign(last, op.patch); this.dirty = true; this.markDirty();
+    } else if (op.op === 'replaceLast') {
+      const index = scene.actions.length - 1; if (index < 0) return;
+      scene.actions[index] = { id: scene.actions[index].id, ...op.action }; this.dirty = true; this.markDirty();
+      const row = this.body?.querySelector(`[data-action-index="${index}"]`); if (!row) return;
+      row.outerHTML = this.actionRow(scene.actions[index], index);
+      this.bindActionRow(this.body.querySelector(`[data-action-index="${index}"]`));
+    }
+  }
+  /* head() only renders the unsaved-changes badge during a full render(); recording avoids those. */
+  markDirty() { if (this.shell.querySelector('.sr-dirty')) return; this.shell.querySelector('[data-global="ai"]')?.insertAdjacentHTML('beforebegin', '<span class="sr-dirty">Unsaved changes</span>'); }
   actionRow(action, index) { const definition = window.ScreenReelCore.definitionForAction(action); return `<article class="sr-action ${this.failedAction === index ? 'failed' : ''}" data-action-index="${index}"><span class="sr-action-index">${index + 1}</span><span class="sr-action-ico">${icon(ACTION_ICONS[action.type] || 'spark')}</span><div class="sr-action-body"><strong>${esc(definition?.label || action.type)}</strong><small>${esc(action.selector || action.url || action.fn || `${action.ms || ''} ms`)}</small></div><div class="sr-action-btns"><button data-action-edit title="Settings" aria-label="Settings">${icon('sliders')}</button><button data-action-up aria-label="Move up">${icon('up')}</button><button data-action-down aria-label="Move down">${icon('down')}</button><button data-action-delete class="sr-danger" aria-label="Remove">${icon('close')}</button></div></article>`; }
   moveAction(from, to) { if (to < 0 || to >= this.scene().actions.length) return; this.ensureEditable(); const [action] = this.scene().actions.splice(from, 1); this.scene().actions.splice(to, 0, action); this.dirty = true; this.render(); }
   openCatalog() {
@@ -75,7 +143,8 @@ class Studio {
     const frameDoc = this.frame?.contentDocument; if (!frameDoc) return this.toast('Preview is not available for picking'); const banner = this.body.querySelector('.sr-picker-banner'); banner.hidden = false; let phase = 0; let target = null; let previousChild = null; let sourceSelector = null;
     const outline = frameDoc.createElement('div'); outline.className = 'sr-selector-outline'; Object.assign(outline.style, { position: 'fixed', zIndex: '2147483640', pointerEvents: 'none', border: '3px solid #8b5cf6', borderRadius: '9px', boxShadow: '0 0 0 2px #fff,0 0 22px rgba(124,58,237,.55)' }); frameDoc.body.appendChild(outline); const place = (el) => { target = el; const rect = el.getBoundingClientRect(); Object.assign(outline.style, { left: `${rect.left - 4}px`, top: `${rect.top - 4}px`, width: `${rect.width + 8}px`, height: `${rect.height + 8}px` }); };
     const hover = (e) => { const resolved = window.ScreenReelCore.resolvePickerTarget(e.target, policy === 'source-destination' ? (phase ? 'visual' : 'interactive') : policy, frameDoc); if (resolved) place(resolved); };
-    const click = (e) => { e.preventDefault(); e.stopPropagation(); if (!target) return; const selector = policy === 'collection' ? window.ScreenReelCore.selectorForCollection(target) : window.ScreenReelCore.selectorFor(target); if (policy === 'source-destination' && phase === 0) { sourceSelector = selector; phase = 1; banner.textContent = 'Now pick the destination · Esc cancels'; return; } cleanup(); done(policy === 'source-destination' ? { selector: sourceSelector, toSelector: selector } : { selector }); this.toast(`${target.tagName.toLowerCase()} selected · ${frameDoc.querySelectorAll(selector).length} match`); };
+    const fingerprintOf = (el) => ({ text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 120), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '' });
+    const click = (e) => { e.preventDefault(); e.stopPropagation(); if (!target) return; const selector = policy === 'collection' ? window.ScreenReelCore.selectorForCollection(target) : window.ScreenReelCore.selectorFor(target); if (policy === 'source-destination' && phase === 0) { sourceSelector = selector; phase = 1; banner.textContent = 'Now pick the destination · Esc cancels'; return; } cleanup(); done(policy === 'source-destination' ? { selector: sourceSelector, toSelector: selector } : { selector, fingerprint: fingerprintOf(target) }); this.toast(`${target.tagName.toLowerCase()} selected · ${frameDoc.querySelectorAll(selector).length} match`); };
     const key = (e) => { if (e.key === 'Escape') cleanup(); else if (e.key === 'ArrowUp' && target?.parentElement && target.parentElement !== frameDoc.body) { previousChild = target; place(target.parentElement); } else if (e.key === 'ArrowDown' && previousChild) { place(previousChild); previousChild = null; } };
     const cleanup = () => { frameDoc.removeEventListener('mousemove', hover, true); frameDoc.removeEventListener('click', click, true); frameDoc.defaultView.removeEventListener('keydown', key, true); outline.remove(); banner.hidden = true; this.cancelPicker = () => {}; };
     frameDoc.addEventListener('mousemove', hover, true); frameDoc.addEventListener('click', click, true); frameDoc.defaultView.addEventListener('keydown', key, true); this.cancelPicker = cleanup;
@@ -98,8 +167,9 @@ class Studio {
     }
     if (scene.settleMs) await window.ScreenReelCore.sleep(scene.settleMs);
     for (let index = 0; index < scene.actions.length; index++) {
-      const result = await window.ScreenReelCore.runAction(scene.actions[index], { document: doc, window: win, navigate: (route) => { this.frame.src = this.previewRoute(route); } });
+      const result = await window.ScreenReelCore.runAction(scene.actions[index], { document: doc, window: win, variables: window.ScreenReelCore.variableDefaults(this.draft?.variables), navigate: (route) => { this.frame.src = this.previewRoute(route); } });
       if (!result.ok) { this.failedAction = index; this.toast(`Action ${index + 1} failed`); this.render(); return; }
+      if (result.jumpTo) { this.toast(`Choice would jump to "${result.jumpTo}" — single-scene preview stops here`); return; }
       if (result.navigated) return;
     }
     this.toast('Scene completed');
@@ -114,6 +184,7 @@ class Studio {
       if (scene.settleMs != null && (!Number.isFinite(Number(scene.settleMs)) || Number(scene.settleMs) < 0 || Number(scene.settleMs) > 30000)) errors.push(`${scene.title}: invalid settle time`);
       if (scene.id === this.sceneId) for (const action of scene.actions) if (!action.locked) errors.push(...window.ScreenReelCore.validate(action, this.frame?.contentDocument, location.href).map((message) => `${scene.title}: ${message}`));
     }
+    errors.push(...window.ScreenReelCore.validateFlowGraph(this.draft));
     if (errors.length) { this.toast(errors[0]); return false; }
     this.draft = this.store.save(this.draft); this.flowId = this.draft.id; this.dirty = false; this.toast('Saved locally'); this.render(); return true;
   }

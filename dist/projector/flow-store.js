@@ -88,7 +88,18 @@
     createCopy(source, name) {
       const flow = clone(source || this.activeFlow()); const stamp = now();
       flow.id = makeId('flow'); flow.name = name || `${flow.name} copy`; flow.readonly = false; flow.createdAt = stamp; flow.updatedAt = stamp;
-      flow.scenes = flow.scenes.map((scene, sceneIndex) => ({ ...normalizeScene(scene, sceneIndex, this.baseHref), id: makeId('scene'), actions: scene.actions.map((action) => ({ ...action, id: makeId('action') })) }));
+      // Scene ids are regenerated, so anything referencing them by id (choice targets) must be
+      // remapped or the copy's branches silently point at the original flow's scenes.
+      const idMap = new Map(flow.scenes.map((scene) => [scene.id, makeId('scene')]));
+      const remap = (id) => idMap.get(id) ?? id;
+      flow.scenes = flow.scenes.map((scene, sceneIndex) => ({ ...normalizeScene(scene, sceneIndex, this.baseHref), id: remap(scene.id), actions: scene.actions.map((action) => {
+        const copy = { ...action, id: makeId('action') };
+        if (copy.type === 'choice') {
+          if (Array.isArray(copy.options)) copy.options = copy.options.map((option) => ({ ...option, scene: remap(option?.scene) }));
+          if (copy.defaultScene) copy.defaultScene = remap(copy.defaultScene);
+        }
+        return copy;
+      }) }));
       return flow;
     }
     createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: { dwellMs: 6000, settleMs: 900 }, scenes: [] }; }
@@ -113,7 +124,15 @@
     setPosition(value) { this.session.setItem(this.sessionKey('position'), String(Math.max(0, value))); }
     playing() { return this.session.getItem(this.sessionKey('playing')) === '1'; }
     setPlaying(value) { value ? this.session.setItem(this.sessionKey('playing'), '1') : this.session.removeItem(this.sessionKey('playing')); }
-    clearRun() { ['position', 'playing', 'navigation'].forEach((key) => this.session.removeItem(this.sessionKey(key))); }
+    /* Share mode (?demo=play): viewer-facing minimal chrome. Session-scoped so it survives the
+       flow's own cross-page navigations, exactly like playback state. */
+    share() { return this.session.getItem(this.sessionKey('share')) === '1'; }
+    setShare(value) { value ? this.session.setItem(this.sessionKey('share'), '1') : this.session.removeItem(this.sessionKey('share')); }
+    /* URL-supplied demo variables persist for the run (session-scoped, like position/playing) so a
+       personalized share link survives hard navigations mid-flow. */
+    variables() { try { return JSON.parse(this.session.getItem(this.sessionKey('variables'))) || {}; } catch { return {}; } }
+    setVariables(values) { const entries = Object.entries(values || {}); entries.length ? this.session.setItem(this.sessionKey('variables'), JSON.stringify(Object.fromEntries(entries))) : this.session.removeItem(this.sessionKey('variables')); }
+    clearRun() { ['position', 'playing', 'navigation', 'variables', 'share'].forEach((key) => this.session.removeItem(this.sessionKey(key))); }
     clearAll() {
       const keys = []; for (let index = 0; index < this.storage.length; index++) { const key = this.storage.key(index); if (key?.startsWith(this.prefix)) keys.push(key); } keys.forEach((key) => this.storage.removeItem(key));
       const sessionKeys = []; for (let index = 0; index < this.session.length; index++) { const key = this.session.key(index); if (key?.startsWith(this.prefix)) sessionKeys.push(key); } sessionKeys.forEach((key) => this.session.removeItem(key));

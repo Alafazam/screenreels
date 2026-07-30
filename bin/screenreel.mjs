@@ -16,6 +16,7 @@ import { loadConfig, loadScenes } from '../lib/config.mjs';
 import { capture } from '../lib/capture.mjs';
 import { assemble } from '../lib/assemble.mjs';
 import { inspectFlow, validateFlow, testFlow, migrateFlow, installProjector } from '../lib/flow-tools.mjs';
+import { doctorFlow } from '../lib/flow-doctor.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -39,13 +40,15 @@ const HELP = `screenreel — scripted user journeys of a running web app → dem
 Usage:
   screenreel init [--config <path>]        scaffold config + scenes templates
   screenreel capture [ids…] [--config …]   capture scenes as clips
-  screenreel assemble [--config …]         stitch clips + title cards into the video
-  screenreel record [ids…] [--config …]    capture + assemble
+  screenreel assemble [--config …] [--voice]  stitch clips + title cards into the video
+  screenreel record [ids…] [--config …] [--voice]  capture + assemble
+                                           --voice narrates scenes from narration/talkingPoints
   screenreel projector install --out <dir> copy self-hosted browser assets
   screenreel flow inspect --base-url <url> --route <route> [--json]
   screenreel flow validate --flow <file> --base-url <url> [--json]
   screenreel flow test --flow <file> --scene <id> --base-url <url> [--screenshots <dir>] [--json]
   screenreel flow migrate --input <file> --output <file> [--json]
+  screenreel flow doctor --flow <file> --base-url <url> [--fix] [--json]
 
 The app under capture must already be running (dev server); set baseUrl,
 login hook and output paths in screenreel.config.mjs.`;
@@ -77,11 +80,13 @@ async function main() {
     else if (action === 'validate') printResult(await validateFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json') }));
     else if (action === 'test') printResult(await testFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json'), sceneId: opt('--scene'), screenshots: opt('--screenshots') }));
     else if (action === 'migrate') printResult(migrateFlow({ input: opt('--input'), output: opt('--output', './screenreel.demo.json') }));
+    else if (action === 'doctor') printResult(await doctorFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json'), fix: has('--fix') }));
     else throw new Error(`unknown flow command: ${action || '(missing)'}`);
     return;
   }
 
   const config = await loadConfig(opt('--config', './screenreel.config.mjs'));
+  if (has('--voice')) config.voice.enabled = true;
   const allScenes = loadScenes(config);
   const scenes = positional.length
     ? positional.map(id => {
@@ -101,7 +106,7 @@ async function main() {
   if (command === 'assemble' || command === 'record') {
     // Assemble always walks the FULL scene list so a partial re-capture still
     // stitches the complete reel from existing clips.
-    assemble(config, allScenes);
+    await assemble(config, allScenes);
   }
   if (!['capture', 'assemble', 'record'].includes(command)) {
     console.error(`unknown command: ${command}\n\n${HELP}`);

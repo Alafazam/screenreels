@@ -47,12 +47,26 @@ try {
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
   const editButtons = page.getByRole('button', { name: 'Edit', exact: true }); assert.equal(await editButtons.count(), 4); await editButtons.nth(0).click();
   const titleField = page.locator('[data-field="title"]'); await titleField.fill('Studio-authored highlight');
-  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 25); assert.equal(await page.locator('[data-recipe]').count(), 6);
+  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 26); assert.equal(await page.locator('[data-recipe]').count(), 6);
   await page.locator('[data-definition="highlight"]').click(); const preview = page.frameLocator('.sr-preview-frame'); const kpiValue = preview.locator('[data-kpi="revenue"] strong'); await kpiValue.click();
   const savedTarget = page.locator('.sr-action small').filter({ hasText: '[data-kpi="revenue"]' }); await savedTarget.waitFor(); assert.equal(await savedTarget.count(), 1);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal(await page.locator('.sr-dirty').count(), 0);
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 11))));
+  // Record-by-doing: trusted interactions inside the preview iframe become actions incrementally,
+  // without a re-render (the checkbox click must NOT double-emit alongside its toggle).
+  const recordButton = page.locator('[data-record]'); await recordButton.click();
+  await page.locator('.sr-picker-banner').waitFor({ state: 'visible' });
+  await preview.locator('#submit-control').click();
+  await preview.locator('#customer-name').pressSequentially('Recorded Co', { delay: 40 });
+  await preview.locator('#priority').check();
+  await recordButton.click();
+  await page.locator('.sr-picker-banner').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('.sr-action').count(), 14);
+  assert.equal(await page.locator('.sr-action small').filter({ hasText: '#customer-name' }).count(), 1);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  assert.equal(await page.locator('.sr-dirty').count(), 0);
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.length === 14 && scene.actions.some((action) => action.type === 'type' && action.text === 'Recorded Co')))));
   await page.getByRole('button', { name: 'Back to scenes', exact: true }).click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').filter({ hasText: 'Studio-authored highlight' }).count(), 1);
   await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-1440x900.png') });
@@ -73,8 +87,45 @@ try {
     const report = projector.validateScene(); projector.enable(); await projector.play(); const playing = projector.store.playing(); const matched = projector.routeMatches({ route: '/legacy.html' }); projector.destroy(); target.remove();
     return { report, playing, matched };
   });
-  assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false); await inlinePage.close();
+  assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false);
+  // Choice branching: clicking a card jumps playback to the target scene's enabled index.
+  const choiceMounted = await inlinePage.evaluate(async () => {
+    const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);
+    const route = `${location.pathname}${location.search}${location.hash}`;
+    const projector = await window.ScreenReel.mount(target, { projectId: 'choice-example', loop: false, flow: { data: { schemaVersion: 1, flows: [{ id: 'branchy', name: 'Branchy', scenes: [
+      { id: 'start', route, actions: [{ type: 'choice', prompt: 'Pick a path', options: [{ label: 'Skip ahead', scene: 'finale' }, { label: 'Next', scene: 'middle' }] }] },
+      { id: 'middle', route, actions: [] },
+      { id: 'finale', route, actions: [{ type: 'wait', ms: 4000 }] },
+    ] }] } } });
+    window.__choiceProjector = projector;
+    projector.enable(); projector.store.setPosition(0); projector.play();
+    return true;
+  });
+  assert.equal(choiceMounted, true);
+  await inlinePage.locator('.sr-choice-overlay .sr-choice-card', { hasText: 'Skip ahead' }).click();
+  await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
+  await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
+  await inlinePage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
+  // stable session id. Fresh context so presenter-mode session state can't leak in.
+  const shareContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const sharePage = await shareContext.newPage();
+  await sharePage.addInitScript(() => { window.__analyticsEvents = []; addEventListener('screenreel:analytics', (e) => window.__analyticsEvents.push(e.detail)); });
+  await sharePage.goto(`${baseUrl}?demo=play`, { waitUntil: 'domcontentloaded' });
+  const sharePill = await visiblePill(sharePage);
+  assert.equal(await sharePill.evaluate((node) => node.classList.contains('sr-pill--share')), true);
+  assert.equal(await sharePage.locator('.sr-flow').count(), 0);
+  assert.equal(await sharePage.locator('button[title="Open ScreenReel Studio"]').count(), 0);
+  await sharePage.waitForFunction(() => (window.__analyticsEvents || []).some((item) => item.event === 'scene_enter'), null, { timeout: 9000 });
+  const funnel = await sharePage.evaluate(() => window.__analyticsEvents);
+  assert.equal(funnel[0].event, 'view_start');
+  assert.equal(funnel[1].event, 'scene_enter');
+  assert.equal(funnel[0].sessionId, funnel[1].sessionId);
+  assert.equal(funnel[0].share, true);
+  await sharePage.locator('button[title="Exit demo mode"]').click();
+  await sharePage.locator('.sr-pill').waitFor({ state: 'detached' });
+  await shareContext.close();
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } }); await mobilePage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await mobilePage.locator('#demo-button').waitFor(); assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true); await mobilePage.screenshot({ path: path.join(output, 'landing-mobile-390x844.png'), fullPage: true }); await mobilePage.close();
   // The deployed artifact is _site/, not examples/: it has rewritten asset paths and cache-busting
   // queries, and its page scripts share one global scope. Exercising only examples/ once let a

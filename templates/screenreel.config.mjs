@@ -27,6 +27,15 @@ export default {
 
   // font: '/absolute/path/to/font.ttf', // needed only if the platform default isn't found
 
+  // Voiceover: narrate each scene from scene.narration ?? scene.talkingPoints.
+  // voice: {
+  //   enabled: true,
+  //   provider: 'say',                          // macOS built-in TTS
+  //   // provider: 'command',                   // any TTS CLI:
+  //   // command: 'espeak -f {textFile} -w {outFile}',
+  //   overflow: 'extend',                       // long narration freezes the last frame
+  // },
+
   // Authenticate once per capture run. Delete if the app has no login.
   async login(page, config) {
     // await page.goto(config.baseUrl + '/login');
