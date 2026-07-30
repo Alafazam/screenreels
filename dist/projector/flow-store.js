@@ -113,7 +113,11 @@
     setPosition(value) { this.session.setItem(this.sessionKey('position'), String(Math.max(0, value))); }
     playing() { return this.session.getItem(this.sessionKey('playing')) === '1'; }
     setPlaying(value) { value ? this.session.setItem(this.sessionKey('playing'), '1') : this.session.removeItem(this.sessionKey('playing')); }
-    clearRun() { ['position', 'playing', 'navigation'].forEach((key) => this.session.removeItem(this.sessionKey(key))); }
+    /* URL-supplied demo variables persist for the run (session-scoped, like position/playing) so a
+       personalized share link survives hard navigations mid-flow. */
+    variables() { try { return JSON.parse(this.session.getItem(this.sessionKey('variables'))) || {}; } catch { return {}; } }
+    setVariables(values) { const entries = Object.entries(values || {}); entries.length ? this.session.setItem(this.sessionKey('variables'), JSON.stringify(Object.fromEntries(entries))) : this.session.removeItem(this.sessionKey('variables')); }
+    clearRun() { ['position', 'playing', 'navigation', 'variables'].forEach((key) => this.session.removeItem(this.sessionKey(key))); }
     clearAll() {
       const keys = []; for (let index = 0; index < this.storage.length; index++) { const key = this.storage.key(index); if (key?.startsWith(this.prefix)) keys.push(key); } keys.forEach((key) => this.storage.removeItem(key));
       const sessionKeys = []; for (let index = 0; index < this.session.length; index++) { const key = this.session.key(index); if (key?.startsWith(this.prefix)) sessionKeys.push(key); } sessionKeys.forEach((key) => this.session.removeItem(key));

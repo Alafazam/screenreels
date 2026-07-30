@@ -4,6 +4,7 @@ const instances = new Set();
 const functions = new Map();
 const TOAST_MS = 2600;
 const PILL_INTRO_MS = 1100;
+const VARIABLE_PARAM_PREFIX = 'srv_';
 let publicApi;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const event = (name, detail) => window.dispatchEvent(new CustomEvent(`screenreel:${name}`, { detail }));
@@ -37,9 +38,23 @@ class Projector {
     this.clickHandler = () => this.store.enabled() ? this.disable() : this.enable(); this.target.addEventListener('click', this.clickHandler); this.target.setAttribute('aria-pressed', String(this.store.enabled()));
   }
   parseActivation() {
-    const value = new URLSearchParams(location.search).get(this.options.activationQueryParam);
+    const params = new URLSearchParams(location.search);
+    const value = params.get(this.options.activationQueryParam);
     if (value === '1') this.store.setEnabled(true); if (value === '0') { this.store.setEnabled(false); this.store.clearRun(); }
+    // Share-link personalization: ?srv_company=Acme feeds {{company}}. Captured once into the
+    // session so it survives cross-route navigation; fresh params override the stored copy.
+    const fromUrl = {};
+    for (const [key, raw] of params) if (key.startsWith(VARIABLE_PARAM_PREFIX)) fromUrl[key.slice(VARIABLE_PARAM_PREFIX.length)] = raw;
+    if (Object.keys(fromUrl).length) this.store.setVariables({ ...this.store.variables(), ...fromUrl });
   }
+  /* Effective variables for a flow, lowest to highest priority: flow declaration defaults,
+     mount-option variables, then URL/session values. */
+  variablesFor(flow = this.store.activeFlow()) {
+    const merged = { ...window.ScreenReelCore.variableDefaults(flow?.variables), ...(this.options.variables || {}), ...this.store.variables() };
+    return Object.keys(merged).length ? merged : null;
+  }
+  /* Interpolates a display string (scene title / talking points) at render time only. */
+  displayText(value) { return window.ScreenReelCore.interpolate(value, this.variablesFor()).value; }
   mountUi() {
     if (this.rootHost) return;
     this.rootHost = document.createElement('div'); this.rootHost.id = `screenreel-projector-${this.store.projectId}`; document.body.appendChild(this.rootHost); this.shadow = this.rootHost.attachShadow({ mode: 'open' });
@@ -56,7 +71,7 @@ class Projector {
   }
   renderNotes(scene) {
     const visible = this.store.notesVisible() && !!scene; this.notes.hidden = !visible;
-    if (visible) { this.notes.innerHTML = `<div><span>Talking points</span><strong>${esc(scene.title)}</strong></div><p>${esc(scene.talkingPoints || 'No talking points yet.')}</p><button data-edit>Edit scene</button>`; this.notes.querySelector('[data-edit]').onclick = () => this.openStudio({ flowId: this.store.activeFlow().id, sceneId: scene.id }); this.reserveNotes(true); }
+    if (visible) { this.notes.innerHTML = `<div><span>Talking points</span><strong>${esc(this.displayText(scene.title))}</strong></div><p>${esc(this.displayText(scene.talkingPoints) || 'No talking points yet.')}</p><button data-edit>Edit scene</button>`; this.notes.querySelector('[data-edit]').onclick = () => this.openStudio({ flowId: this.store.activeFlow().id, sceneId: scene.id }); this.reserveNotes(true); }
     else this.reserveNotes(false);
   }
   reserveNotes(visible) {
@@ -139,6 +154,7 @@ class Projector {
       let navigationSameDocument = false; let priorPosition = null;
       const result = await window.ScreenReelCore.runAction(action, {
         document, window, signal: this.controller.signal, resolveFunction: (name) => functions.get(name),
+        variables: this.variablesFor(),
         // The executor already calls these at every interaction site; supplying them is what makes
         // the agent cursor visible during a live tour instead of a no-op.
         moveCursor: this.options.cursor === false ? undefined : async (el) => { if (el) await this.cursor()?.moveTo(el)?.catch?.(() => {}); },

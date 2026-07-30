@@ -220,8 +220,48 @@
     await ctx.moveCursor?.(el); el.dispatchEvent(event('pointerdown', Pointer, sx, sy, true)); el.dispatchEvent(event('mousedown', Mouse, sx, sy, true)); const started = performance.now(); const duration = Number(action.durMs) || 900;
     await new Promise((resolve) => { const frame = (now) => { const p = Math.min(1, (now - started) / duration); const x = sx + dx * p; const y = sy + dy * p; ctx.window.dispatchEvent(event('pointermove', Pointer, x, y, true)); ctx.window.dispatchEvent(event('mousemove', Mouse, x, y, true)); ctx.window.__screenreelCursor?.moveToPoint?.(x, y, 1); if (!ctx.signal?.aborted && p < 1) ctx.window.requestAnimationFrame(frame); else { ctx.window.dispatchEvent(event('pointerup', Pointer, x, y, false)); ctx.window.dispatchEvent(event('mouseup', Mouse, x, y, false)); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
   }
+  /* Flow variables. {{name}} placeholders resolve against ctx.variables in DISPLAY/VALUE fields
+     only — the allowlist below. Selectors, function names, and goto urls are deliberately
+     excluded: variables can arrive from the share-link URL, and a URL-controlled selector would
+     break validation guarantees while a URL-controlled goto is an open redirect (the projector's
+     default router assigns location.href without re-normalizing at play time). Single pass, no
+     recursive expansion; unknown names stay literal so flows without variables are byte-identical. */
+  const INTERPOLATED_FIELDS = ['text', 'note', 'value', 'label', 'code', 'caption', 'goText'];
+  const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_]\w*)\s*\}\}/g;
+  function interpolate(value, variables) {
+    const missing = [];
+    if (typeof value !== 'string' || !value.includes('{{')) return { value, missing };
+    const resolved = value.replace(VARIABLE_PATTERN, (whole, name) => {
+      if (variables && Object.prototype.hasOwnProperty.call(variables, name)) return String(variables[name]);
+      missing.push(name);
+      return whole;
+    });
+    return { value: resolved, missing };
+  }
+  /* Flattens a flow's variables declaration ({ name: 'default' } or { name: { label, default } })
+     into a plain { name: default } map, dropping invalid names. */
+  function variableDefaults(declared) {
+    const defaults = {};
+    for (const [name, spec] of Object.entries(declared || {})) {
+      if (!/^[A-Za-z_]\w*$/.test(name)) continue;
+      defaults[name] = typeof spec === 'object' && spec !== null ? String(spec.default ?? '') : String(spec ?? '');
+    }
+    return defaults;
+  }
+  function resolveActionVariables(action, variables, warn) {
+    if (!variables) return action;
+    const resolved = { ...action };
+    const unresolved = new Set();
+    for (const field of INTERPOLATED_FIELDS) {
+      const { value, missing } = interpolate(resolved[field], variables);
+      resolved[field] = value;
+      missing.forEach((name) => unresolved.add(name));
+    }
+    if (unresolved.size && warn) warn(`Unresolved demo variable(s): ${[...unresolved].join(', ')}`);
+    return resolved;
+  }
   async function runAction(source, context = {}) {
-    const action = { ...source, type: actionType(source) }; const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
+    const action = resolveActionVariables({ ...source, type: actionType(source) }, context.variables, context.warn); const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
     if (!doc) return { ok: false, error: 'document' };
     if (action.note && ctx.announce) ctx.announce(action.note);
     if (action.type === 'wait') { await sleep(action.ms || 500, ctx.signal); return { ok: true }; }
@@ -286,5 +326,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, 500).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 120), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, sleep, setTimeScale, timeScale: () => timeScale, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

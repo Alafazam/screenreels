@@ -165,6 +165,18 @@ screenreel flow migrate --input legacy.json --output screenreel.demo.json --json
 
 These commands return stable machine-readable scene, action, selector, match, error, and screenshot data. They do not upload DOM or product data.
 
+## Personalizing a demo
+
+Declare variables on a flow and reference them as `{{name}}` in action `text`, `note`, `value`, `label`, `code`, `caption`, and in scene titles/talking points:
+
+```json
+{ "id": "sales", "name": "Sales walkthrough",
+  "variables": { "company": { "label": "Company name", "default": "Acme" } },
+  "scenes": [{ "actions": [{ "type": "type", "selector": "#name", "text": "{{company}}" }] }] }
+```
+
+Values resolve in priority order: URL parameters (`?demo=1&srv_company=Northstar` — one link personalizes the whole run and survives cross-page navigation), then the `variables` mount option, then flow defaults. Unknown names stay literal and raise a one-time warning. Selectors, function names, and `goto` URLs are never interpolated — URL-supplied values must not steer targeting or navigation. Capture reads flow defaults automatically (`config.variables` overrides), and Studio edits the declaration via the **Variables** button on the scene list.
+
 ## Keeping demos in sync: doctor and CI
 
 Because ScreenReel drives the live app, a renamed selector is the one way a demo can rot. Two tools close that loop:
