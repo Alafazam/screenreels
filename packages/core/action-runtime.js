@@ -74,6 +74,9 @@
       const base = new URL(baseHref || 'http://screenreel.local/'); const url = new URL(raw, base);
       if (url.origin !== base.origin) return null;
       url.searchParams.delete('demo'); url.searchParams.delete('screenreelPreview');
+      // srv_* are ScreenReel share-link variables, not app routing state — a personalized link
+      // must still route-match the scene it personalizes.
+      for (const key of [...url.searchParams.keys()]) if (key.startsWith('srv_')) url.searchParams.delete(key);
       return `${url.pathname}${url.search}${url.hash}`;
     } catch { return null; }
   }

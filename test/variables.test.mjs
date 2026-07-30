@@ -60,6 +60,12 @@ test('runAction interpolates the announced note inside the executor', async () =
   assert.deepEqual(announced, ['Welcome, Acme']);
 });
 
+test('share-link srv_ params never affect route matching', () => {
+  const { normalizeRoute } = globalThis.ScreenReelCore;
+  assert.equal(normalizeRoute('/tour?demo=play&srv_company=Acme&task=review', 'https://app.test/'), '/tour?task=review');
+  assert.equal(normalizeRoute('/tour?srv_a=1&srv_b=2', 'https://app.test/'), '/tour');
+});
+
 test('flows with variables round-trip through the store and session values persist per run', async () => {
   class MemoryStorage {
     constructor() { this.values = new Map(); }

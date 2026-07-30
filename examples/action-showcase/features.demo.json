@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "flows": [
+    {
+      "id": "feature-tour", "name": "Feature gallery tour", "defaults": { "dwellMs": 900, "settleMs": 150 },
+      "variables": { "company": { "label": "Company name", "default": "Acme Retail" } },
+      "scenes": [
+        { "id": "gallery-welcome", "enabled": true, "route": "features.html", "title": "Six new tools for demo creators", "talkingPoints": "Everything on this page shipped in the demo-creator suite: recording, self-repair, voiceover, personalization, sharing, and branching.", "actions": [
+          { "type": "countdown", "from": 2, "stepMs": 480, "caption": "Touring the new features", "note": "Here we go…" },
+          { "type": "glow", "selector": ".fg-card", "sequence": true, "count": 6, "stepMs": 900, "afterMs": 300, "note": "Six features, all runnable on this page" }
+        ]},
+        { "id": "gallery-personalize", "enabled": true, "route": "features.html", "title": "Personalized for {{company}}", "talkingPoints": "The {{company}} placeholder resolves from the share link, the mount options, or the flow defaults.", "actions": [
+          { "type": "scrollIntoView", "selector": "#fg-playground", "block": "center", "note": "A live form the flows can drive" },
+          { "type": "type", "selector": "#fg-name", "text": "Hello {{company}}!", "clearFirst": true, "charMs": 45, "afterMs": 600, "note": "Typing a {{company}} personalization" },
+          { "type": "snippet", "selector": "#fg-playground", "label": "The action that just ran", "code": "{\n  \"type\": \"type\",\n  \"selector\": \"#fg-name\",\n  \"text\": \"Hello {{company}}!\"\n}", "holdMs": 2600, "note": "Selectors are never interpolated — only display text" }
+        ]},
+        { "id": "gallery-choose", "enabled": true, "route": "features.html", "title": "Your demo, your path", "talkingPoints": "Choice cards turn a linear tour into a self-serve demo.", "actions": [
+          { "type": "scrollIntoView", "selector": "[data-demo-id=\"fg-branching\"]", "block": "center", "note": "Branching, live" },
+          { "type": "choice", "prompt": "Where next?", "options": [ { "label": "Replay the tour", "scene": "gallery-welcome" }, { "label": "Wrap it up", "scene": "gallery-finale" } ], "timeoutMs": 10000, "defaultScene": "gallery-finale" }
+        ]},
+        { "id": "gallery-finale", "enabled": true, "route": "features.html", "title": "That's the suite", "talkingPoints": "Record it, keep it honest in CI, narrate it, personalize it, share it, branch it.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"fg-cta\"]", "holdMs": 1600, "note": "All of it is in the repo — one npm install away" }
+        ]}
+      ]
+    },
+    {
+      "id": "branching-demo", "name": "Branching demo", "defaults": { "dwellMs": 700, "settleMs": 150 },
+      "scenes": [
+        { "id": "branch-ask", "enabled": true, "route": "features.html", "title": "Pick a path", "talkingPoints": "Each card jumps to a different scene.", "actions": [
+          { "type": "scrollIntoView", "selector": "#fg-playground", "block": "center", "note": "Viewer's choice" },
+          { "type": "choice", "prompt": "What should the demo show?", "options": [ { "label": "The form", "scene": "branch-form" }, { "label": "The metrics", "scene": "branch-metrics" } ], "timeoutMs": 15000, "defaultScene": "branch-form" }
+        ]},
+        { "id": "branch-form", "enabled": true, "route": "features.html", "title": "Path A: the form", "talkingPoints": "You chose the form path.", "actions": [
+          { "type": "type", "selector": "#fg-name", "text": "You chose the form path", "clearFirst": true, "charMs": 30, "note": "This scene only plays if you picked it" },
+          { "type": "highlight", "selector": "#fg-playground", "holdMs": 1400, "note": "Branch A complete" }
+        ]},
+        { "id": "branch-metrics", "enabled": true, "route": "features.html", "title": "Path B: the metrics", "talkingPoints": "You chose the metrics path.", "actions": [
+          { "type": "glow", "selector": ".fg-metric", "sequence": true, "count": 3, "stepMs": 800, "note": "This scene only plays if you picked it" },
+          { "type": "flash", "selector": "[data-metric=\"choices\"]", "times": 2, "note": "Branch B complete" }
+        ]}
+      ]
+    }
+  ]
+}
