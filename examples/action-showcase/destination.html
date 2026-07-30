@@ -3,7 +3,27 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Navigation complete — ScreenReel</title><meta name="robots" content="noindex,follow"><link rel="canonical" href="https://alafazam.com/screenreels/"><meta name="theme-color" content="#ffffff"><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="stylesheet" href="styles.css"></head>
 <body>
   <header class="topbar"><a class="brand" href="./" aria-label="ScreenReel home"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><button id="demo-button" class="header-cta" type="button">Demo controls</button></header>
-  <main><section class="destination" data-demo-id="destination-card"><p class="eyebrow">Navigation complete</p><h1>The same flow continued across pages.</h1><p>Projector position and playback state stayed in the project-scoped session namespace while the browser moved to a new document.</p><a class="primary link" data-demo-id="return-home" href="./">Return to ScreenReel</a></section></main>
-  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script><script data-cfasync="false">ScreenReel.mount(document.getElementById('demo-button'),{projectId:'action-showcase',flow:{src:'screenreel.demo.json'},loop:false});</script>
+  <main>
+    <section class="destination" data-demo-id="destination-card"><p class="eyebrow">Navigation complete</p><h1>The same flow continued across pages.</h1><p>Projector position and playback state stayed in the project-scoped session namespace while the browser moved to a new document.</p><a class="primary link" data-demo-id="return-home" href="./">Return to ScreenReel</a><p class="preview-result"><span>Shared runtime</span><strong id="hero-result">Ready for Projector or Capture</strong></p></section>
+
+    <!-- Fixtures for the "All actions showcase" coverage flow. They live on this second route so
+         the landing page stays focused on the story while drag, pointer, container scroll,
+         waitFor, and call keep a real target to run against. -->
+    <section class="demo-block split" data-demo-id="fixtures">
+      <div class="block-copy"><span>Coverage fixtures</span><h3>Drag, pointer, and delayed state</h3><p>Used by the all-actions showcase flow, not by the guided tour.</p></div>
+      <div class="board">
+        <div class="column"><h4>Backlog</h4><button class="work-card" data-demo-id="drag-source" type="button">Review assortment</button><button class="port" id="pointer-target" aria-label="Pointer target" type="button"></button></div>
+        <div class="column" data-demo-id="drag-destination"><h4>In review</h4><p>Drop work here</p></div>
+      </div>
+      <div class="block-head"><button class="secondary" type="button" data-action="reveal-delayed">Reveal delayed target</button></div>
+      <div class="activity-scroll" id="activity-scroll">
+        <div class="activity"><b>09:00</b><span>Forecast imported</span></div><div class="activity"><b>09:12</b><span>Planner opened review</span></div><div class="activity"><b>09:20</b><span>Rules evaluated</span></div><div class="activity"><b>09:34</b><span>Exceptions grouped</span></div><div class="activity"><b>09:45</b><span>Approval requested</span></div><div class="activity"><b>10:02</b><span>Plan published</span></div><div id="delayed-target" class="delayed" hidden>Delayed state is now visible</div>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast" hidden></div>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="fixtures.js"></script>
+  <script data-cfasync="false">ScreenReel.mount(document.getElementById('demo-button'),{projectId:'action-showcase',flow:{src:'screenreel.demo.json'},loop:false});</script>
 </body>
 </html>
