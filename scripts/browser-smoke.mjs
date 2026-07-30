@@ -76,5 +76,27 @@ try {
   assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false); await inlinePage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } }); await mobilePage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await mobilePage.locator('#demo-button').waitFor(); assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true); await mobilePage.screenshot({ path: path.join(output, 'landing-mobile-390x844.png'), fullPage: true }); await mobilePage.close();
+  // The deployed artifact is _site/, not examples/: it has rewritten asset paths and cache-busting
+  // queries, and its page scripts share one global scope. Exercising only examples/ once let a
+  // broken bundle reach production, so the built artifact gets its own end-to-end check.
+  const siteIndex = path.resolve('./_site/index.html');
+  if (fs.existsSync(siteIndex)) {
+    const sitePage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const siteErrors = [];
+    sitePage.on('pageerror', (error) => siteErrors.push(error.message));
+    sitePage.on('response', (response) => { if (response.status() >= 400) siteErrors.push(`${response.status()} ${response.url()}`); });
+    await sitePage.goto(new URL('../../_site/index.html', baseUrl).href, { waitUntil: 'networkidle' });
+    assert.deepEqual(siteErrors, [], `Pages artifact reported errors: ${siteErrors.join('; ')}`);
+    const siteTrigger = sitePage.locator('#demo-button');
+    await sitePage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
+    assert.equal(await siteTrigger.getAttribute('aria-pressed'), 'false');
+    await siteTrigger.click();
+    await visiblePill(sitePage);
+    assert.equal(await siteTrigger.getAttribute('aria-pressed'), 'true', 'Pages artifact did not start the guided tour');
+    assert.deepEqual(siteErrors, [], `Pages artifact reported errors while playing: ${siteErrors.join('; ')}`);
+    await sitePage.close();
+  } else {
+    throw new Error('Run `npm run build:pages` before the browser smoke test so the deployed artifact is covered');
+  }
   console.log(JSON.stringify({ ok: true, screenshots: fs.readdirSync(output).map((name) => path.join(output, name)) }, null, 2));
 } finally { await browser.close(); }
