@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The journey of a demo — ScreenReel showcase</title>
+<meta name="description" content="ScreenReel's demo-creator suite told as a story: record it, keep it honest, narrate it, personalize it, share it, and let the viewer drive.">
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
+    <button id="sc-journey-button" class="header-cta" type="button">Play the journey</button>
+  </header>
+  <main>
+    <section class="sc-hero">
+      <p class="sc-chapter">The ScreenReel showcase</p>
+      <h1>The journey of a demo.</h1>
+      <p>Six chapters, six features — and the guided tour is the proof: press <strong>Play the journey</strong> and one flow will drive itself through every chapter page, doing each chapter’s thing as it passes through. Nothing on these pages is mocked.</p>
+    </section>
+    <div class="sc-panel">
+      <h3>How to read this story</h3>
+      <p>Every chapter is a real, runnable demonstration. Follow them in order, or press play and let the tour take you — it types, highlights, branches, and hops pages on its own, emitting analytics the whole way.</p>
+      <div class="sc-actions"><button class="sc-btn primary" data-sc="journey">▶ Start the journey</button></div>
+    </div>
+    <div class="sc-chapters">
+      <a class="sc-chapter-card" href="showcase-create.html"><span class="sc-num">CHAPTER 1 · AUTHOR</span><h3>Perform it once</h3><p>You don’t write a demo — you perform it, and Studio’s recorder writes it down.</p><small>Record-by-doing →</small></a>
+      <a class="sc-chapter-card" href="showcase-heal.html"><span class="sc-num">CHAPTER 2 · MAINTAIN</span><h3>It refuses to rot</h3><p>The product renamed a button. The doctor re-matched it by fingerprint before anyone noticed.</p><small>Flow doctor + CI →</small></a>
+      <a class="sc-chapter-card" href="showcase-voice.html"><span class="sc-num">CHAPTER 3 · PRODUCE</span><h3>Give it a voice</h3><p>The talking points you already write become the narration on the rendered video.</p><small>Voiceover →</small></a>
+      <a class="sc-chapter-card" href="showcase-personalize.html"><span class="sc-num">CHAPTER 4 · PERSONALIZE</span><h3>Say their name</h3><p>One manifest, many prospects — <code>{{company}}</code> resolves from the share link.</p><small>Flow variables →</small></a>
+      <a class="sc-chapter-card" href="showcase-share.html"><span class="sc-num">CHAPTER 5 · DISTRIBUTE</span><h3>Send it out</h3><p>Viewers get minimal chrome and auto-play; you get the funnel, without a backend.</p><small>Share mode + analytics →</small></a>
+      <a class="sc-chapter-card" href="showcase-branch.html"><span class="sc-num">CHAPTER 6 · ENGAGE</span><h3>Let them drive</h3><p>Choice cards hand the wheel to the viewer — a linear tour becomes a conversation.</p><small>Branching →</small></a>
+    </div>
+    <nav class="sc-nav"><a class="next" href="showcase-create.html"><span>Next</span><strong>Chapter 1 — Perform it once</strong></a></nav>
+  </main>
+  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="./">Home</a><a href="https://github.com/Alafazam/screenreels">GitHub</a></nav></footer>
+  <div id="toast" class="toast" hidden></div>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="showcase.js"></script>
+</body>
+</html>

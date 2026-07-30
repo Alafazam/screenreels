@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chapter 5 — Send it out — ScreenReel showcase</title>
+<meta name="description" content="Share mode gives viewers minimal chrome and auto-play; funnel analytics stay on-page by default.">
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
+    <button id="sc-journey-button" class="header-cta" type="button">Play the journey</button>
+  </header>
+  <main>
+    <section class="sc-hero">
+      <p class="sc-chapter">Chapter 5 · Distribute</p>
+      <h1>Send it out.</h1>
+      <p>A share link (<code>?demo=play</code>) auto-plays with viewer chrome — progress, play/pause, exit. And every run tells you what happened: a funnel from <code>view_start</code> to <code>flow_complete</code> or <code>drop_off</code>.</p>
+    </section>
+    <div class="sc-playground">
+      <label>The funnel, live — these counters have been counting since you arrived</label>
+      <div class="sc-metrics">
+        <div class="sc-metric" data-metric="events"><span>Events</span><strong id="sc-count-events">0</strong></div>
+        <div class="sc-metric" data-metric="scenes"><span>Scenes seen</span><strong id="sc-count-scenes">0</strong></div>
+        <div class="sc-metric" data-metric="choices"><span>Choices made</span><strong id="sc-count-choices">0</strong></div>
+      </div>
+      <div class="sc-events" id="sc-events" aria-live="polite"></div>
+      <p class="sc-note">Nothing leaves this page — a listener right here consumes <code>screenreel:analytics</code> events. Add an <code>onEvent</code> callback or a <code>beaconUrl</code> to ship them to your own analytics.</p>
+      <div class="sc-actions">
+        <input class="sc-input" id="sc-company" placeholder="Company name" value="Northstar Retail">
+        <button class="sc-btn primary" data-sc="share">Open the journey in share mode</button>
+      </div>
+      <div class="sc-share-url" id="sc-share-url"></div>
+    </div>
+    <nav class="sc-nav"><a class="prev" href="showcase-personalize.html"><span>Previous</span><strong>Chapter 4 — Say their name</strong></a><a class="next" href="showcase-branch.html"><span>Next</span><strong>Chapter 6 — Let them drive</strong></a></nav>
+  </main>
+  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="./">Home</a><a href="https://github.com/Alafazam/screenreels">GitHub</a></nav></footer>
+  <div id="toast" class="toast" hidden></div>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="showcase.js"></script>
+</body>
+</html>

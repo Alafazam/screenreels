@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chapter 1 — Perform it once — ScreenReel showcase</title>
+<meta name="description" content="Record-by-doing: use your app in the Studio preview and interactions become flow actions.">
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
+    <button id="sc-journey-button" class="header-cta" type="button">Play the journey</button>
+  </header>
+  <main>
+    <section class="sc-hero">
+      <p class="sc-chapter">Chapter 1 · Author</p>
+      <h1>Perform it once.</h1>
+      <p>Every demo starts the same way: someone who knows the product uses it well, once. The recorder’s job is to be there when it happens — you click, type, and scroll; Studio writes the flow.</p>
+    </section>
+    <div class="sc-panel" data-demo-id="rec-panel">
+      <h3>Try it: record against this page</h3>
+      <p>Open Studio below, press <strong>Record</strong>, and use the form in the preview. When you stop, your session is a scene — every interaction an editable action.</p>
+      <div class="sc-actions"><button class="sc-btn primary" data-sc="open-studio">Open Studio to record</button></div>
+    </div>
+    <div class="sc-playground" data-demo-id="rec-form">
+      <label for="sc-rec-name">A form to record against</label>
+      <input id="sc-rec-name" placeholder="Type here while recording">
+      <div class="sc-actions">
+        <select class="sc-input" id="sc-rec-region"><option>North</option><option>South</option><option>West</option></select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="sc-rec-priority"> Priority</label>
+        <button class="sc-btn" id="sc-rec-submit" type="button">Submit</button>
+      </div>
+    </div>
+    <div class="sc-panel" data-demo-id="rec-mapping">
+      <h3>What the recorder understands</h3>
+      <p>A burst of keystrokes becomes <strong>one</strong> <code>type</code> action at your measured typing speed. A checkbox becomes <code>toggle</code>, a select becomes <code>set</code>, a slider becomes <code>lever</code>, a scroll burst becomes one relative <code>scroll</code>, your pauses become pacing — and a click that navigates becomes <code>goto</code>, with recording continuing on the new page. Password fields are never recorded.</p>
+    </div>
+    <nav class="sc-nav"><a class="prev" href="showcase.html"><span>Previous</span><strong>The journey of a demo</strong></a><a class="next" href="showcase-heal.html"><span>Next</span><strong>Chapter 2 — It refuses to rot</strong></a></nav>
+  </main>
+  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="./">Home</a><a href="https://github.com/Alafazam/screenreels">GitHub</a></nav></footer>
+  <div id="toast" class="toast" hidden></div>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="showcase.js"></script>
+</body>
+</html>

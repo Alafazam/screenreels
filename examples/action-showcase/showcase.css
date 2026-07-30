@@ -1,0 +1,42 @@
+/* Showcase journey chrome, layered on styles.css. sc- prefix throughout. */
+.sc-hero{padding:58px 0 26px}
+.sc-hero .sc-chapter{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#7c3aed}
+.sc-hero h1{font-size:42px;line-height:1.08;letter-spacing:-.02em;margin:10px 0 14px}
+.sc-hero p{max-width:660px;color:var(--muted);font-size:16px;line-height:1.6;margin:0}
+.sc-panel{border:1px solid var(--line);border-radius:16px;background:#fff;padding:24px;margin:22px 0}
+.sc-panel h3{margin:0 0 8px;font-size:17px}
+.sc-panel p{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0 0 8px}
+.sc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.sc-btn{appearance:none;border:1px solid var(--line);background:#fff;border-radius:9px;padding:10px 15px;font:700 13px/1 Inter,system-ui,sans-serif;cursor:pointer;color:var(--ink)}
+.sc-btn:hover{border-color:#7c3aed;color:#7c3aed}
+.sc-btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.sc-btn.primary:hover{background:#7c3aed;border-color:#7c3aed;color:#fff}
+.sc-input{border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:600 13px/1 Inter,system-ui,sans-serif;min-width:180px}
+.sc-terminal{background:#0f172a;color:#cbd5e1;border-radius:12px;padding:15px 17px;font:500 12px/1.7 ui-monospace,Menlo,monospace;overflow:auto;white-space:pre;margin:14px 0 0}
+.sc-terminal .ok{color:#4ade80}.sc-terminal .warn{color:#fbbf24}.sc-terminal .err{color:#f87171}.sc-terminal .dim{color:#64748b}
+.sc-code{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font:500 12px/1.7 ui-monospace,Menlo,monospace;overflow:auto;white-space:pre;margin:14px 0 0;color:#3f3f46}
+.sc-chapters{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:28px 0 40px}
+.sc-chapter-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:20px;text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:8px;transition:border-color .15s ease,transform .15s ease}
+.sc-chapter-card:hover{border-color:#7c3aed;transform:translateY(-2px)}
+.sc-chapter-card .sc-num{font:800 12px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;color:#7c3aed}
+.sc-chapter-card h3{margin:0;font-size:16px}
+.sc-chapter-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.5;flex:1}
+.sc-chapter-card small{font-weight:700;color:#7c3aed}
+.sc-nav{display:flex;justify-content:space-between;gap:12px;margin:40px 0 60px}
+.sc-nav a{flex:1;border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-decoration:none;color:var(--ink);background:#fff}
+.sc-nav a:hover{border-color:#7c3aed}
+.sc-nav a span{display:block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.sc-nav a strong{font-size:14px}
+.sc-nav a.next{text-align:right}
+.sc-playground{border:1px dashed #c4b5fd;border-radius:16px;background:var(--soft);padding:20px;margin:18px 0}
+.sc-playground label{display:block;font-weight:700;font-size:13px;margin-bottom:6px}
+.sc-playground input[type="text"],.sc-playground input:not([type]){width:100%;border:1px solid var(--line);border-radius:9px;padding:11px 12px;font:600 14px/1 Inter,system-ui,sans-serif}
+.sc-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.sc-metric{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px 14px}
+.sc-metric span{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.sc-metric strong{font-size:22px}
+.sc-events{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:500 11.5px/1.7 ui-monospace,Menlo,monospace;max-height:180px;overflow:auto;color:#3f3f46;margin-top:12px}
+.sc-events:empty::before{content:'Analytics events appear here as demos play…';color:var(--muted)}
+.sc-note{font-size:12px;color:var(--muted);margin-top:8px}
+.sc-share-url{font:600 12px/1.5 ui-monospace,Menlo,monospace;background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 12px;word-break:break-all;margin-top:10px;color:#7c3aed}
+@media(max-width:820px){.sc-hero h1{font-size:31px}.sc-metrics{grid-template-columns:1fr}}

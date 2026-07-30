@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chapter 6 — Let them drive — ScreenReel showcase</title>
+<meta name="description" content="Choice cards jump playback to the scene the viewer picks — a linear tour becomes self-serve.">
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
+    <button id="sc-journey-button" class="header-cta" type="button">Play the journey</button>
+  </header>
+  <main>
+    <section class="sc-hero">
+      <p class="sc-chapter">Chapter 6 · Engage</p>
+      <h1>Let them drive.</h1>
+      <p>The best demo answers the viewer’s question, not the presenter’s script. A <code>choice</code> action shows up to four cards; clicking one jumps playback to that scene — and every target is graph-validated so a branch can never dead-end.</p>
+    </section>
+    <div class="sc-playground" id="sc-playground">
+      <label for="sc-branch-note">Path A types here — Path B lights up the metrics</label>
+      <input id="sc-branch-note" placeholder="Pick the form path to see typing">
+      <div class="sc-metrics">
+        <div class="sc-metric" data-metric="events"><span>Events</span><strong id="sc-count-events">0</strong></div>
+        <div class="sc-metric" data-metric="scenes"><span>Scenes seen</span><strong id="sc-count-scenes">0</strong></div>
+        <div class="sc-metric" data-metric="choices"><span>Choices made</span><strong id="sc-count-choices">0</strong></div>
+      </div>
+      <div class="sc-actions"><button class="sc-btn primary" data-sc="branch">Play the branching demo</button></div>
+    </div>
+    <div class="demo-block final-card" data-demo-id="sc-cta" style="margin:26px 0 10px">
+      <div><span>The end of the journey</span><h3>Six features, one runtime, no backend</h3><p>Recorded, self-healing, narrated, personalized, shared, and branching — everything on these pages is in the repo today.</p></div>
+      <a class="primary link" href="https://github.com/Alafazam/screenreels">View on GitHub <span aria-hidden="true">→</span></a>
+    </div>
+    <nav class="sc-nav"><a class="prev" href="showcase-share.html"><span>Previous</span><strong>Chapter 5 — Send it out</strong></a><a class="next" href="showcase.html"><span>Next</span><strong>Start the journey again</strong></a></nav>
+  </main>
+  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="./">Home</a><a href="https://github.com/Alafazam/screenreels">GitHub</a></nav></footer>
+  <div id="toast" class="toast" hidden></div>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="showcase.js"></script>
+</body>
+</html>

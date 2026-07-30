@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chapter 2 — It refuses to rot — ScreenReel showcase</title>
+<meta name="description" content="Flow doctor repairs renamed selectors by fingerprint; CI annotates the PR that broke a demo.">
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
+    <button id="sc-journey-button" class="header-cta" type="button">Play the journey</button>
+  </header>
+  <main>
+    <section class="sc-hero">
+      <p class="sc-chapter">Chapter 2 · Maintain</p>
+      <h1>It refuses to rot.</h1>
+      <p>Here’s where every other demo dies: three sprints later, a button gets renamed, and nobody finds out until a prospect is watching. ScreenReel drives the live app — so instead of hiding from change, it detects and repairs it.</p>
+    </section>
+    <div class="sc-panel">
+      <h3>The doctor, on a real break</h3>
+      <p>This is genuine output — a selector renamed out from under a flow, re-matched by the <code>fingerprint</code> Studio stamped when the target was picked:</p>
+      <div class="sc-terminal"><span class="dim">$</span> screenreel flow doctor --flow demo.json --base-url http://localhost:3000 --fix
+
+<span class="err">✖ tour-opening action 2</span>  selector matches multiple elements
+  <span class="ok" data-sc-fix>repair  .flow-row → [data-flow-step="1"]</span>  <span class="dim">confidence 100</span>
+<span class="warn">▲ tour-controls action 5</span>  has no matches  <span class="dim">(follows a state-mutating action — dry-run warning, not repaired)</span>
+
+<span class="ok">1 fix applied</span> — re-run: <span class="ok">ok: true</span></div>
+    </div>
+    <div class="sc-panel">
+      <h3>And in CI, before anyone presents</h3>
+      <p>Every PR validates the flows against the running app. A break shows up as an inline annotation on the PR that caused it — <em>“flow guided-tour scene tour-kpis action 2: selector has no matches”</em> — instead of a surprise mid-call.</p>
+      <div class="sc-code">- run: npm ci
+- name: Start my app
+  run: npm run dev &amp; npx wait-on http://localhost:3000
+- uses: Alafazam/screenreels/.github/actions/validate-flows@main
+  with:
+    flow: demos/sales-demo.json
+    base-url: http://localhost:3000</div>
+    </div>
+    <nav class="sc-nav"><a class="prev" href="showcase-create.html"><span>Previous</span><strong>Chapter 1 — Perform it once</strong></a><a class="next" href="showcase-voice.html"><span>Next</span><strong>Chapter 3 — Give it a voice</strong></a></nav>
+  </main>
+  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="./">Home</a><a href="https://github.com/Alafazam/screenreels">GitHub</a></nav></footer>
+  <div id="toast" class="toast" hidden></div>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="showcase.js"></script>
+</body>
+</html>

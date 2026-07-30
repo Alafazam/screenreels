@@ -20,7 +20,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 fs.rmSync(site, { recursive: true, force: true });
 fs.mkdirSync(site, { recursive: true });
-for (const name of ['index.html', 'destination.html', 'styles.css', 'app.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
+for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html', 'showcase.css', 'showcase.js', 'showcase.demo.json', 'styles.css', 'app.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
   fs.copyFileSync(path.join(example, name), path.join(site, name));
 }
 fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), { recursive: true });
@@ -30,9 +30,9 @@ fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), 
    cursor.js when only those change. */
 const runtimeDir = path.join(site, 'dist/projector');
 const runtimeKey = hashOf(...fs.readdirSync(runtimeDir).sort().map((name) => fs.readFileSync(path.join(runtimeDir, name))));
-const pageKeys = { 'app.js': hashFile(path.join(site, 'app.js')), 'fixtures.js': hashFile(path.join(site, 'fixtures.js')) };
+const pageKeys = { 'app.js': hashFile(path.join(site, 'app.js')), 'fixtures.js': hashFile(path.join(site, 'fixtures.js')), 'showcase.js': hashFile(path.join(site, 'showcase.js')) };
 
-for (const name of ['index.html', 'destination.html']) {
+for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html']) {
   const target = path.join(site, name);
   let html = fs.readFileSync(target, 'utf8')
     .replaceAll('../../dist/projector/', './dist/projector/')
@@ -48,6 +48,10 @@ const required = [
   'styles.css',
   'app.js',
   'fixtures.js',
+  'showcase.html',
+  'showcase.js',
+  'showcase.css',
+  'showcase.demo.json',
   'screenreel.demo.json',
   'logo.svg',
   'favicon.svg',
@@ -61,7 +65,7 @@ const required = [
 for (const name of required) {
   if (!fs.existsSync(path.join(site, name))) throw new Error(`Pages artifact is missing ${name}`);
 }
-const stagedText = ['index.html', 'destination.html', 'screenreel.demo.json']
+const stagedText = ['index.html', 'destination.html', 'showcase.html', 'showcase.demo.json', 'screenreel.demo.json']
   .map((name) => fs.readFileSync(path.join(site, name), 'utf8'))
   .join('\n');
 if (stagedText.includes('../../dist/projector/')) throw new Error('Pages artifact contains a broken projector asset path');

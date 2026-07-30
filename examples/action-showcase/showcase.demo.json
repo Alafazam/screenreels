@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "flows": [
+    {
+      "id": "journey", "name": "The journey of a demo", "defaults": { "dwellMs": 800, "settleMs": 150 },
+      "variables": { "company": { "label": "Company name", "default": "Acme Retail" } },
+      "scenes": [
+        { "id": "j-intro", "enabled": true, "route": "showcase.html", "title": "The journey of a demo", "talkingPoints": "Six chapters, six features — and this tour will walk through every page itself.", "actions": [
+          { "type": "countdown", "from": 2, "stepMs": 480, "caption": "The journey of a demo", "note": "Six chapters. The tour drives every page itself." },
+          { "type": "glow", "selector": ".sc-chapter-card", "sequence": true, "count": 6, "stepMs": 800, "afterMs": 300, "note": "One flow will now travel through all six chapters" },
+          { "type": "goto", "url": "showcase-create.html", "note": "Chapter 1: it starts with a recording" }
+        ]},
+        { "id": "j-create", "enabled": true, "route": "showcase-create.html", "title": "Chapter 1 — Perform it once", "talkingPoints": "You don't write a demo. You perform it once, and Studio writes it down.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"rec-panel\"]", "holdMs": 1700, "note": "Press Record in Studio and just use the app" },
+          { "type": "flash", "selector": "[data-demo-id=\"rec-mapping\"]", "times": 2, "afterMs": 400, "note": "Keystrokes, toggles, scrolls — all become actions" },
+          { "type": "goto", "url": "showcase-heal.html", "note": "Chapter 2: then the product changes…" }
+        ]},
+        { "id": "j-heal", "enabled": true, "route": "showcase-heal.html", "title": "Chapter 2 — It refuses to rot", "talkingPoints": "The product changed. The doctor re-matches the target by fingerprint and CI tells the PR that broke it.", "actions": [
+          { "type": "highlight", "selector": ".sc-terminal", "holdMs": 1700, "note": "flow doctor finds the renamed selector…" },
+          { "type": "flash", "selector": "[data-sc-fix]", "times": 3, "afterMs": 400, "note": "…and repairs it by fingerprint" },
+          { "type": "goto", "url": "showcase-voice.html", "note": "Chapter 3: give it a voice" }
+        ]},
+        { "id": "j-voice", "enabled": true, "route": "showcase-voice.html", "title": "Chapter 3 — Give it a voice", "talkingPoints": "The talking points you already write become the narration track.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"voice-panel\"]", "holdMs": 1700, "note": "assemble --voice narrates the video from these very notes" },
+          { "type": "goto", "url": "showcase-personalize.html", "note": "Chapter 4: say their name" }
+        ]},
+        { "id": "j-personalize", "enabled": true, "route": "showcase-personalize.html", "title": "Chapter 4 — Say their name, {{company}}", "talkingPoints": "One flow, personalized per prospect: {{company}} resolves from the share link.", "actions": [
+          { "type": "scrollIntoView", "selector": "#sc-name", "block": "center", "note": "Watch the placeholder resolve" },
+          { "type": "type", "selector": "#sc-name", "text": "Hello {{company}}!", "clearFirst": true, "charMs": 45, "afterMs": 500, "note": "Typed for {{company}} — from the link, not the manifest" },
+          { "type": "goto", "url": "showcase-share.html", "note": "Chapter 5: send it out" }
+        ]},
+        { "id": "j-share", "enabled": true, "route": "showcase-share.html", "title": "Chapter 5 — Send it out", "talkingPoints": "Viewers get minimal chrome; you get the funnel. This very tour has been emitting events the whole way.", "actions": [
+          { "type": "glow", "selector": ".sc-metric", "sequence": true, "count": 3, "stepMs": 800, "afterMs": 300, "note": "These metrics counted THIS tour, live" },
+          { "type": "goto", "url": "showcase-branch.html", "note": "Chapter 6: your turn to drive" }
+        ]},
+        { "id": "j-branch", "enabled": true, "route": "showcase-branch.html", "title": "Chapter 6 — Let them drive", "talkingPoints": "The tour ends by handing the wheel to the viewer.", "actions": [
+          { "type": "choice", "prompt": "You drive. Where to?", "options": [ { "label": "Replay the journey", "scene": "j-intro" }, { "label": "Finish the story", "scene": "j-finale" } ], "timeoutMs": 12000, "defaultScene": "j-finale" }
+        ]},
+        { "id": "j-finale", "enabled": true, "route": "showcase-branch.html", "title": "The end — and the beginning", "talkingPoints": "Recorded, self-healing, narrated, personalized, shared, and branching. One runtime, no backend.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"sc-cta\"]", "holdMs": 2000, "note": "That was six features in one cross-page flow. The end." }
+        ]}
+      ]
+    },
+    {
+      "id": "personalize-demo", "name": "Personalization demo", "defaults": { "dwellMs": 700, "settleMs": 150 },
+      "variables": { "company": { "label": "Company name", "default": "Acme Retail" } },
+      "scenes": [
+        { "id": "p-type", "enabled": true, "route": "showcase-personalize.html", "title": "Personalized for {{company}}", "talkingPoints": "The same session store a ?srv_company= link would fill.", "actions": [
+          { "type": "scrollIntoView", "selector": "#sc-name", "block": "center", "note": "Personalizing for {{company}}" },
+          { "type": "type", "selector": "#sc-name", "text": "Hello {{company}}!", "clearFirst": true, "charMs": 45, "afterMs": 500, "note": "Selectors are never interpolated — only display text" },
+          { "type": "snippet", "selector": "#sc-playground", "label": "The action that just ran", "code": "{\n  \"type\": \"type\",\n  \"selector\": \"#sc-name\",\n  \"text\": \"Hello {{company}}!\"\n}", "holdMs": 2600, "note": "One manifest, many prospects" }
+        ]}
+      ]
+    },
+    {
+      "id": "branching-demo", "name": "Branching demo", "defaults": { "dwellMs": 700, "settleMs": 150 },
+      "scenes": [
+        { "id": "b-ask", "enabled": true, "route": "showcase-branch.html", "title": "Pick a path", "talkingPoints": "Each card jumps to a different scene.", "actions": [
+          { "type": "scrollIntoView", "selector": "#sc-playground", "block": "center", "note": "Viewer's choice" },
+          { "type": "choice", "prompt": "What should the demo show?", "options": [ { "label": "The form path", "scene": "b-form" }, { "label": "The metrics path", "scene": "b-metrics" } ], "timeoutMs": 15000, "defaultScene": "b-form" }
+        ]},
+        { "id": "b-form", "enabled": true, "route": "showcase-branch.html", "title": "Path A — the form", "talkingPoints": "This scene only plays because you picked it.", "actions": [
+          { "type": "type", "selector": "#sc-branch-note", "text": "You chose the form path", "clearFirst": true, "charMs": 30, "note": "Path A: typing" },
+          { "type": "highlight", "selector": "#sc-playground", "holdMs": 1400, "note": "Branch A complete" }
+        ]},
+        { "id": "b-metrics", "enabled": true, "route": "showcase-branch.html", "title": "Path B — the metrics", "talkingPoints": "This scene only plays because you picked it.", "actions": [
+          { "type": "glow", "selector": ".sc-metric", "sequence": true, "count": 3, "stepMs": 800, "note": "Path B: the metrics" },
+          { "type": "flash", "selector": "[data-metric=\"choices\"]", "times": 2, "note": "Branch B complete" }
+        ]}
+      ]
+    },
+    {
+      "id": "record-sandbox", "name": "Recording sandbox", "defaults": { "dwellMs": 800, "settleMs": 150 },
+      "scenes": [
+        { "id": "r-start", "enabled": true, "route": "showcase-create.html", "title": "Your recorded scene", "talkingPoints": "Press Record in the editor and use the form in the preview — your interactions land here as actions.", "actions": [
+          { "type": "highlight", "selector": "[data-demo-id=\"rec-form\"]", "holdMs": 1200, "note": "Record against this form" }
+        ]}
+      ]
+    }
+  ]
+}
