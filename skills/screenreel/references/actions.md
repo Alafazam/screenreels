@@ -27,6 +27,7 @@ Generated from `packages/core/action-runtime.js`.
 | Wait duration | `wait` | Timing | none | `{"ms":1000}` |
 | Wait for target or state | `waitFor` | Timing | visual | `{"condition":"visible","timeoutMs":8000}` |
 | Navigate | `goto` | Navigation | none | `{"url":"/"}` |
+| Viewer choice | `choice` | Navigation | none | `{"prompt":"What do you want to see next?","options":[],"timeoutMs":0,"defaultScene":""}` |
 | Pointer tap | `pointer` | Advanced | interactive | `{"afterMs":700}` |
 | Call page function | `call` | Advanced | none | `{"fn":"","args":[],"afterMs":700}` |
 

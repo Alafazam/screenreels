@@ -16,8 +16,8 @@ class MemoryStorage {
   removeItem(key) { this.values.delete(key); }
 }
 
-test('registry exposes 25 catalog entries, recipes, and legacy aliases', () => {
-  assert.equal(ScreenReelCore.definitions.length, 25); assert.equal(ScreenReelCore.recipes.length, 6); assert.equal(ScreenReelCore.actionType({ type: 'fill' }), 'type'); assert(ScreenReelCore.supportedTypes.has('glow'));
+test('registry exposes 26 catalog entries, recipes, and legacy aliases', () => {
+  assert.equal(ScreenReelCore.definitions.length, 26); assert.equal(ScreenReelCore.recipes.length, 6); assert.equal(ScreenReelCore.actionType({ type: 'fill' }), 'type'); assert(ScreenReelCore.supportedTypes.has('glow'));
 });
 test('time scale defaults to 1, scales every sleep, and rejects invalid values', async () => {
   assert.equal(ScreenReelCore.timeScale(), 1);

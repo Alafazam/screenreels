@@ -177,6 +177,18 @@ Declare variables on a flow and reference them as `{{name}}` in action `text`, `
 
 Values resolve in priority order: URL parameters (`?demo=1&srv_company=Northstar` — one link personalizes the whole run and survives cross-page navigation), then the `variables` mount option, then flow defaults. Unknown names stay literal and raise a one-time warning. Selectors, function names, and `goto` URLs are never interpolated — URL-supplied values must not steer targeting or navigation. Capture reads flow defaults automatically (`config.variables` overrides), and Studio edits the declaration via the **Variables** button on the scene list.
 
+## Branching with viewer choices
+
+A `choice` action shows 1–4 cards; clicking one jumps playback to the named scene, turning a linear tour into a self-serve interactive demo:
+
+```json
+{ "type": "choice", "prompt": "What do you want to see?",
+  "options": [ { "label": "Reporting", "scene": "tour-kpis" }, { "label": "Setup", "scene": "tour-controls" } ],
+  "timeoutMs": 12000, "defaultScene": "tour-kpis" }
+```
+
+`timeoutMs` auto-continues to `defaultScene` (required when a timeout is set, so unattended playback never stalls); `timeoutMs: 0` waits for the viewer. Jumps resolve against enabled scenes, and every choice target is graph-validated at Studio save time and by `flow validate` — an unknown or disabled target is an error, not a silent no-op. Each choice emits a `screenreel:choice` event and a `choice` analytics event with the target scene, so branch popularity shows up in the funnel. Captured video is linear: the cards render, the default (or first) option highlights briefly, and the scene continues.
+
 ## Sharing a demo and measuring it
 
 Send `?demo=play` (optionally with `srv_` variables) and the tour auto-plays with viewer chrome only — progress, play/pause, and exit; no flow picker, notes, capture, or Studio:

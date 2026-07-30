@@ -104,7 +104,7 @@ class Projector {
      the emphasis it is narrating (the main reason the tour read as rushed). */
   toast(message) { if (!this.toastNode) return; this.toastNode.textContent = message; this.toastNode.hidden = false; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => { this.toastNode.hidden = true; }, TOAST_MS * (Number(this.options.timeScale) || 1)); }
   enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); this.cursor()?.show(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
-  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout,.sr-snippet,.sr-cursor-ring').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
+  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
   current() { const scenes = this.store.enabledScenes(); return { scenes, position: Math.min(this.store.position(), Math.max(0, scenes.length - 1)), scene: scenes[Math.min(this.store.position(), Math.max(0, scenes.length - 1))] }; }
   routeMatches(scene) {
     const currentRoute = this.router.getRoute();
@@ -189,6 +189,16 @@ class Projector {
         announce: (message) => this.toast(message),
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
+      if (result.jumpTo && generation === this.playGeneration && this.store.playing()) {
+        // Choice jump: positions index into enabledScenes, so resolve there — never raw flow.scenes.
+        const enabled = this.store.enabledScenes();
+        const targetIndex = enabled.findIndex((item) => item.id === result.jumpTo);
+        if (targetIndex === -1) { this.toast(`Unknown choice target: ${result.jumpTo}`); continue; }
+        event('choice', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, targetSceneId: result.jumpTo, actionIndex });
+        this.analytics.emit('choice', { targetSceneId: result.jumpTo });
+        this.store.setPosition(targetIndex); this.render();
+        return this.play();
+      }
       if (result.navigated) {
         const nextScene = this.current().scene;
         if (navigationSameDocument && generation === this.playGeneration && this.store.playing() && nextScene && this.routeMatches(nextScene)) return this.play();

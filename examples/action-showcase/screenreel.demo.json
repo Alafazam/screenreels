@@ -79,7 +79,8 @@
           { "type": "click", "selector": "[data-action=\"reveal-delayed\"]" },
           { "type": "waitFor", "selector": "#delayed-target", "condition": "visible", "timeoutMs": 3000 },
           { "type": "highlight", "selector": "#delayed-target", "holdMs": 650 },
-          { "type": "call", "fn": "showScreenReelResult", "args": ["Safe page function called"], "cursorTo": "[data-demo-id=\"return-home\"]", "afterMs": 450 }
+          { "type": "call", "fn": "showScreenReelResult", "args": ["Safe page function called"], "cursorTo": "[data-demo-id=\"return-home\"]", "afterMs": 450 },
+          { "type": "choice", "prompt": "Where to next?", "options": [ { "label": "Replay the story", "scene": "action-tour" }, { "label": "Real controls", "scene": "interaction-tour" } ], "timeoutMs": 8000, "defaultScene": "action-tour" }
         ]}
       ]
     }

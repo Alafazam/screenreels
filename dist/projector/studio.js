@@ -4,7 +4,8 @@ import { Recorder } from './recorder.js';
 let activeStudio;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const clone = (value) => JSON.parse(JSON.stringify(value));
-const ACTION_ICONS = { highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
+const CHOICE_ESTIMATE_MS = 5000; // a viewer choice has no fixed duration; assume a beat for planning
+const ACTION_ICONS = { choice: 'right', highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
 const flowCounts = (flow) => ({ scenes: flow.scenes.length, enabled: flow.scenes.filter((scene) => scene.enabled !== false).length, actions: flow.scenes.reduce((total, scene) => total + scene.actions.length, 0) });
 function formatUpdated(flow) { if (flow.readonly) return 'Standard'; try { return new Date(flow.updatedAt).toLocaleDateString('en-GB'); } catch { return '—'; } }
 function estimateSceneSeconds(scene, defaults) {
@@ -14,6 +15,7 @@ function estimateSceneSeconds(scene, defaults) {
     if (action.type === 'glow' && action.sequence) ms += Number(action.stepMs || 1050) * Number(action.count || 6);
     else ms += Number(action.holdMs || action.durMs || action.ms || action.stepMs || 0);
     if (action.type === 'type') ms += Number(action.charMs ?? 45) * String(action.text || '').length;
+    if (action.type === 'choice') ms += Number(action.timeoutMs) || CHOICE_ESTIMATE_MS;
   }
   return Math.max(1, Math.round(ms / 1000));
 }
@@ -167,6 +169,7 @@ class Studio {
     for (let index = 0; index < scene.actions.length; index++) {
       const result = await window.ScreenReelCore.runAction(scene.actions[index], { document: doc, window: win, variables: window.ScreenReelCore.variableDefaults(this.draft?.variables), navigate: (route) => { this.frame.src = this.previewRoute(route); } });
       if (!result.ok) { this.failedAction = index; this.toast(`Action ${index + 1} failed`); this.render(); return; }
+      if (result.jumpTo) { this.toast(`Choice would jump to "${result.jumpTo}" — single-scene preview stops here`); return; }
       if (result.navigated) return;
     }
     this.toast('Scene completed');
@@ -181,6 +184,7 @@ class Studio {
       if (scene.settleMs != null && (!Number.isFinite(Number(scene.settleMs)) || Number(scene.settleMs) < 0 || Number(scene.settleMs) > 30000)) errors.push(`${scene.title}: invalid settle time`);
       if (scene.id === this.sceneId) for (const action of scene.actions) if (!action.locked) errors.push(...window.ScreenReelCore.validate(action, this.frame?.contentDocument, location.href).map((message) => `${scene.title}: ${message}`));
     }
+    errors.push(...window.ScreenReelCore.validateFlowGraph(this.draft));
     if (errors.length) { this.toast(errors[0]); return false; }
     this.draft = this.store.save(this.draft); this.flowId = this.draft.id; this.dirty = false; this.toast('Saved locally'); this.render(); return true;
   }

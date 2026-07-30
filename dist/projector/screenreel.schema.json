@@ -148,6 +148,7 @@
             "wait",
             "waitFor",
             "goto",
+            "choice",
             "pointer",
             "call",
             "fill"

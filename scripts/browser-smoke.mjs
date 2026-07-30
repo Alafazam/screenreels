@@ -47,7 +47,7 @@ try {
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
   const editButtons = page.getByRole('button', { name: 'Edit', exact: true }); assert.equal(await editButtons.count(), 4); await editButtons.nth(0).click();
   const titleField = page.locator('[data-field="title"]'); await titleField.fill('Studio-authored highlight');
-  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 25); assert.equal(await page.locator('[data-recipe]').count(), 6);
+  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 26); assert.equal(await page.locator('[data-recipe]').count(), 6);
   await page.locator('[data-definition="highlight"]').click(); const preview = page.frameLocator('.sr-preview-frame'); const kpiValue = preview.locator('[data-kpi="revenue"] strong'); await kpiValue.click();
   const savedTarget = page.locator('.sr-action small').filter({ hasText: '[data-kpi="revenue"]' }); await savedTarget.waitFor(); assert.equal(await savedTarget.count(), 1);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -87,7 +87,25 @@ try {
     const report = projector.validateScene(); projector.enable(); await projector.play(); const playing = projector.store.playing(); const matched = projector.routeMatches({ route: '/legacy.html' }); projector.destroy(); target.remove();
     return { report, playing, matched };
   });
-  assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false); await inlinePage.close();
+  assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false);
+  // Choice branching: clicking a card jumps playback to the target scene's enabled index.
+  const choiceMounted = await inlinePage.evaluate(async () => {
+    const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);
+    const route = `${location.pathname}${location.search}${location.hash}`;
+    const projector = await window.ScreenReel.mount(target, { projectId: 'choice-example', loop: false, flow: { data: { schemaVersion: 1, flows: [{ id: 'branchy', name: 'Branchy', scenes: [
+      { id: 'start', route, actions: [{ type: 'choice', prompt: 'Pick a path', options: [{ label: 'Skip ahead', scene: 'finale' }, { label: 'Next', scene: 'middle' }] }] },
+      { id: 'middle', route, actions: [] },
+      { id: 'finale', route, actions: [{ type: 'wait', ms: 4000 }] },
+    ] }] } } });
+    window.__choiceProjector = projector;
+    projector.enable(); projector.store.setPosition(0); projector.play();
+    return true;
+  });
+  assert.equal(choiceMounted, true);
+  await inlinePage.locator('.sr-choice-overlay .sr-choice-card', { hasText: 'Skip ahead' }).click();
+  await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
+  await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
+  await inlinePage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
   // stable session id. Fresh context so presenter-mode session state can't leak in.

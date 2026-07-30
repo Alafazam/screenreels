@@ -88,7 +88,18 @@
     createCopy(source, name) {
       const flow = clone(source || this.activeFlow()); const stamp = now();
       flow.id = makeId('flow'); flow.name = name || `${flow.name} copy`; flow.readonly = false; flow.createdAt = stamp; flow.updatedAt = stamp;
-      flow.scenes = flow.scenes.map((scene, sceneIndex) => ({ ...normalizeScene(scene, sceneIndex, this.baseHref), id: makeId('scene'), actions: scene.actions.map((action) => ({ ...action, id: makeId('action') })) }));
+      // Scene ids are regenerated, so anything referencing them by id (choice targets) must be
+      // remapped or the copy's branches silently point at the original flow's scenes.
+      const idMap = new Map(flow.scenes.map((scene) => [scene.id, makeId('scene')]));
+      const remap = (id) => idMap.get(id) ?? id;
+      flow.scenes = flow.scenes.map((scene, sceneIndex) => ({ ...normalizeScene(scene, sceneIndex, this.baseHref), id: remap(scene.id), actions: scene.actions.map((action) => {
+        const copy = { ...action, id: makeId('action') };
+        if (copy.type === 'choice') {
+          if (Array.isArray(copy.options)) copy.options = copy.options.map((option) => ({ ...option, scene: remap(option?.scene) }));
+          if (copy.defaultScene) copy.defaultScene = remap(copy.defaultScene);
+        }
+        return copy;
+      }) }));
       return flow;
     }
     createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: { dwellMs: 6000, settleMs: 900 }, scenes: [] }; }

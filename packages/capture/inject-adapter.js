@@ -8,7 +8,9 @@
       if (scene.waitFor) await window.ScreenReelCore.waitFor(document, scene.waitFor, 'visible', 15000);
       for (const action of scene.actions || []) {
         try {
-          await window.ScreenReelCore.runAction(action, { document, window, moveCursor, variables, navigate: (route) => { location.href = route; }, warn: (message) => console.warn('[screenreel]', message) });
+          // Capture clips are per-scene and linear, so a choice can't jump mid-clip: chooseOption
+          // renders the cards, visually picks defaultScene (else the first option), and continues.
+          await window.ScreenReelCore.runAction(action, { document, window, moveCursor, variables, chooseOption: (candidate) => candidate.defaultScene || candidate.options?.[0]?.scene, navigate: (route) => { location.href = route; }, warn: (message) => console.warn('[screenreel]', message) });
         } catch (error) { console.warn('[screenreel] action failed', action, error); }
       }
       return true;
