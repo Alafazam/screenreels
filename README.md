@@ -2,7 +2,7 @@
 
 Author one scripted product journey, present it live inside the product, and capture the same flow as polished video.
 
-[Open the live ScreenReel demo](https://alafazam.com/screenreels/)
+**Live demo: [alafazam.com/screenreels](https://alafazam.com/screenreels/)** — the guided tour plays automatically when you press *Open live demo*. Deployed from `main` by `.github/workflows/pages.yml`; the published artifact is built by `npm run build:pages`.
 
 ScreenReel contains two independent products backed by one action runtime:
 
@@ -185,7 +185,7 @@ npm run build
 npm run example:serve
 ```
 
-Open `http://127.0.0.1:4173/examples/action-showcase/`.
+Open `http://127.0.0.1:4173/examples/action-showcase/`. The same page is deployed at [alafazam.com/screenreels](https://alafazam.com/screenreels/).
 
 - `action-showcase` ships two flows: `guided-tour` is the 6-scene landing-page story, and `action-showcase` exercises every action family, local Studio, Projector, CLI Test, and Capture. The showcase flow's drag, pointer, container-scroll, `waitFor`, and `call` fixtures live on `destination.html` so the landing page stays focused on the story.
 - `spa-router` demonstrates framework-independent SPA navigation.
@@ -218,9 +218,17 @@ Navigation is same-origin by default. Page-function actions accept a named globa
 ```bash
 npm run build
 npm test
+npm run build:pages    # required before test:browser — it covers the deployed artifact
+npm run test:browser
 ```
 
 The build generates browser assets, JSON Schema, TypeScript declarations, and skill action references from the shared action registry. See `docs-architecture.md`, `CONTRIBUTING.md`, and `SECURITY.md`.
+
+## Deployment
+
+`.github/workflows/pages.yml` publishes `_site/` to [alafazam.com/screenreels](https://alafazam.com/screenreels/) on every push to `main`. `build:pages` fingerprints `app.js`, `fixtures.js`, and the projector runtime with a content hash, so any change to those bytes produces a new `?v=` URL and the CDN cannot serve a stale copy. The runtime key covers the whole `dist/projector` directory because the loader copies its own query onto every asset it pulls in.
+
+The browser smoke test loads `_site/index.html` as well as `examples/`, since the deployed artifact has different asset paths and its page scripts share one global scope.
 
 ## License
 

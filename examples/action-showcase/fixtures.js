@@ -1,7 +1,10 @@
 /* Shared demo-page fixtures. Loaded by index.html (form controls) and destination.html
    (drag board, pointer target, delayed state), so the behaviour has one home on both routes.
-   Every lookup is optional — each page only carries the fixtures it needs. */
+   Every lookup is optional — each page only carries the fixtures it needs.
 
+   Wrapped in an IIFE: this and app.js are classic scripts sharing one global scope, so any
+   top-level binding here could collide with one there and kill the whole script. */
+(function initFixtures() {
 const TOAST_MS = 1800;
 const DELAYED_REVEAL_MS = 650;
 const PAGE_FN_LATENCY_MS = 120;
@@ -34,3 +37,4 @@ window.showScreenReelResult = async (message = 'Page function called') => {
   toast(message);
 };
 window.ScreenReel?.registerFn('showScreenReelResult', window.showScreenReelResult);
+})();

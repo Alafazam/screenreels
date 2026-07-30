@@ -3,8 +3,11 @@
    Tour pacing lives in screenreel.demo.json — the timings there are the real durations, so
    Studio shows true numbers. Pass `timeScale` to mount if you want to stretch or compress
    everything uniformly (it reaches the runtime's internal constants too, which rewriting the
-   manifest cannot). */
+   manifest cannot).
 
+   Wrapped in an IIFE: this and fixtures.js are classic scripts sharing one global scope, so any
+   top-level binding here could collide with one there and kill the whole script. */
+(function initDemoPage() {
 const demoButton = document.getElementById('demo-button');
 if (demoButton) {
   (async () => {
@@ -31,3 +34,4 @@ if (demoButton) {
     document.querySelector('[data-action="open-demo"]')?.addEventListener('click', () => demoButton.click());
   })();
 }
+})();
