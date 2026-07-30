@@ -16,6 +16,7 @@ import { loadConfig, loadScenes } from '../lib/config.mjs';
 import { capture } from '../lib/capture.mjs';
 import { assemble } from '../lib/assemble.mjs';
 import { inspectFlow, validateFlow, testFlow, migrateFlow, installProjector } from '../lib/flow-tools.mjs';
+import { doctorFlow } from '../lib/flow-doctor.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -46,6 +47,7 @@ Usage:
   screenreel flow validate --flow <file> --base-url <url> [--json]
   screenreel flow test --flow <file> --scene <id> --base-url <url> [--screenshots <dir>] [--json]
   screenreel flow migrate --input <file> --output <file> [--json]
+  screenreel flow doctor --flow <file> --base-url <url> [--fix] [--json]
 
 The app under capture must already be running (dev server); set baseUrl,
 login hook and output paths in screenreel.config.mjs.`;
@@ -77,6 +79,7 @@ async function main() {
     else if (action === 'validate') printResult(await validateFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json') }));
     else if (action === 'test') printResult(await testFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json'), sceneId: opt('--scene'), screenshots: opt('--screenshots') }));
     else if (action === 'migrate') printResult(migrateFlow({ input: opt('--input'), output: opt('--output', './screenreel.demo.json') }));
+    else if (action === 'doctor') printResult(await doctorFlow({ baseUrl, flowFile: opt('--flow', './screenreel.scenes.json'), fix: has('--fix') }));
     else throw new Error(`unknown flow command: ${action || '(missing)'}`);
     return;
   }

@@ -165,6 +165,28 @@ screenreel flow migrate --input legacy.json --output screenreel.demo.json --json
 
 These commands return stable machine-readable scene, action, selector, match, error, and screenshot data. They do not upload DOM or product data.
 
+## Keeping demos in sync: doctor and CI
+
+Because ScreenReel drives the live app, a renamed selector is the one way a demo can rot. Two tools close that loop:
+
+```bash
+screenreel flow doctor --flow demos/sales.json --base-url http://localhost:3000 [--fix] [--json]
+```
+
+Doctor re-validates every scene against the live DOM and proposes repairs: an ambiguous selector gets a unique re-derived selector (or `index: 0`); a dead selector is re-matched by the action's stored `fingerprint` (`{text, tag, role}`, stamped automatically when you pick targets in Studio) and rewritten when the match is confident. Without a fingerprint the doctor lists the closest candidates but never auto-fixes. `--fix` rewrites only the repaired keys in place — the rest of your file is untouched. A "has no matches" that follows a state-mutating action in the same scene is reported as a warning, not an error, because validation is a current-DOM dry run and the target may be created mid-scene.
+
+For CI, `.github/workflows/ci.yml` runs unit tests, a dist-drift check, and browser-backed flow validation on every PR. Repos that consume ScreenReel can validate their own flows with the composite action — a broken demo becomes an inline PR annotation instead of a surprise mid-call:
+
+```yaml
+- run: npm ci
+- name: Start my app
+  run: npm run dev & npx wait-on http://localhost:3000
+- uses: Alafazam/screenreels/.github/actions/validate-flows@main
+  with:
+    flow: demos/sales-demo.json
+    base-url: http://localhost:3000
+```
+
 ## Capture
 
 Install from GitHub or a local tarball, then scaffold a capture configuration:

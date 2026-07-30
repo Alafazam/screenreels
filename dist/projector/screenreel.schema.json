@@ -133,6 +133,21 @@
         },
         "afterMs": {
           "type": "number"
+        },
+        "fingerprint": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": true
