@@ -48,6 +48,12 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
 
 Projector provides flow selection, play/pause, previous/next, presenter notes, Capture Current Page, Studio, and Exit. Studio is a lazy-loaded full-screen overlay; personal flows stay in project-scoped local storage.
 
+## Recording a scene
+
+In Studio's scene editor, press **Record** and use your app inside the preview. Interactions become actions as you go: typing in one field coalesces into a single `type` action at your measured typing speed, checkbox/select/range changes become `toggle`/`set`/`lever`, scrolling becomes one relative `scroll` per burst, and your pauses are kept as `afterMs` pacing. A click that navigates is recorded as `goto`, and recording continues on the new page (same origin only). Press Record again or Esc to stop, then Save.
+
+Notes: password fields are never recorded; synthetic events dispatched by the app are ignored (`isTrusted` only); after recording across a navigation, split the scene at the `goto` if save-time validation flags selectors that only exist on the second page; SPA `pushState` route changes are not yet detected.
+
 ## Agent cursor
 
 Projector and Capture share one pointer implementation (`packages/core/cursor.js`), so a live tour and a recorded video show the same cursor. It travels to each interaction target before the action fires, emits concentric rings on arrival to mark its position, dips with a brighter ring burst on click and pointer taps, and drifts vertically while the page scrolls so motion reads as cursor-driven.

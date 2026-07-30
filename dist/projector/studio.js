@@ -1,4 +1,5 @@
 import { icon } from './icons.js';
+import { Recorder } from './recorder.js';
 
 let activeStudio;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -57,11 +58,62 @@ class Studio {
   previewRoute(route) { const url = new URL(route, location.href); url.searchParams.set('screenreelPreview', '1'); return `${url.pathname}${url.search}${url.hash}`; }
   renderEditor() {
     const scene = this.scene(); if (!scene) { this.view = 'scenes'; return this.render(); }
-    this.body.innerHTML = `<section class="sr-page"><div class="sr-page-title"><div><button class="sr-back" data-back aria-label="Back to scenes">${icon('left')}</button><h1>${esc(scene.title)}</h1><p>${esc(this.draft.name)} · ${esc(scene.route)}</p></div><div class="sr-toolbar"><button data-play-scene>${icon('play')} Play scene</button><button data-save class="sr-primary">${icon('check')} Save</button></div></div><div class="sr-fields"><div class="sr-field"><label>Scene title</label><input data-field="title" value="${esc(scene.title)}"></div><div class="sr-field"><label>Route</label><input data-field="route" value="${esc(scene.route)}"></div><div class="sr-field"><label>Scene time (ms)</label><input type="number" min="100" max="120000" data-field="dwellMs" value="${Number(scene.dwellMs || 6000)}"></div><div class="sr-field"><label>Ready selector (optional)</label><input data-field="waitFor" value="${esc(scene.waitFor || '')}" placeholder="#page-ready"></div><div class="sr-field"><label>Ready timeout (ms)</label><input type="number" min="100" max="120000" data-field="timeoutMs" value="${scene.timeoutMs ?? ''}" placeholder="8000"></div><div class="sr-field"><label>Settle time (ms)</label><input type="number" min="0" max="30000" data-field="settleMs" value="${scene.settleMs ?? ''}" placeholder="0"></div><div class="sr-field wide"><label>Talking points</label><textarea data-field="talkingPoints">${esc(scene.talkingPoints)}</textarea></div></div><div class="sr-editor-grid"><section class="sr-preview-panel"><div class="sr-preview-tools"><strong>Product preview</strong><input readonly value="${esc(scene.route)}"><button data-reload aria-label="Reload preview" title="Reload">${icon('rotate')}</button></div><div class="sr-preview-frame-wrap"><div class="sr-picker-banner" hidden>Pick a target · ↑ parent · ↓ child · Esc cancel</div><iframe class="sr-preview-frame" src="${esc(this.previewRoute(scene.route))}" title="Scene preview"></iframe></div></section><aside class="sr-timeline"><div class="sr-timeline-head"><div><strong>Scene sequence</strong><span>${scene.actions.length} actions · drag to reorder</span></div><button data-add-action class="sr-primary sr-add-action">${icon('plus')} Add action</button></div><div class="sr-actions">${scene.actions.length ? scene.actions.map((action, index) => this.actionRow(action, index)).join('') : '<div class="sr-empty">Add the first action to this scene.</div>'}</div></aside></div></section>`;
-    this.frame = this.body.querySelector('.sr-preview-frame'); this.body.querySelector('[data-back]').onclick = () => { this.view = 'scenes'; this.render(); }; this.body.querySelector('[data-save]').onclick = () => this.save(); this.body.querySelector('[data-reload]').onclick = () => this.frame.contentWindow.location.reload(); this.body.querySelector('[data-add-action]').onclick = () => this.openCatalog(); this.body.querySelector('[data-play-scene]').onclick = () => this.playScene();
+    this.body.innerHTML = `<section class="sr-page"><div class="sr-page-title"><div><button class="sr-back" data-back aria-label="Back to scenes">${icon('left')}</button><h1>${esc(scene.title)}</h1><p>${esc(this.draft.name)} · ${esc(scene.route)}</p></div><div class="sr-toolbar"><button data-record class="sr-record">${icon('record')} Record</button><button data-play-scene>${icon('play')} Play scene</button><button data-save class="sr-primary">${icon('check')} Save</button></div></div><div class="sr-fields"><div class="sr-field"><label>Scene title</label><input data-field="title" value="${esc(scene.title)}"></div><div class="sr-field"><label>Route</label><input data-field="route" value="${esc(scene.route)}"></div><div class="sr-field"><label>Scene time (ms)</label><input type="number" min="100" max="120000" data-field="dwellMs" value="${Number(scene.dwellMs || 6000)}"></div><div class="sr-field"><label>Ready selector (optional)</label><input data-field="waitFor" value="${esc(scene.waitFor || '')}" placeholder="#page-ready"></div><div class="sr-field"><label>Ready timeout (ms)</label><input type="number" min="100" max="120000" data-field="timeoutMs" value="${scene.timeoutMs ?? ''}" placeholder="8000"></div><div class="sr-field"><label>Settle time (ms)</label><input type="number" min="0" max="30000" data-field="settleMs" value="${scene.settleMs ?? ''}" placeholder="0"></div><div class="sr-field wide"><label>Talking points</label><textarea data-field="talkingPoints">${esc(scene.talkingPoints)}</textarea></div></div><div class="sr-editor-grid"><section class="sr-preview-panel"><div class="sr-preview-tools"><strong>Product preview</strong><input readonly value="${esc(scene.route)}"><button data-reload aria-label="Reload preview" title="Reload">${icon('rotate')}</button></div><div class="sr-preview-frame-wrap"><div class="sr-picker-banner" hidden>Pick a target · ↑ parent · ↓ child · Esc cancel</div><iframe class="sr-preview-frame" src="${esc(this.previewRoute(scene.route))}" title="Scene preview"></iframe></div></section><aside class="sr-timeline"><div class="sr-timeline-head"><div><strong>Scene sequence</strong><span data-action-count>${scene.actions.length} actions · drag to reorder</span></div><button data-add-action class="sr-primary sr-add-action">${icon('plus')} Add action</button></div><div class="sr-actions">${scene.actions.length ? scene.actions.map((action, index) => this.actionRow(action, index)).join('') : '<div class="sr-empty">Add the first action to this scene.</div>'}</div></aside></div></section>`;
+    this.frame = this.body.querySelector('.sr-preview-frame'); this.body.querySelector('[data-back]').onclick = () => { this.view = 'scenes'; this.render(); }; this.body.querySelector('[data-save]').onclick = () => this.save(); this.body.querySelector('[data-reload]').onclick = () => this.frame.contentWindow.location.reload(); this.body.querySelector('[data-add-action]').onclick = () => this.openCatalog(); this.body.querySelector('[data-play-scene]').onclick = () => this.playScene(); this.body.querySelector('[data-record]').onclick = () => this.toggleRecording();
     this.body.querySelectorAll('[data-field]').forEach((input) => input.oninput = () => { this.ensureEditable(); const value = input.type === 'number' ? (input.value === '' ? undefined : Number(input.value)) : input.value; this.scene()[input.dataset.field] = value; this.dirty = true; });
-    this.body.querySelectorAll('[data-action-index]').forEach((row) => { const index = Number(row.dataset.actionIndex); row.querySelector('[data-action-edit]').onclick = () => this.editAction(index); row.querySelector('[data-action-up]').onclick = () => this.moveAction(index, index - 1); row.querySelector('[data-action-down]').onclick = () => this.moveAction(index, index + 1); row.querySelector('[data-action-delete]').onclick = () => { this.ensureEditable(); this.scene().actions.splice(index, 1); this.dirty = true; this.render(); }; });
+    this.body.querySelectorAll('[data-action-index]').forEach((row) => this.bindActionRow(row));
   }
+  bindActionRow(row) { const index = Number(row.dataset.actionIndex); row.querySelector('[data-action-edit]').onclick = () => this.editAction(index); row.querySelector('[data-action-up]').onclick = () => this.moveAction(index, index - 1); row.querySelector('[data-action-down]').onclick = () => this.moveAction(index, index + 1); row.querySelector('[data-action-delete]').onclick = () => { this.ensureEditable(); this.scene().actions.splice(index, 1); this.dirty = true; this.render(); }; }
+  /* Record-by-doing. The recorder's teardown is installed into this.cancelPicker — the same slot
+     the selector picker uses — so any destructive render() (row edits, back, save, close) stops
+     recording cleanly before the preview iframe is torn down. */
+  toggleRecording() {
+    if (this.recorder?.active) { this.cancelPicker(); return; }
+    if (!this.frame?.contentDocument) return this.toast('Preview is not available for recording');
+    this.cancelPicker();
+    this.ensureEditable();
+    const button = this.body.querySelector('[data-record]');
+    const recorder = new Recorder({
+      frame: this.frame, core: window.ScreenReelCore, banner: this.body.querySelector('.sr-picker-banner'),
+      route: this.scene().route,
+      onOp: (op) => this.applyRecordedOp(op),
+      onStop: (reason) => {
+        this.recorder = null; this.cancelPicker = () => {};
+        const node = this.body?.querySelector('[data-record]');
+        if (node) { node.classList.remove('recording'); node.innerHTML = `${icon('record')} Record`; }
+        if (reason) this.toast(reason);
+      },
+    });
+    if (!recorder.start()) return this.toast('Preview is not available for recording');
+    this.recorder = recorder;
+    this.cancelPicker = () => recorder.stop();
+    if (button) { button.classList.add('recording'); button.innerHTML = `${icon('record')} Stop`; }
+  }
+  /* Applies recorder ops without render(): a re-render would recreate the preview iframe, losing
+     page state and the recorder's listeners mid-session. Rows are appended incrementally instead. */
+  applyRecordedOp(op) {
+    const scene = this.scene(); if (!scene) return;
+    if (op.op === 'append') {
+      const action = { id: window.ScreenReelStore.makeId('action'), ...op.action };
+      scene.actions.push(action); this.dirty = true; this.markDirty();
+      const list = this.body?.querySelector('.sr-actions'); if (!list) return;
+      list.querySelector('.sr-empty')?.remove();
+      list.insertAdjacentHTML('beforeend', this.actionRow(action, scene.actions.length - 1));
+      this.bindActionRow(list.lastElementChild);
+      const count = this.body.querySelector('[data-action-count]'); if (count) count.textContent = `${scene.actions.length} actions · drag to reorder`;
+    } else if (op.op === 'patchLast') {
+      const last = scene.actions[scene.actions.length - 1]; if (!last) return;
+      Object.assign(last, op.patch); this.dirty = true; this.markDirty();
+    } else if (op.op === 'replaceLast') {
+      const index = scene.actions.length - 1; if (index < 0) return;
+      scene.actions[index] = { id: scene.actions[index].id, ...op.action }; this.dirty = true; this.markDirty();
+      const row = this.body?.querySelector(`[data-action-index="${index}"]`); if (!row) return;
+      row.outerHTML = this.actionRow(scene.actions[index], index);
+      this.bindActionRow(this.body.querySelector(`[data-action-index="${index}"]`));
+    }
+  }
+  /* head() only renders the unsaved-changes badge during a full render(); recording avoids those. */
+  markDirty() { if (this.shell.querySelector('.sr-dirty')) return; this.shell.querySelector('[data-global="ai"]')?.insertAdjacentHTML('beforebegin', '<span class="sr-dirty">Unsaved changes</span>'); }
   actionRow(action, index) { const definition = window.ScreenReelCore.definitionForAction(action); return `<article class="sr-action ${this.failedAction === index ? 'failed' : ''}" data-action-index="${index}"><span class="sr-action-index">${index + 1}</span><span class="sr-action-ico">${icon(ACTION_ICONS[action.type] || 'spark')}</span><div class="sr-action-body"><strong>${esc(definition?.label || action.type)}</strong><small>${esc(action.selector || action.url || action.fn || `${action.ms || ''} ms`)}</small></div><div class="sr-action-btns"><button data-action-edit title="Settings" aria-label="Settings">${icon('sliders')}</button><button data-action-up aria-label="Move up">${icon('up')}</button><button data-action-down aria-label="Move down">${icon('down')}</button><button data-action-delete class="sr-danger" aria-label="Remove">${icon('close')}</button></div></article>`; }
   moveAction(from, to) { if (to < 0 || to >= this.scene().actions.length) return; this.ensureEditable(); const [action] = this.scene().actions.splice(from, 1); this.scene().actions.splice(to, 0, action); this.dirty = true; this.render(); }
   openCatalog() {

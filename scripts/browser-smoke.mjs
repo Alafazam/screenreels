@@ -53,6 +53,20 @@ try {
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal(await page.locator('.sr-dirty').count(), 0);
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 11))));
+  // Record-by-doing: trusted interactions inside the preview iframe become actions incrementally,
+  // without a re-render (the checkbox click must NOT double-emit alongside its toggle).
+  const recordButton = page.locator('[data-record]'); await recordButton.click();
+  await page.locator('.sr-picker-banner').waitFor({ state: 'visible' });
+  await preview.locator('#submit-control').click();
+  await preview.locator('#customer-name').pressSequentially('Recorded Co', { delay: 40 });
+  await preview.locator('#priority').check();
+  await recordButton.click();
+  await page.locator('.sr-picker-banner').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('.sr-action').count(), 14);
+  assert.equal(await page.locator('.sr-action small').filter({ hasText: '#customer-name' }).count(), 1);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  assert.equal(await page.locator('.sr-dirty').count(), 0);
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.length === 14 && scene.actions.some((action) => action.type === 'type' && action.text === 'Recorded Co')))));
   await page.getByRole('button', { name: 'Back to scenes', exact: true }).click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').filter({ hasText: 'Studio-authored highlight' }).count(), 1);
   await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-1440x900.png') });
