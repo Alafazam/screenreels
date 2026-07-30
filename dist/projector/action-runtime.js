@@ -371,6 +371,7 @@
     }
     return errors;
   }
+  const INSPECT_TEXT_LIMIT = 120, INSPECT_LIMIT = 500; // fingerprint/inspection bounds
   const interactiveSelector = 'button,a[href],input,select,textarea,[role="button"],[role="switch"],[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
   function isBroad(el, doc) { if (!el || ['BODY', 'HTML', 'MAIN'].includes(el.tagName) || el.getAttribute('role') === 'tabpanel' || el.hasAttribute('data-panel')) return true; const rect = el.getBoundingClientRect(); return rect.width * rect.height > doc.defaultView.innerWidth * doc.defaultView.innerHeight * .7; }
   function visualCandidate(el, doc) { if (!el || isBroad(el, doc)) return false; const rect = el.getBoundingClientRect(); if (rect.width < 24 || rect.height < 18) return false; const style = doc.defaultView.getComputedStyle(el); const padded = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].some((key) => parseFloat(style[key]) >= 6); return style.borderStyle !== 'none' || style.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(style.borderRadius) >= 4 || padded; }
@@ -393,7 +394,14 @@
     }
     return selectorFor(el);
   }
-  function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, 500).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 120), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
+  /* A target's human-recognisable identity, stored on actions so `flow doctor` can re-match them
+     after a selector is renamed. Same shape inspectDocument reports, so scoring compares like
+     with like. One definition, used by the Studio picker, the recorder, and the doctor. */
+  function fingerprintFor(el) {
+    if (!el?.tagName) return null;
+    return { text: String(el.innerText || el.getAttribute?.('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), tag: el.tagName.toLowerCase(), role: el.getAttribute?.('role') || '' };
+  }
+  function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

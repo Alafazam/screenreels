@@ -48,25 +48,29 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
 
 Projector provides flow selection, play/pause, previous/next, presenter notes, Capture Current Page, Studio, and Exit. Studio is a lazy-loaded full-screen overlay; personal flows stay in project-scoped local storage.
 
-## Recording a scene
+## Guides
 
-In Studio's scene editor, press **Record** and use your app inside the preview. Interactions become actions as you go: typing in one field coalesces into a single `type` action at your measured typing speed, checkbox/select/range changes become `toggle`/`set`/`lever`, scrolling becomes one relative `scroll` per burst, and your pauses are kept as `afterMs` pacing. A click that navigates is recorded as `goto`, and recording continues on the new page (same origin only). Press Record again or Esc to stop, then Save.
+Task-oriented walkthroughs for each capability live in **[docs/](docs/README.md)**:
 
-Notes: password fields are never recorded; synthetic events dispatched by the app are ignored (`isTrusted` only); after recording across a navigation, split the scene at the `goto` if save-time validation flags selectors that only exist on the second page; SPA `pushState` route changes are not yet detected.
+| Guide | Answers |
+|---|---|
+| [Recording a scene](docs/recording.md) | Create a demo by using your app, not by writing JSON |
+| [Keeping demos working](docs/doctor-and-ci.md) | Find and auto-repair steps your app broke; gate it in CI |
+| [Voiceover](docs/voiceover.md) | Narrate the captured video from the notes you already wrote |
+| [Personalizing with variables](docs/variables.md) | One demo, per-prospect names via `?srv_company=…` |
+| [Sharing and analytics](docs/sharing-and-analytics.md) | Hand over a self-playing link and see what viewers did |
+| [Branching with choices](docs/branching.md) | Let the viewer pick what they see |
+| [Pacing and the cursor](docs/pacing-and-cursor.md) | Make it calmer; change or hide the pointer |
 
-## Agent cursor
+The sections below are the reference: formats, options, and CLI surface.
 
-Projector and Capture share one pointer implementation (`packages/core/cursor.js`), so a live tour and a recorded video show the same cursor. It travels to each interaction target before the action fires, emits concentric rings on arrival to mark its position, dips with a brighter ring burst on click and pointer taps, and drifts vertically while the page scrolls so motion reads as cursor-driven.
+## Agent cursor and pacing
 
-The pointer is created lazily on first use, so an idle page never shows a stray cursor. Emphasis actions (`highlight`, `glow`, `spotlight`) do not move it — those are camera moves, not interactions, and a pointer chasing every highlight reads as noise. `prefers-reduced-motion: reduce` disables travel, rings, and drift — the cursor jumps straight to position.
+Projector and Capture share one pointer implementation, so a live tour and a recorded video show the same cursor: it travels to each interaction target, emits rings on arrival, dips on click, and drifts while the page scrolls. `cursor: 'dot'` (default), `'arrow'`, or `false`. `prefers-reduced-motion: reduce` disables the motion.
 
-Set `cursor: 'arrow'` for the classic arrow glyph, or `cursor: false` to turn it off entirely.
+`timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and internal constants (countdown steps, flash pulses, reveal fades) that manifest rewriting cannot reach. Timeouts and scroll-settle limits are excluded: those are limits, not pacing. Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, `settleMs` to `flow.defaults.settleMs`.
 
-## Pacing
-
-`timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and the runtime's own internal constants (countdown steps, flash pulses, reveal fades). Rewriting timings in a manifest cannot reach the last group, which is why a single multiplier lives in the runtime instead. Timeouts and scroll-settle limits are deliberately excluded: those are limits, not pacing. Presenter notes ride the same scale, so a note never outlives the emphasis it narrates.
-
-Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, and `settleMs` to `flow.defaults.settleMs`.
+See [Pacing and the cursor](docs/pacing-and-cursor.md).
 
 ## Flow format
 
@@ -167,82 +171,34 @@ These commands return stable machine-readable scene, action, selector, match, er
 
 ## Personalizing a demo
 
-Declare variables on a flow and reference them as `{{name}}` in action `text`, `note`, `value`, `label`, `code`, `caption`, and in scene titles/talking points:
+Declare `variables` on a flow and reference them as `{{name}}` in action `text`, `note`, `value`, `label`, `code`, and `caption`, plus scene titles and talking points. Values resolve URL (`?srv_company=…`) > mount option > flow default. Selectors, function names, and `goto` URLs are never interpolated, so a crafted link cannot retarget actions or redirect the page.
 
-```json
-{ "id": "sales", "name": "Sales walkthrough",
-  "variables": { "company": { "label": "Company name", "default": "Acme" } },
-  "scenes": [{ "actions": [{ "type": "type", "selector": "#name", "text": "{{company}}" }] }] }
-```
-
-Values resolve in priority order: URL parameters (`?demo=1&srv_company=Northstar` — one link personalizes the whole run and survives cross-page navigation), then the `variables` mount option, then flow defaults. Unknown names stay literal and raise a one-time warning. Selectors, function names, and `goto` URLs are never interpolated — URL-supplied values must not steer targeting or navigation. Capture reads flow defaults automatically (`config.variables` overrides), and Studio edits the declaration via the **Variables** button on the scene list.
+Full walkthrough: **[docs/variables.md](docs/variables.md)**.
 
 ## Branching with viewer choices
 
-A `choice` action shows 1–4 cards; clicking one jumps playback to the named scene, turning a linear tour into a self-serve interactive demo:
+A `choice` action shows 1–4 cards; clicking one jumps playback to the named scene, turning a linear tour into a self-serve demo. Targets are graph-validated on Studio save and by `flow validate` — an unknown or disabled target is an error, not a silent no-op. Captured video auto-picks `defaultScene` so it stays linear.
 
-```json
-{ "type": "choice", "prompt": "What do you want to see?",
-  "options": [ { "label": "Reporting", "scene": "tour-kpis" }, { "label": "Setup", "scene": "tour-controls" } ],
-  "timeoutMs": 12000, "defaultScene": "tour-kpis" }
-```
-
-`timeoutMs` auto-continues to `defaultScene` (required when a timeout is set, so unattended playback never stalls); `timeoutMs: 0` waits for the viewer. Jumps resolve against enabled scenes, and every choice target is graph-validated at Studio save time and by `flow validate` — an unknown or disabled target is an error, not a silent no-op. Each choice emits a `screenreel:choice` event and a `choice` analytics event with the target scene, so branch popularity shows up in the funnel. Captured video is linear: the cards render, the default (or first) option highlights briefly, and the scene continues.
+Full walkthrough: **[docs/branching.md](docs/branching.md)**.
 
 ## Sharing a demo and measuring it
 
-Send `?demo=play` (optionally with `srv_` variables) and the tour auto-plays with viewer chrome only — progress, play/pause, and exit; no flow picker, notes, capture, or Studio:
+Send `?demo=play` (optionally with `srv_` variables) and the tour auto-plays with viewer chrome only — progress, play/pause, and exit. Playback emits a funnel (`view_start`, `scene_enter`, `scene_complete`, `flow_complete`, `drop_off`, `choice`) as `screenreel:analytics` events, an `analytics.onEvent` callback, and an optional `analytics.beaconUrl`. Nothing leaves the page unless you configure a beacon; payloads carry manifest identifiers only.
 
-```
-https://your-app.example/product?demo=play&srv_company=Northstar
-```
-
-Playback emits funnel events — `view_start` (once per session), `scene_enter`, `scene_complete`, `flow_complete`, and `drop_off` (left while playing) — each enriched with a session id, scene position, and percent complete. **Nothing leaves the page by default.** Consume them in-page or send them wherever you already do analytics:
-
-```js
-await ScreenReel.mount(button, {
-  projectId: 'acme-sales',
-  flow: { src: '/demos/sales-demo.json' },
-  analytics: {
-    onEvent: (event) => posthog?.capture(`screenreel_${event.event}`, event),
-    beaconUrl: 'https://collector.example/events',   // optional: POST each event as JSON
-  },
-});
-```
-
-Payloads carry manifest identifiers only (scene ids, indices) — no URLs, page content, or PII. A collector can be ten lines:
-
-```js
-import http from 'node:http';
-import fs from 'node:fs';
-http.createServer((req, res) => {
-  let body = '';
-  req.on('data', (chunk) => { body += chunk; });
-  req.on('end', () => { fs.appendFileSync('events.jsonl', body + '\n'); res.writeHead(204).end(); });
-}).listen(8787);
-```
+Full walkthrough: **[docs/sharing-and-analytics.md](docs/sharing-and-analytics.md)**.
 
 ## Keeping demos in sync: doctor and CI
 
-Because ScreenReel drives the live app, a renamed selector is the one way a demo can rot. Two tools close that loop:
+Because ScreenReel drives the live app, a renamed selector is the one way a demo can rot.
 
 ```bash
-screenreel flow doctor --flow demos/sales.json --base-url http://localhost:3000 [--fix] [--json]
+screenreel flow validate --flow demos/sales.json --base-url http://localhost:3000 --json
+screenreel flow doctor   --flow demos/sales.json --base-url http://localhost:3000 [--fix] [--json]
 ```
 
-Doctor re-validates every scene against the live DOM and proposes repairs: an ambiguous selector gets a unique re-derived selector (or `index: 0`); a dead selector is re-matched by the action's stored `fingerprint` (`{text, tag, role}`, stamped automatically when you pick targets in Studio) and rewritten when the match is confident. Without a fingerprint the doctor lists the closest candidates but never auto-fixes. `--fix` rewrites only the repaired keys in place — the rest of your file is untouched. A "has no matches" that follows a state-mutating action in the same scene is reported as a warning, not an error, because validation is a current-DOM dry run and the target may be created mid-scene.
+Doctor re-validates every scene against the live DOM and repairs what it can: an ambiguous selector gets a unique re-derived selector (or `index: 0`), and a dead selector is re-matched by the action's stored `fingerprint` (`{text, tag, role}`, stamped automatically when you pick a target in Studio or record a scene). Without a fingerprint it ranks candidates but never auto-fixes. `.github/workflows/ci.yml` gates every PR, and `.github/actions/validate-flows` gives consumer repos inline PR annotations when a product change breaks their demo.
 
-For CI, `.github/workflows/ci.yml` runs unit tests, a dist-drift check, and browser-backed flow validation on every PR. Repos that consume ScreenReel can validate their own flows with the composite action — a broken demo becomes an inline PR annotation instead of a surprise mid-call:
-
-```yaml
-- run: npm ci
-- name: Start my app
-  run: npm run dev & npx wait-on http://localhost:3000
-- uses: Alafazam/screenreels/.github/actions/validate-flows@main
-  with:
-    flow: demos/sales-demo.json
-    base-url: http://localhost:3000
-```
+Full walkthrough: **[docs/doctor-and-ci.md](docs/doctor-and-ci.md)**.
 
 ## Capture
 

@@ -134,6 +134,22 @@ test('navigating to the identical route emits nothing', () => {
   assert.deepEqual(coalescer.navigate('/here', 100), []);
 });
 
+test('recorded actions carry the target fingerprint so the doctor can repair them', () => {
+  const coalescer = make();
+  const fingerprint = { text: 'Rock the demo', tag: 'button', role: '' };
+  const clicked = appended(coalescer.push({ kind: 'click', at: 0, selector: '#submit', fingerprint }));
+  assert.deepEqual(clicked[0].fingerprint, fingerprint);
+  const typed = make();
+  const field = { text: '', tag: 'input', role: '' };
+  typed.push({ kind: 'input', at: 0, selector: '#name', fingerprint: field, value: 'A' });
+  typed.push({ kind: 'input', at: 60, selector: '#name', fingerprint: field, value: 'Ac' });
+  assert.deepEqual(appended(typed.flush())[0].fingerprint, field);
+  // A scroll has no meaningful element identity, so it stays fingerprint-free.
+  const scrolled = make();
+  scrolled.push({ kind: 'scroll', at: 0, selector: null, deltaX: 0, deltaY: 900, viewportW: 1000, viewportH: 1000 });
+  assert.equal(appended(scrolled.flush())[0].fingerprint, undefined);
+});
+
 test('flush finalizes pending state exactly once', () => {
   const coalescer = make();
   const ops = [];

@@ -57,11 +57,11 @@ export class Coalescer {
         this.pendingType.value = record.value; this.pendingType.lastAt = record.at;
       } else {
         this.finalizeType(ops);
-        this.pendingType = { selector: record.selector, value: record.value, firstAt: record.at, lastAt: record.at, gaps: [] };
+        this.pendingType = { selector: record.selector, fingerprint: record.fingerprint, value: record.value, firstAt: record.at, lastAt: record.at, gaps: [] };
       }
     } else if (record.kind === 'click') {
       this.finalizeType(ops);
-      this.emit(ops, { type: 'click', definitionId: 'click', selector: record.selector }, record.at, record.at);
+      this.emit(ops, { type: 'click', definitionId: 'click', selector: record.selector }, record.at, record.at, record.fingerprint);
     } else if (record.kind === 'change') {
       const action = this.changeAction(record);
       if (record.control === 'text') { if (this.pendingType?.selector === record.selector) this.finalizeType(ops); return ops; }
@@ -73,7 +73,7 @@ export class Coalescer {
         ops.push({ op: 'replaceLast', action });
         this.lastEmitted = { type: action.type, selector: record.selector, at: record.at };
       } else {
-        this.emit(ops, action, record.at, record.at);
+        this.emit(ops, action, record.at, record.at, record.fingerprint);
       }
     } else if (record.kind === 'submit') {
       this.finalizeType(ops);
@@ -113,7 +113,7 @@ export class Coalescer {
     if (!this.pendingType) return;
     const pending = this.pendingType; this.pendingType = null;
     const charMs = pending.gaps.length ? clamp(Math.round(median(pending.gaps)), CHAR_MS_MIN, CHAR_MS_MAX) : this.defaults('type').charMs;
-    this.emit(ops, { type: 'type', definitionId: 'type', selector: pending.selector, text: pending.value, clearFirst: true, charMs }, pending.firstAt, pending.lastAt);
+    this.emit(ops, { type: 'type', definitionId: 'type', selector: pending.selector, text: pending.value, clearFirst: true, charMs }, pending.firstAt, pending.lastAt, pending.fingerprint);
   }
 
   finalizeScroll(ops) {
@@ -131,7 +131,8 @@ export class Coalescer {
 
   /* Idle gaps between interactions become afterMs on the PREVIOUS action, so replay keeps the
      author's pacing without inventing pauses they didn't take. */
-  emit(ops, action, firstAt, lastAt) {
+  emit(ops, action, firstAt, lastAt, fingerprint) {
+    if (fingerprint && action.selector) action.fingerprint = fingerprint;
     if (this.emittedCount > 0 && this.lastEmitted) {
       const gap = firstAt - this.lastEmitted.at;
       if (gap >= IDLE_GAP_MIN_MS) ops.push({ op: 'patchLast', patch: { afterMs: Math.min(Math.round(gap / IDLE_GAP_ROUND_MS) * IDLE_GAP_ROUND_MS, IDLE_GAP_MAX_MS) } });
@@ -215,9 +216,11 @@ export class Recorder {
   /* Overlay chrome (ScreenReel's own boxes, ripples, cursor) must never record. */
   isOverlayTarget(el) { return !!(el.closest?.('[class^="sr-"],[class*=" sr-"]') || el.closest?.('#__screenreelCursor')); }
 
-  selectorOf(el) {
+  /* Resolved selector plus the target's fingerprint: without the fingerprint, `flow doctor`
+     cannot re-match a recorded action after the app renames its selector. */
+  targetOf(el) {
     const resolved = this.core.resolvePickerTarget(el, 'interactive', this.doc) || el;
-    return this.core.selectorFor(resolved);
+    return { selector: this.core.selectorFor(resolved), fingerprint: this.core.fingerprintFor(resolved) };
   }
 
   handleClick(event) {
@@ -230,9 +233,9 @@ export class Recorder {
     const label = target.closest?.('label');
     const labelled = label ? (label.control || label.querySelector('input,select,textarea')) : null;
     if (labelled && !(labelled.tagName === 'INPUT' && CLICK_KEEP_INPUT_TYPES.includes(labelled.type))) return;
-    const selector = this.selectorOf(target);
+    const { selector, fingerprint } = this.targetOf(target);
     if (!selector) return;
-    this.apply(this.coalescer.push({ kind: 'click', at: Date.now(), selector }));
+    this.apply(this.coalescer.push({ kind: 'click', at: Date.now(), selector, fingerprint }));
   }
 
   handleInput(event) {
@@ -241,18 +244,18 @@ export class Recorder {
     if (!el || this.isOverlayTarget(el)) return;
     const isText = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_INPUT_TYPES.includes(el.type));
     if (!isText || SENSITIVE_INPUT_TYPES.includes(el.type)) return;
-    const selector = this.selectorOf(el);
+    const { selector, fingerprint } = this.targetOf(el);
     if (!selector) return;
-    this.apply(this.coalescer.push({ kind: 'input', at: Date.now(), selector, value: el.value }));
+    this.apply(this.coalescer.push({ kind: 'input', at: Date.now(), selector, fingerprint, value: el.value }));
   }
 
   handleChange(event) {
     if (!event.isTrusted || !this.active) return;
     const el = event.target;
     if (!el || this.isOverlayTarget(el) || SENSITIVE_INPUT_TYPES.includes(el.type) || el.type === 'file') return;
-    const selector = this.selectorOf(el);
+    const { selector, fingerprint } = this.targetOf(el);
     if (!selector) return;
-    const record = { kind: 'change', at: Date.now(), selector, value: el.value, checked: el.checked };
+    const record = { kind: 'change', at: Date.now(), selector, fingerprint, value: el.value, checked: el.checked };
     if (el.tagName === 'SELECT') record.control = 'select';
     else if (el.type === 'checkbox') record.control = 'checkbox';
     else if (el.type === 'radio') record.control = 'radio';
