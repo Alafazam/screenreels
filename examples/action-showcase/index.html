@@ -53,7 +53,6 @@
           </button>
           <a class="secondary link" href="https://github.com/Alafazam/screenreels">View on GitHub</a>
         </div>
-        <label class="explain-toggle"><input type="checkbox" id="explain-toggle" checked> Explain each step as it plays</label>
         <p class="hero-hint">No account or cloud service required — the guided tour plays automatically.</p>
       </div>
       <aside class="hero-card" data-demo-id="hero-card" aria-label="ScreenReel workflow preview">
@@ -76,7 +75,7 @@
     <section id="why" class="section why-section">
       <div class="section-intro">
         <p class="eyebrow">Why we built it</p>
-        <h2><span class="sr-word" data-word="demos">Demos</span> should not <span class="sr-reel" data-reel="drift">drift</span> <span class="sr-flash" data-flash="changes">every time the product changes.</span></h2>
+        <h2><span class="sr-word" data-word="demos">Demos</span> should not <span class="sr-reel" data-reel="drift">drift</span> <span class="sr-flash" data-flash="changes">every time the <span class="sr-word" data-word="product">product</span> changes.</span></h2>
       </div>
       <div class="why-copy">
         <p>Live walkthroughs are hard to repeat. Recorded videos go stale. Automation scripts are rarely presenter-friendly.</p>
@@ -113,7 +112,7 @@
 
     <section id="live-demo" class="section demo-section">
       <div class="demo-heading">
-        <div><p class="eyebrow">Live demo</p><h2>Watch the runtime operate a real page.</h2><p>Open the controls above and press Play. ScreenReel will highlight these cards, scroll the page, change the form, reveal delayed state, and continue onto a second page.</p></div>
+        <div><p class="eyebrow">Live demo</p><h2>Watch the runtime operate a real page.</h2><p>Open the controls above and press Play. ScreenReel will highlight these cards, scroll the page, change the form, and continue onto a second page.</p></div>
         <button class="secondary replay-demo" type="button" data-action="open-demo">Open demo controls</button>
       </div>
 
@@ -128,7 +127,7 @@
       </div>
 
       <div id="form" class="demo-block split">
-        <div class="block-copy"><span>Scene 2</span><h3>Work with real controls</h3><p>Click, hover, focus, type, set, toggle, move a range input, and drag work between stages.</p></div>
+        <div class="block-copy"><span>Scene 2</span><h3>Work with real controls</h3><p>Click, hover, focus, type, set, toggle, and move a range input — all with real events.</p></div>
         <form class="control-card" onsubmit="return false">
           <label>Name<input id="customer-name" placeholder="Type a customer name"></label>
           <label>Region<select id="region"><option>North</option><option>South</option><option>West</option></select></label>
@@ -136,21 +135,10 @@
           <label>Confidence <output id="confidence-output">45%</output><input id="confidence" type="range" min="0" max="100" value="45"></label>
           <button id="submit-control" class="primary" type="button">Rock the demo</button>
         </form>
-        <div class="board">
-          <div class="column"><h4>Backlog</h4><button class="work-card" data-demo-id="drag-source" type="button">Review assortment</button><button class="port" id="pointer-target" aria-label="Pointer target" type="button"></button></div>
-          <div class="column" data-demo-id="drag-destination"><h4>In review</h4><p>Drop work here</p></div>
-        </div>
-      </div>
-
-      <div id="viewport" class="demo-block">
-        <div class="block-head"><div><span>Scene 3</span><h3>Control viewport and timing</h3></div><button class="secondary" type="button" data-action="reveal-delayed">Reveal delayed target</button></div>
-        <div class="activity-scroll" id="activity-scroll">
-          <div class="activity"><b>09:00</b><span>Forecast imported</span></div><div class="activity"><b>09:12</b><span>Planner opened review</span></div><div class="activity"><b>09:20</b><span>Rules evaluated</span></div><div class="activity"><b>09:34</b><span>Exceptions grouped</span></div><div class="activity"><b>09:45</b><span>Approval requested</span></div><div class="activity"><b>10:02</b><span>Plan published</span></div><div id="delayed-target" class="delayed" hidden>Delayed state is now visible</div>
-        </div>
       </div>
 
       <div class="demo-block final-card" data-demo-id="final-card">
-        <div><span>Scene 4</span><h3>Continue across routes</h3><p>The active flow and presenter state survive a full-page navigation.</p></div>
+        <div><span>Scene 3</span><h3>Continue across routes</h3><p>The active flow and presenter state survive a full-page navigation.</p></div>
         <a class="primary link" data-action="destination" href="destination.html?from=showcase">Open destination <span aria-hidden="true">→</span></a>
       </div>
     </section>
@@ -158,13 +146,8 @@
 
   <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="https://github.com/Alafazam/screenreels">GitHub</a><a href="https://alafazam.com/">Made by Alafazam</a></nav></footer>
   <div id="toast" class="toast" hidden></div>
-  <aside id="how-its-made" class="how-its-made" hidden aria-live="polite">
-    <div class="him-head"><span class="him-dot" aria-hidden="true"></span><strong>How it's made</strong><span class="him-step" id="him-step"></span></div>
-    <p class="him-label" id="him-label"></p>
-    <p class="him-explain" id="him-explain"></p>
-    <pre class="him-code"><code id="him-code"></code></pre>
-  </aside>
   <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
+  <script data-cfasync="false" src="fixtures.js"></script>
   <script data-cfasync="false" src="app.js"></script>
 </body>
 </html>

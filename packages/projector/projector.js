@@ -2,6 +2,8 @@ import { icon } from './icons.js';
 
 const instances = new Set();
 const functions = new Map();
+const TOAST_MS = 2600;
+const PILL_INTRO_MS = 1100;
 let publicApi;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const event = (name, detail) => window.dispatchEvent(new CustomEvent(`screenreel:${name}`, { detail }));
@@ -16,13 +18,19 @@ function defaultRouter() {
 
 class Projector {
   constructor(target, options, assetBase, assetVersion) {
-    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
+    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, timeScale: 1, cursor: 'dot', ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
   }
   assetUrl(name) { const url = new URL(name, this.assetBase); if (this.assetVersion) url.search = this.assetVersion; return url.href; }
+  /* Shared agent cursor, configured to this projector's glyph. Null when the host opted out. */
+  cursor() {
+    if (this.options.cursor === false) return null;
+    const cursor = window.__screenreelCursor; if (!cursor) return null;
+    return cursor.configure({ glyph: this.options.cursor === true ? 'dot' : this.options.cursor });
+  }
   async init() {
-    await this.store.ready(); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
+    await this.store.ready(); window.ScreenReelCore.setTimeScale(this.options.timeScale); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
     if (this.store.enabled() && !new URLSearchParams(location.search).has('screenreelPreview')) { this.enable(false); if (this.store.playing()) queueMicrotask(() => this.play()); } instances.add(this); event('ready', { projectId: this.store.projectId }); return this;
   }
   bindTarget() {
@@ -61,9 +69,11 @@ class Projector {
     else if (command === 'notes') { this.store.setNotesVisible(!this.store.notesVisible()); this.render(); }
     else if (command === 'capture') this.captureCurrent(); else if (command === 'studio') this.openStudio(); else if (command === 'exit') this.disable();
   }
-  toast(message) { if (!this.toastNode) return; this.toastNode.textContent = message; this.toastNode.hidden = false; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => { this.toastNode.hidden = true; }, 2600); }
-  enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
-  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
+  /* Notes ride the same time scale as the actions they describe, so a note never outlives
+     the emphasis it is narrating (the main reason the tour read as rushed). */
+  toast(message) { if (!this.toastNode) return; this.toastNode.textContent = message; this.toastNode.hidden = false; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => { this.toastNode.hidden = true; }, TOAST_MS * (Number(this.options.timeScale) || 1)); }
+  enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); this.cursor()?.show(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
+  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout,.sr-snippet,.sr-cursor-ring').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
   current() { const scenes = this.store.enabledScenes(); return { scenes, position: Math.min(this.store.position(), Math.max(0, scenes.length - 1)), scene: scenes[Math.min(this.store.position(), Math.max(0, scenes.length - 1))] }; }
   routeMatches(scene) {
     const currentRoute = this.router.getRoute();
@@ -116,9 +126,12 @@ class Projector {
         console.warn('[screenreel]', result.error); if (this.options.strict) return this.actionFailed(scene, { id: null, type: 'waitFor', selector: scene.waitFor }, -1, result);
       }
     }
-    if (scene.settleMs && generation === this.playGeneration && this.store.playing()) await window.ScreenReelCore.sleep(Number(scene.settleMs), this.controller.signal);
+    const settleMs = Number(scene.settleMs ?? this.store.activeFlow().defaults?.settleMs ?? 0);
+    if (settleMs && generation === this.playGeneration && this.store.playing()) await window.ScreenReelCore.sleep(settleMs, this.controller.signal);
     if (generation !== this.playGeneration || !this.store.playing()) return;
     const { position: sceneIndex } = this.current();
+    if (sceneIndex === 0) await this.introducePill();
+    if (generation !== this.playGeneration || !this.store.playing()) return;
     for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
       const action = scene.actions[actionIndex];
       if (generation !== this.playGeneration || !this.store.playing()) break;
@@ -126,6 +139,12 @@ class Projector {
       let navigationSameDocument = false; let priorPosition = null;
       const result = await window.ScreenReelCore.runAction(action, {
         document, window, signal: this.controller.signal, resolveFunction: (name) => functions.get(name),
+        // The executor already calls these at every interaction site; supplying them is what makes
+        // the agent cursor visible during a live tour instead of a no-op.
+        moveCursor: this.options.cursor === false ? undefined : async (el) => { if (el) await this.cursor()?.moveTo(el)?.catch?.(() => {}); },
+        pressCursor: this.options.cursor === false ? undefined : async () => { await this.cursor()?.press()?.catch?.(() => {}); },
+        scrollCursor: this.options.cursor === false ? undefined : (direction) => this.cursor()?.startBob(direction),
+        stopScrollCursor: this.options.cursor === false ? undefined : () => this.cursor()?.stopBob(),
         navigate: async (route) => {
           // Navigation actions are terminal: persist the next scene before a hard navigation can unload this document.
           const { scenes, position } = this.current(); priorPosition = position;
@@ -144,7 +163,17 @@ class Projector {
     }
     if (generation !== this.playGeneration || !this.store.playing()) return; const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
-  pause() { this.playGeneration++; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.render(); return this; }
+  /* Introduce the control pill before the first action runs, so the viewer sees which flow is
+     about to play and where the controls are. Resolves when the beat is over. */
+  async introducePill() {
+    if (!this.pill || this.pill.dataset.intro === 'done') return;
+    const beat = PILL_INTRO_MS * (Number(this.options.timeScale) || 1);
+    this.pill.style.setProperty('--sr-pill-intro', `${beat}ms`);
+    this.pill.dataset.intro = 'true';
+    await window.ScreenReelCore.sleep(PILL_INTRO_MS, this.controller?.signal);
+    this.pill.dataset.intro = 'done';
+  }
+  pause() { this.playGeneration++; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
     const current = this.current(); if (autoPlay && this.options.loop === false && current.position >= current.scenes.length - 1) return this.complete();

@@ -27,29 +27,32 @@ try {
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
   const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'tour-opening');
-  assert.equal(await page.locator('.sr-count').innerText(), '1/8');
+  assert.equal(await page.locator('.sr-count').innerText(), '1/6');
   await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 9000 });
+  // The agent cursor must be live during playback: the Projector supplies moveCursor to the
+  // executor, so a missing node means the cursor call sites have gone back to being no-ops.
+  await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 9000 });
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
   await page.waitForFunction(() => document.querySelector('#customer-name')?.value === 'Northstar Retail' && document.querySelector('#region')?.value === 'West' && document.querySelector('#priority')?.checked && document.querySelector('#confidence')?.value === '95', null, { timeout: 45000 });
   assert((await page.evaluate(() => window.scrollY)) > 0);
   await page.waitForURL(/destination\.html\?from=showcase/, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await visiblePill(page); await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 6000 });
-  assert.equal(await page.locator('.sr-count').innerText(), '8/8');
+  assert.equal(await page.locator('.sr-count').innerText(), '6/6');
   await page.screenshot({ path: path.join(output, 'projector-destination-1280x720.png') });
   await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await visiblePill(page);
   await page.locator('button[title="Open ScreenReel Studio"]').click(); const heading = page.getByRole('heading', { name: 'Demo flows', exact: true }); await heading.waitFor();
   const showcaseRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase' }).first(); await showcaseRow.getByRole('button', { name: 'Duplicate', exact: true }).click();
   const localRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase copy' }); assert.equal(await localRow.count(), 1); await localRow.locator('.sr-flow-name').click();
-  await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 5);
-  const editButtons = page.getByRole('button', { name: 'Edit', exact: true }); assert.equal(await editButtons.count(), 5); await editButtons.nth(0).click();
+  await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
+  const editButtons = page.getByRole('button', { name: 'Edit', exact: true }); assert.equal(await editButtons.count(), 4); await editButtons.nth(0).click();
   const titleField = page.locator('[data-field="title"]'); await titleField.fill('Studio-authored highlight');
-  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 24); assert.equal(await page.locator('[data-recipe]').count(), 6);
+  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 25); assert.equal(await page.locator('[data-recipe]').count(), 6);
   await page.locator('[data-definition="highlight"]').click(); const preview = page.frameLocator('.sr-preview-frame'); const kpiValue = preview.locator('[data-kpi="revenue"] strong'); await kpiValue.click();
   const savedTarget = page.locator('.sr-action small').filter({ hasText: '[data-kpi="revenue"]' }); await savedTarget.waitFor(); assert.equal(await savedTarget.count(), 1);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal(await page.locator('.sr-dirty').count(), 0);
-  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 6))));
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 11))));
   await page.getByRole('button', { name: 'Back to scenes', exact: true }).click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').filter({ hasText: 'Studio-authored highlight' }).count(), 1);
   await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-1440x900.png') });

@@ -11,6 +11,7 @@ Generated from `packages/core/action-runtime.js`.
 | Flash target | `flash` | Emphasis | visual | `{"times":2}` |
 | Reel text into place | `reel` | Emphasis | visual | `{"frames":7,"stepMs":80,"holdMs":500}` |
 | Reveal image over target | `reveal` | Emphasis | visual | `{"holdMs":1600}` |
+| Show code beside target | `snippet` | Emphasis | visual | `{"label":"How it works","code":"{ \"type\": \"highlight\" }","side":"auto","holdMs":2600}` |
 | Play countdown | `countdown` | Timing | none | `{"from":3,"stepMs":720,"caption":"Your demo is about to play"}` |
 | Click target | `click` | Interaction | interactive | `{"afterMs":700}` |
 | Hover target | `hover` | Interaction | interactive | `{"holdMs":800}` |

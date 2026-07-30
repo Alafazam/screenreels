@@ -16,8 +16,24 @@ class MemoryStorage {
   removeItem(key) { this.values.delete(key); }
 }
 
-test('registry exposes 24 catalog entries, recipes, and legacy aliases', () => {
-  assert.equal(ScreenReelCore.definitions.length, 24); assert.equal(ScreenReelCore.recipes.length, 6); assert.equal(ScreenReelCore.actionType({ type: 'fill' }), 'type'); assert(ScreenReelCore.supportedTypes.has('glow'));
+test('registry exposes 25 catalog entries, recipes, and legacy aliases', () => {
+  assert.equal(ScreenReelCore.definitions.length, 25); assert.equal(ScreenReelCore.recipes.length, 6); assert.equal(ScreenReelCore.actionType({ type: 'fill' }), 'type'); assert(ScreenReelCore.supportedTypes.has('glow'));
+});
+test('time scale defaults to 1, scales every sleep, and rejects invalid values', async () => {
+  assert.equal(ScreenReelCore.timeScale(), 1);
+  const elapsed = async () => { const started = Date.now(); await ScreenReelCore.sleep(60); return Date.now() - started; };
+  const atOne = await elapsed();
+  assert.equal(ScreenReelCore.setTimeScale(3), 3);
+  const atThree = await elapsed();
+  assert(atThree > atOne * 1.8, `expected the 3x sleep to be clearly longer (${atOne}ms vs ${atThree}ms)`);
+  for (const bad of [0, -1, 'x', null, undefined, NaN]) assert.equal(ScreenReelCore.setTimeScale(bad), 1, `${String(bad)} should fall back to 1`);
+  assert.equal(ScreenReelCore.timeScale(), 1);
+});
+test('snippet actions require a target and accept a code payload', () => {
+  const definition = ScreenReelCore.getDefinition('snippet');
+  assert.equal(definition.type, 'snippet');
+  assert.equal(definition.picker, 'visual');
+  assert.deepEqual(ScreenReelCore.validate({ type: 'snippet', code: '{}' }, null, 'https://app.test/'), ['Choose a target']);
 });
 test('route normalization preserves functional query and rejects external routes', () => {
   assert.equal(ScreenReelCore.normalizeRoute('/orders?task=review&demo=1', 'https://app.test/home'), '/orders?task=review');

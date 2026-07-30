@@ -13,7 +13,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 fs.rmSync(site, { recursive: true, force: true });
 fs.mkdirSync(site, { recursive: true });
-for (const name of ['index.html', 'destination.html', 'styles.css', 'app.js', 'screenreel.demo.json', 'logo.svg', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
+for (const name of ['index.html', 'destination.html', 'styles.css', 'app.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
   fs.copyFileSync(path.join(example, name), path.join(site, name));
 }
 fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), { recursive: true });
@@ -23,7 +23,8 @@ for (const name of ['index.html', 'destination.html']) {
   const html = fs.readFileSync(target, 'utf8')
     .replaceAll('../../dist/projector/', './dist/projector/')
     .replaceAll('src="./dist/projector/screenreel.js"', `src="./dist/projector/screenreel.js?v=${releaseVersion}"`)
-    .replaceAll('src="app.js"', `src="app.js?v=${releaseVersion}"`);
+    .replaceAll('src="app.js"', `src="app.js?v=${releaseVersion}"`)
+    .replaceAll('src="fixtures.js"', `src="fixtures.js?v=${releaseVersion}"`);
   fs.writeFileSync(target, html);
 }
 fs.writeFileSync(path.join(site, '.nojekyll'), '');
@@ -33,6 +34,7 @@ const required = [
   'destination.html',
   'styles.css',
   'app.js',
+  'fixtures.js',
   'screenreel.demo.json',
   'logo.svg',
   'favicon.svg',

@@ -40,11 +40,27 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
   projectId: 'acme-sales',
   flow: { src: '/demos/sales-demo.json' },
   loop: false,
-  strict: true
+  strict: true,
+  timeScale: 1,     // pacing multiplier for every delay in the runtime
+  cursor: 'dot'     // 'dot', 'arrow', or false to hide the agent cursor
 });
 ```
 
 Projector provides flow selection, play/pause, previous/next, presenter notes, Capture Current Page, Studio, and Exit. Studio is a lazy-loaded full-screen overlay; personal flows stay in project-scoped local storage.
+
+## Agent cursor
+
+Projector and Capture share one pointer implementation (`packages/core/cursor.js`), so a live tour and a recorded video show the same cursor. It travels to each interaction target before the action fires, emits concentric rings on arrival to mark its position, dips with a brighter ring burst on click and pointer taps, and drifts vertically while the page scrolls so motion reads as cursor-driven.
+
+The pointer is created lazily on first use, so an idle page never shows a stray cursor. Emphasis actions (`highlight`, `glow`, `spotlight`) do not move it — those are camera moves, not interactions, and a pointer chasing every highlight reads as noise. `prefers-reduced-motion: reduce` disables travel, rings, and drift — the cursor jumps straight to position.
+
+Set `cursor: 'arrow'` for the classic arrow glyph, or `cursor: false` to turn it off entirely.
+
+## Pacing
+
+`timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and the runtime's own internal constants (countdown steps, flash pulses, reveal fades). Rewriting timings in a manifest cannot reach the last group, which is why a single multiplier lives in the runtime instead. Timeouts and scroll-settle limits are deliberately excluded: those are limits, not pacing. Presenter notes ride the same scale, so a note never outlives the emphasis it narrates.
+
+Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, and `settleMs` to `flow.defaults.settleMs`.
 
 ## Flow format
 
@@ -171,7 +187,7 @@ npm run example:serve
 
 Open `http://127.0.0.1:4173/examples/action-showcase/`.
 
-- `action-showcase` exercises every action family, local Studio, Projector, CLI Test, and Capture.
+- `action-showcase` ships two flows: `guided-tour` is the 6-scene landing-page story, and `action-showcase` exercises every action family, local Studio, Projector, CLI Test, and Capture. The showcase flow's drag, pointer, container-scroll, `waitFor`, and `call` fixtures live on `destination.html` so the landing page stays focused on the story.
 - `spa-router` demonstrates framework-independent SPA navigation.
 - `inline-flow` demonstrates an existing button and inline data without a build system.
 
