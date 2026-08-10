@@ -3,29 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ScreenReel — Live product demos from one reusable flow</title>
-  <meta name="description" content="ScreenReel is an open-source toolkit that turns one deterministic product flow into a live demo, an editable walkthrough, and a polished capture video — no account or backend required.">
+  <title>ScreenReel — Product demos that record themselves and repair themselves</title>
+  <meta name="description" content="ScreenReel turns a walkthrough you perform once into a live demo, a self-playing share link, and a rendered video — and repairs the steps a product change breaks. Open source, no account, no backend.">
   <meta name="author" content="Alafazam">
-  <meta name="keywords" content="product demo, interactive demo, demo studio, screen recording, product video, launch video, walkthrough, Playwright">
+  <meta name="keywords" content="product demo, interactive demo, demo studio, self-healing demo, branching demo, screen recording, product video, launch video, walkthrough, Playwright">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://alafazam.com/screenreels/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ScreenReel">
-  <meta property="og:title" content="ScreenReel — One flow for live demos and polished video">
-  <meta property="og:description" content="Author one product flow. Present it live with Projector, refine it in Studio, and capture the same flow as polished video.">
+  <meta property="og:title" content="ScreenReel — Record it once. It repairs itself.">
+  <meta property="og:description" content="Perform your walkthrough once and Studio writes the flow. It drives your real product live, on a share link, and as video — and flow doctor repairs the steps a product change breaks.">
   <meta property="og:url" content="https://alafazam.com/screenreels/">
   <meta property="og:image" content="https://alafazam.com/screenreels/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="ScreenReel — one flow for live demos and polished video">
+  <meta property="og:image:alt" content="ScreenReel — record it once, it repairs itself">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ScreenReel — One flow for live demos and polished video">
-  <meta name="twitter:description" content="Author one product flow. Present it live, refine it in Studio, and capture it as polished video.">
+  <meta name="twitter:title" content="ScreenReel — Record it once. It repairs itself.">
+  <meta name="twitter:description" content="Perform your walkthrough once and Studio writes the flow. It drives your real product live, on a share link, and as video — and repairs the steps a product change breaks.">
   <meta name="twitter:image" content="https://alafazam.com/screenreels/og-image.png">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ScreenReel","applicationCategory":"DeveloperApplication","operatingSystem":"Web","description":"Author one deterministic product flow, present it live with Projector, refine it in Studio, and capture it as polished video.","url":"https://alafazam.com/screenreels/","image":"https://alafazam.com/screenreels/og-image.png","license":"https://www.apache.org/licenses/LICENSE-2.0","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Alafazam","url":"https://alafazam.com/"},"sameAs":["https://github.com/Alafazam/screenreels"]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ScreenReel","applicationCategory":"DeveloperApplication","operatingSystem":"Web","description":"Perform your walkthrough once and Studio writes the flow. It drives your real product live, on a share link, and as video — and flow doctor repairs the steps a product change breaks.","url":"https://alafazam.com/screenreels/","image":"https://alafazam.com/screenreels/og-image.png","license":"https://www.apache.org/licenses/LICENSE-2.0","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Alafazam","url":"https://alafazam.com/"},"sameAs":["https://github.com/Alafazam/screenreels"]}</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -33,6 +33,7 @@
     <a class="brand" href="./" aria-label="ScreenReel home"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
     <nav aria-label="Primary navigation">
       <a href="#why">Why</a>
+      <a href="#features">Features</a>
       <a href="#how">How it works</a>
       <a href="#live-demo">Live demo</a>
       <a href="showcase.html">Showcase</a>
@@ -46,8 +47,8 @@
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">Open-source product demo toolkit</p>
-        <h1>One product flow.<br><span>Live demo, editable walkthrough, polished video.</span></h1>
-        <p class="hero-lede">Author a repeatable journey once. Present it with Projector, refine it locally in Studio, and capture the same flow for launch videos and walkthroughs.</p>
+        <h1>Record it once.<br><span>It repairs itself.</span></h1>
+        <p class="hero-lede">Perform your walkthrough once and Studio writes the flow. It drives your real product — live, on a share link, or rendered to video — and when the product moves, <code>flow doctor</code> re-matches the steps that broke.</p>
         <div class="hero-actions">
           <button id="demo-button" class="primary demo-cta" type="button">
             <span>Open live demo</span>
@@ -60,18 +61,18 @@
       <aside class="hero-card" data-demo-id="hero-card" aria-label="ScreenReel workflow preview">
         <div class="window-bar"><span></span><span></span><span></span><small>screenreel.demo.json</small></div>
         <div class="flow-preview">
-          <div class="flow-row" data-flow-step="1"><span class="flow-index">01</span><div><strong>Highlight the story</strong><small>Projector focuses the right card</small></div><span class="status">Ready</span></div>
+          <div class="flow-row" data-flow-step="1"><span class="flow-index">01</span><div><strong>Perform it</strong><small>Studio's recorder writes the flow</small></div><span class="status">Recorded</span></div>
           <div class="flow-line"></div>
-          <div class="flow-row" data-flow-step="2"><span class="flow-index">02</span><div><strong>Interact with the UI</strong><small>Type, scroll, toggle, and drag</small></div><span class="status">Ready</span></div>
+          <div class="flow-row" data-flow-step="2"><span class="flow-index">02</span><div><strong>Keep it true</strong><small>The doctor re-matches what moved</small></div><span class="status">Healthy</span></div>
           <div class="flow-line"></div>
-          <div class="flow-row" data-flow-step="3"><span class="flow-index">03</span><div><strong>Capture and share</strong><small>The same flow becomes video</small></div><span class="status accent">Export</span></div>
+          <div class="flow-row" data-flow-step="3"><span class="flow-index">03</span><div><strong>Play it anywhere</strong><small>Live, shared link, or video</small></div><span class="status accent">Export</span></div>
         </div>
-        <div class="preview-result"><span>Shared runtime</span><strong id="hero-result">Ready for Projector or Capture</strong></div>
+        <div class="preview-result"><span>Shared runtime</span><strong id="hero-result">One flow, every surface</strong></div>
       </aside>
     </section>
 
     <section class="proof-strip" aria-label="ScreenReel capabilities">
-      <p>One deterministic source of truth</p><span></span><p>Browser-local authoring</p><span></span><p>Framework independent</p><span></span><p>Capture ready</p>
+      <p>One deterministic source of truth</p><span></span><p>Fingerprint self-repair</p><span></span><p>Browser-local authoring</p><span></span><p>Framework independent</p>
     </section>
 
     <section id="why" class="section why-section">
@@ -80,20 +81,52 @@
         <h2><span class="sr-word" data-word="demos">Demos</span> should not <span class="sr-reel" data-reel="drift">drift</span> <span class="sr-flash" data-flash="changes">every time the <span class="sr-word" data-word="product">product</span> changes.</span></h2>
       </div>
       <div class="why-copy">
-        <p>Live walkthroughs are hard to repeat. Recorded videos go stale. Automation scripts are rarely presenter-friendly.</p>
-        <p>ScreenReel keeps the product journey in one readable flow so teams can present it, edit it, test it, and record it without rebuilding the story for each format.</p>
+        <p>Live walkthroughs are hard to repeat. Recorded videos go stale the moment the UI moves. Automation scripts are rarely presenter-friendly. Here is where most demos die: three sprints later a button gets renamed, and nobody finds out until a prospect is watching.</p>
+        <p>So ScreenReel drives the real product instead of a recording of it — and because it drives the real product, it can tell when the product changed. One readable flow gets presented, personalized, branched, and rendered; <code>flow doctor</code> repairs the steps that broke, and CI fails the pull request that broke them.</p>
       </div>
+    </section>
+
+    <section id="features" class="section features">
+      <div class="section-head">
+        <div><p class="eyebrow">What makes it different</p><h2>Three things that beat demo rot.</h2></div>
+        <p>Each one is a live chapter you can play — nothing on those pages is mocked.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <p class="feature-tag">01 · Author</p>
+          <h3>Perform it once</h3>
+          <p>You don't write a demo. Use your app inside Studio's preview and the recorder writes the flow: keystroke bursts coalesce into one <code>type</code> at your measured speed, a click that navigates becomes <code>goto</code>, and password fields are never recorded.</p>
+          <a class="feature-link" href="showcase-create.html">See it recorded <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="feature-card feature-card-lead">
+          <p class="feature-tag">02 · Maintain</p>
+          <h3>It refuses to rot</h3>
+          <p>Three sprints later a button gets renamed. <code>flow doctor</code> re-matches it by fingerprint and rewrites only the keys that changed — and the <code>validate-flows</code> CI action fails the pull request that broke it, before a prospect ever sees it.</p>
+          <pre class="feature-term"><code>$ screenreel flow doctor --flow demo.json --fix
+repair  .flow-row → [data-flow-step="1"]
+        confidence 100 — 1 fix applied
+re-run: ok: true</code></pre>
+          <a class="feature-link" href="showcase-heal.html">See it repair itself <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="feature-card">
+          <p class="feature-tag">03 · Engage</p>
+          <h3>Let them drive</h3>
+          <p>A <code>choice</code> action shows up to four cards and jumps playback to the scene the viewer picked. Every target is graph-validated, so a branch can never dead-end — and capture auto-picks the default, so the rendered video stays linear.</p>
+          <a class="feature-link" href="showcase-branch.html">See it branch <span aria-hidden="true">→</span></a>
+        </article>
+      </div>
+      <p class="feature-more">It also narrates itself from your talking points, greets each prospect by name from the share link, and reports its own view-to-complete funnel — with no backend. <a href="showcase.html">See the full journey <span aria-hidden="true">→</span></a></p>
     </section>
 
     <section class="section capabilities">
       <div class="section-head">
-        <div><p class="eyebrow">Three connected tools</p><h2>From walkthrough to recording.</h2></div>
-        <p>Each surface uses the same scenes, selectors, actions, and presenter notes.</p>
+        <div><p class="eyebrow">One runtime, three surfaces</p><h2>Everything above runs on the same flow.</h2></div>
+        <p>Projector, Studio, and Capture read the same scenes, selectors, actions, and presenter notes.</p>
       </div>
       <div class="capability-grid">
-        <article class="capability-card" data-demo-id="cap-projector"><span class="capability-number">01</span><h3>Projector</h3><p>Run an uninterrupted live demo with highlights, controls, scrolling, and presenter notes.</p><small>Present confidently</small></article>
-        <article class="capability-card" data-demo-id="cap-studio"><span class="capability-number">02</span><h3>Studio</h3><p>Duplicate a flow, reorder scenes, pick targets visually, and save a personal version locally.</p><small>Author without a backend</small></article>
-        <article class="capability-card" data-demo-id="cap-capture"><span class="capability-number">03</span><h3>Capture</h3><p>Replay the exact flow in Chrome and assemble clean, repeatable video from selected scenes.</p><small>Record the same story</small></article>
+        <article class="capability-card" data-demo-id="cap-projector"><span class="capability-number">01</span><h3>Projector</h3><p>Run the demo live inside your product — highlights, real interactions, presenter notes, and a share link that plays itself.</p><small>Present confidently</small></article>
+        <article class="capability-card" data-demo-id="cap-studio"><span class="capability-number">02</span><h3>Studio</h3><p>Record, reorder, and repair without a backend. Canonical flows stay immutable; your edits fork a local copy.</p><small>Author in the browser</small></article>
+        <article class="capability-card" data-demo-id="cap-capture"><span class="capability-number">03</span><h3>Capture</h3><p>Replay the exact flow in Chrome and render a narrated MP4 — the same story, without a screen recorder.</p><small>Ship the final cut</small></article>
       </div>
     </section>
 
@@ -102,9 +135,9 @@
         <div><p class="eyebrow">How it works</p><h2>A small contract, not another platform.</h2></div>
       </div>
       <div class="steps">
-        <article><span>1</span><div><h3>Author the flow</h3><p>Describe routes, stable selectors, actions, timing, and talking points in JSON.</p></div></article>
-        <article><span>2</span><div><h3>Present and refine</h3><p>Mount Projector in the product and use Studio to shape a personal walkthrough.</p></div></article>
-        <article><span>3</span><div><h3>Capture and share</h3><p>Use the CLI to validate targets, replay scenes, and render the product story.</p></div></article>
+        <article><span>1</span><div><h3>Record the flow</h3><p>Press Record in Studio and use your product. The JSON is the artifact, not the input — readable, diffable, and yours.</p></div></article>
+        <article><span>2</span><div><h3>Present and personalize</h3><p>Mount Projector in the app. Share <code>?demo=play</code> links that auto-play and greet each prospect by name.</p></div></article>
+        <article><span>3</span><div><h3>Keep it honest</h3><p>Run <code>flow doctor</code> in CI to catch and repair what a product change broke, then render the same flow as video.</p></div></article>
       </div>
       <div class="install-card">
         <div><p class="eyebrow">Install from GitHub</p><h3>Start with the same flow in your app.</h3></div>
@@ -146,7 +179,7 @@
     </section>
   </main>
 
-  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow for the live demo and the final cut.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="https://github.com/Alafazam/screenreels/blob/main/docs/README.md">Docs</a><a href="https://github.com/Alafazam/screenreels">GitHub</a><a href="https://alafazam.com/">Made by Alafazam</a></nav></footer>
+  <footer><div><a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a><p>One flow. Recorded, self-repairing, and ready to ship.</p></div><nav aria-label="Footer navigation"><a href="showcase.html">Showcase</a><a href="https://github.com/Alafazam/screenreels/blob/main/docs/README.md">Docs</a><a href="https://github.com/Alafazam/screenreels">GitHub</a><a href="https://alafazam.com/">Made by Alafazam</a></nav></footer>
   <div id="toast" class="toast" hidden></div>
   <script data-cfasync="false" src="../../dist/projector/screenreel.js"></script>
   <script data-cfasync="false" src="fixtures.js"></script>

@@ -22,7 +22,7 @@ try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }); await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
-  assert.equal(await page.locator('h1').innerText(), 'One product flow.\nLive demo, editable walkthrough, polished video.');
+  assert.equal(await page.locator('h1').innerText(), 'Record it once.\nIt repairs itself.');
   // Clicking "Open live demo" plays the default guided tour (with a countdown as its first action).
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);

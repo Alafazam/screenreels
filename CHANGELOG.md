@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Retold the landing page around the differentiator instead of the output formats. The hero now leads with "Record it once. It repairs itself.", a new `#features` section gives the three headline capabilities — record-by-doing, `flow doctor` self-repair, and viewer branching — one card each linking into its live showcase chapter, and the `Projector`/`Studio`/`Capture` grid was reframed from a competing "three tools" pitch into the surfaces that deliver those features. The three `[data-flow-step]` hero rows were rewritten so the guided tour's opening scene narrates the new story while keeping every selector the tour targets, and the one footer/OG/JSON-LD tagline now agrees across all three. The exact-H1 assertion in `scripts/browser-smoke.mjs` moved with it.
+- Fixed the showcase journey being undiscoverable: the seven chapter pages carried `noindex` and no Open Graph tags, so the strongest copy on the site could not be found or shared. They are now `index,follow` with canonical, OG, and Twitter card metadata derived from each page's existing title and description, and `sitemap.xml` lists all seven alongside the homepage.
+- Fixed `resolveChrome()` finding no browser on x64 Linux: it globbed only `chromium-*/chrome-linux/chrome`, but Playwright's layout is arch-dependent and x64 unpacks Chrome for Testing into `chrome-linux64/`. Every GitHub-hosted runner is x64, so CI downloaded Chromium and then failed to find it on the workflow's first-ever run.
+
 ## 0.3.0
 
 - Added task-oriented documentation in `docs/`: one how-to guide per feature (recording, doctor + CI, voiceover, variables, sharing + analytics, branching, pacing + cursor), each with a quickest path, a reference table, troubleshooting, and an under-the-hood note. The README now points at them instead of duplicating detail, every showcase chapter links to its guide, and the landing page links the index.
