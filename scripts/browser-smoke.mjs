@@ -32,6 +32,11 @@ try {
   // The agent cursor must be live during playback: the Projector supplies moveCursor to the
   // executor, so a missing node means the cursor call sites have gone back to being no-ops.
   await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 9000 });
+  // Narration is on by default, so the pill must offer a speaker and report itself unmuted. A
+  // missing button means narrator.js did not load and the tour has silently gone quiet.
+  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').count(), 1);
+  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.evaluate(() => Boolean(window.__screenreelNarrator?.available())), true);
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
   await page.waitForFunction(() => document.querySelector('#customer-name')?.value === 'Northstar Retail' && document.querySelector('#region')?.value === 'West' && document.querySelector('#priority')?.checked && document.querySelector('#confidence')?.value === '95', null, { timeout: 45000 });
   assert((await page.evaluate(() => window.scrollY)) > 0);

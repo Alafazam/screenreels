@@ -20,7 +20,7 @@ function defaultRouter() {
 
 class Projector {
   constructor(target, options, assetBase, assetVersion) {
-    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, timeScale: 1, cursor: 'dot', ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
+    this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, timeScale: 1, cursor: 'dot', narration: true, ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
   }
@@ -30,6 +30,26 @@ class Projector {
     if (this.options.cursor === false) return null;
     const cursor = window.__screenreelCursor; if (!cursor) return null;
     return cursor.configure({ glyph: this.options.cursor === true ? 'dot' : this.options.cursor });
+  }
+  /* Live narrator, or null when the host opted out, the browser has no speech engine, or the
+     viewer muted it. Every call site treats null as "stay silent", so narration is additive. */
+  narrator() {
+    if (this.options.narration === false || this.store.muted()) return null;
+    const narrator = window.__screenreelNarrator;
+    if (!narrator?.available()) return null;
+    return narrator.configure(this.options.narration === true ? {} : this.options.narration);
+  }
+  /* Speak a scene's script. Uses the interpolated text, so a personalized share link is heard
+     saying the prospect's name and not "{{company}}". Silent scenes are a no-op. */
+  async narrate(scene) {
+    const narrator = this.narrator(); if (!narrator) return;
+    const script = this.displayText(window.ScreenReelCore.narrationScript(scene));
+    if (!script) return;
+    const { spoke, reason } = await narrator.speak(script);
+    // Autoplay policy blocks audio until the viewer interacts. Say so once rather than leaving
+    // them to wonder why a demo that advertises narration is silent.
+    if (!spoke && reason === 'blocked' && !this.narrationBlocked) { this.narrationBlocked = true; this.toast('Tap the speaker to turn on narration'); this.render(); }
+    if (spoke) this.narrationBlocked = false;
   }
   async init() {
     await this.store.ready(); window.ScreenReelCore.setTimeScale(this.options.timeScale); this.analytics = createAnalytics({ store: this.store, options: this.options.analytics || {} }); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
@@ -78,9 +98,15 @@ class Projector {
     const share = this.store.share();
     this.pill.classList.toggle('sr-pill--share', share);
     const playButton = `<button data-cmd="play" class="sr-play" title="${this.store.playing() ? 'Pause' : 'Play'}">${icon(this.store.playing() ? 'pause' : 'play')}</button>`;
+    // Narration control rides in both chromes: a viewer on a share link needs it most, and a
+    // presenter talking over the demo needs to silence it fast. Hidden when there is no engine.
+    const muted = this.store.muted();
+    const soundButton = this.options.narration === false || !window.__screenreelNarrator?.available()
+      ? ''
+      : `<button data-cmd="sound" class="${muted ? '' : 'active'}${this.narrationBlocked ? ' sr-needs-sound' : ''}" title="${muted ? 'Turn on narration' : 'Mute narration'}" aria-pressed="${String(!muted)}">${icon(muted ? 'mute' : 'sound')}</button>`;
     this.pill.innerHTML = share
-      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${playButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
-      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button>${playButton}<button data-cmd="next" title="Next scene">${icon('right')}</button><button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><button data-cmd="capture" title="Capture this page as a scene">${icon('capture')}</button><button data-cmd="studio" title="Open ScreenReel Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
+      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${playButton}${soundButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
+      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button>${playButton}<button data-cmd="next" title="Next scene">${icon('right')}</button>${soundButton}<button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><button data-cmd="capture" title="Capture this page as a scene">${icon('capture')}</button><button data-cmd="studio" title="Open ScreenReel Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
     const flowSelect = this.pill.querySelector('.sr-flow'); if (flowSelect) flowSelect.onchange = (e) => { this.pause(); this.store.setActive(e.target.value); this.store.setPosition(0); this.render(); };
     this.pill.querySelectorAll('[data-cmd]').forEach((button) => { button.onclick = () => this.command(button.dataset.cmd); });
     this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(share ? null : scene);
@@ -98,13 +124,20 @@ class Projector {
   command(command) {
     if (command === 'prev') this.previous(); else if (command === 'next') this.next(); else if (command === 'play') this.store.playing() ? this.pause() : this.play();
     else if (command === 'notes') { this.store.setNotesVisible(!this.store.notesVisible()); this.render(); }
+    /* Unmuting is itself the user gesture the autoplay policy wants, so speak the current scene
+       immediately — otherwise the viewer waits until the next scene to hear anything. */
+    else if (command === 'sound') {
+      const unmuting = this.store.muted(); this.store.setMuted(!unmuting);
+      if (unmuting) { this.narrationBlocked = false; this.render(); const { scene } = this.current(); if (scene && this.store.playing()) this.narrate(scene); }
+      else { window.__screenreelNarrator?.cancel(); this.render(); }
+    }
     else if (command === 'capture') this.captureCurrent(); else if (command === 'studio') this.openStudio(); else if (command === 'exit') this.disable();
   }
   /* Notes ride the same time scale as the actions they describe, so a note never outlives
      the emphasis it is narrating (the main reason the tour read as rushed). */
   toast(message) { if (!this.toastNode) return; this.toastNode.textContent = message; this.toastNode.hidden = false; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => { this.toastNode.hidden = true; }, TOAST_MS * (Number(this.options.timeScale) || 1)); }
   enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); this.cursor()?.show(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
-  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
+  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
   current() { const scenes = this.store.enabledScenes(); return { scenes, position: Math.min(this.store.position(), Math.max(0, scenes.length - 1)), scene: scenes[Math.min(this.store.position(), Math.max(0, scenes.length - 1))] }; }
   routeMatches(scene) {
     const currentRoute = this.router.getRoute();
@@ -166,6 +199,9 @@ class Projector {
     const { position: sceneIndex } = this.current();
     if (sceneIndex === 0) await this.introducePill();
     if (generation !== this.playGeneration || !this.store.playing()) return;
+    // Narration starts with the scene's actions and runs alongside them, not before: the viewer
+    // should hear the description of the thing while watching it happen. Deliberately not awaited.
+    this.narrate(scene);
     for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
       const action = scene.actions[actionIndex];
       if (generation !== this.playGeneration || !this.store.playing()) break;
@@ -206,7 +242,14 @@ class Projector {
       }
       if (!result.ok && this.options.strict) return this.actionFailed(scene, action, actionIndex, result);
     }
-    if (generation !== this.playGeneration || !this.store.playing()) return; this.analytics.emit('scene_complete'); const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
+    if (generation !== this.playGeneration || !this.store.playing()) return;
+    /* Hold the scene until narration finishes rather than cutting a sentence mid-word. Capture
+       solves the same overrun by freezing the last frame (voice.overflow: 'extend'); a live
+       product cannot be frozen, so the wait happens here instead — bounded, so one long note can
+       never stall the tour. Scenes with no narration are unaffected. */
+    await this.narrator()?.settle(Number(scene.narrationCapMs) || undefined);
+    if (generation !== this.playGeneration || !this.store.playing()) return;
+    this.analytics.emit('scene_complete'); const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
   /* Introduce the control pill before the first action runs, so the viewer sees which flow is
      about to play and where the controls are. Resolves when the beat is over. */
@@ -218,7 +261,7 @@ class Projector {
     await window.ScreenReelCore.sleep(PILL_INTRO_MS, this.controller?.signal);
     this.pill.dataset.intro = 'done';
   }
-  pause() { this.playGeneration++; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); this.render(); return this; }
+  pause() { this.playGeneration++; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
     const current = this.current(); if (autoPlay && this.options.loop === false && current.position >= current.scenes.length - 1) return this.complete();

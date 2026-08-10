@@ -42,7 +42,8 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
   loop: false,
   strict: true,
   timeScale: 1,     // pacing multiplier for every delay in the runtime
-  cursor: 'dot'     // 'dot', 'arrow', or false to hide the agent cursor
+  cursor: 'dot',    // 'dot', 'arrow', or false to hide the agent cursor
+  narration: true   // speak each scene's talking points aloud; false to disable
 });
 ```
 

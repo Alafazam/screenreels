@@ -401,7 +401,13 @@
     if (!el?.tagName) return null;
     return { text: String(el.innerText || el.getAttribute?.('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), tag: el.tagName.toLowerCase(), role: el.getAttribute?.('role') || '' };
   }
+  /* The spoken script for a scene. Live narration (packages/core/narrator.js) and Capture's
+     voiceover (lib/voice.mjs narrationText) must always speak the same words for the same scene;
+     test/narrator.test.mjs asserts the two agree. Empty means a silent scene, not an error. */
+  function narrationScript(scene) {
+    return String(scene?.narration ?? scene?.talkingPoints ?? '').trim();
+  }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

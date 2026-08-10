@@ -59,6 +59,7 @@ const required = [
   'apple-touch-icon.png',
   'dist/projector/screenreel.js',
   'dist/projector/projector.js',
+  'dist/projector/narrator.js',
   'dist/projector/screenreel.css',
   '.nojekyll',
 ];

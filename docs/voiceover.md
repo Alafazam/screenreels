@@ -1,11 +1,62 @@
 # Voiceover
 
-**What it does:** narrates the captured video by speaking each scene's talking points. The script is
-text you already wrote for the presenter notes — you don't author anything new.
+**What it does:** speaks each scene's talking points — out loud in the live tour, and into the
+rendered video. The script is text you already wrote for the presenter notes; you don't author
+anything new.
 
 Live demo: [Chapter 3 of the showcase](../examples/action-showcase/showcase-voice.html).
 
-## Quickest path (macOS)
+## Two places it speaks
+
+Narration happens twice, from the same field, because the two run in different worlds:
+
+| | Live narration | Captured voiceover |
+|---|---|---|
+| Runs in | The viewer's browser, during playback | Your machine, at render time |
+| Engine | Web Speech API (`speechSynthesis`) | macOS `say`, or any TTS command |
+| Produces | Audio in the tab, every time it plays | An AAC track muxed into the MP4 |
+| Turn on with | On by default; speaker button in the pill | `--voice` or `voice.enabled` |
+| Overrun handling | Holds the scene until the sentence ends | Freezes the last frame (`overflow`) |
+
+Neither can do the other's job: there is no ffmpeg in a browser, and no `speechSynthesis` in Node.
+So both exist, and both read `scene.narration ?? scene.talkingPoints`. `ScreenReelCore.narrationScript`
+and `narrationText` in `lib/voice.mjs` are pinned against each other by `test/narrator.test.mjs`, so
+the two can never drift into speaking different words for the same scene.
+
+## Live narration
+
+On by default. The presenter pill and the share-mode viewer chrome both get a speaker button; muting
+persists per project and survives the flow's own navigations.
+
+```js
+await ScreenReel.mount(button, {
+  projectId: 'acme-sales',
+  flow: { src: '/demos/sales-demo.json' },
+  narration: true,                                  // default; false to disable entirely
+  // narration: { rate: 0.9, voiceName: 'Samantha', lang: 'en-GB' },
+});
+```
+
+Variables are interpolated first, so a personalized share link is *heard* saying the prospect's name:
+`?srv_company=Northstar%20Retail` makes `{{company}} resolves from the share link` come out as
+"Northstar Retail resolves from the share link".
+
+When a scene's actions finish while narration is still talking, playback waits for the sentence to
+end rather than cutting it off — capped at 6 seconds so one long note can't stall the tour. Override
+per scene with `narrationCapMs`.
+
+Three things to know:
+
+- **Autoplay policy.** Browsers block audio until the viewer interacts with the page. Starting the
+  tour from a button is itself that interaction, so the normal path is fine. A `?demo=play` share
+  link auto-plays with no gesture, so narration may be refused — the pill then pulses the speaker
+  button and toasts once, and tapping it both grants the gesture and speaks the current scene.
+- **Voices are not guaranteed.** Linux Chrome often ships none, in which case the speaker button is
+  hidden rather than offering silence.
+- **Capture is unaffected.** Capture injects the action runtime and cursor but not Projector, so live
+  narration cannot leak into a recording or double up with `--voice`.
+
+## Quickest path for video (macOS)
 
 ```bash
 npx screenreel record --voice

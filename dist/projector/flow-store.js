@@ -118,6 +118,10 @@
     enabledScenes(flow = this.activeFlow()) { return flow.scenes.filter((scene) => scene.enabled !== false); }
     notesVisible() { return this.storage.getItem(this.key('notes-visible')) === '1'; }
     setNotesVisible(value) { value ? this.storage.setItem(this.key('notes-visible'), '1') : this.storage.removeItem(this.key('notes-visible')); }
+    /* Narration is on by default, so the persisted key records the mute — absent means unmuted.
+       Stored rather than in-memory so silencing it survives the flow's own hard navigations. */
+    muted() { return this.storage.getItem(this.key('narration-muted')) === '1'; }
+    setMuted(value) { value ? this.storage.setItem(this.key('narration-muted'), '1') : this.storage.removeItem(this.key('narration-muted')); }
     enabled() { return this.storage.getItem(this.key('enabled')) === '1'; }
     setEnabled(value) { value ? this.storage.setItem(this.key('enabled'), '1') : this.storage.removeItem(this.key('enabled')); }
     position() { return Math.max(0, Number(this.session.getItem(this.sessionKey('position'))) || 0); }
