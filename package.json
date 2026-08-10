@@ -1,6 +1,6 @@
 {
   "name": "screenreel",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Author and present interactive product demos, then capture the same flows as polished video.",
   "type": "module",
   "workspaces": [

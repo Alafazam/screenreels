@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - Added task-oriented documentation in `docs/`: one how-to guide per feature (recording, doctor + CI, voiceover, variables, sharing + analytics, branching, pacing + cursor), each with a quickest path, a reference table, troubleshooting, and an under-the-hood note. The README now points at them instead of duplicating detail, every showcase chapter links to its guide, and the landing page links the index.
 - Fixed recorded actions carrying no `fingerprint`, which silently made recorded flows — the primary authoring path — ineligible for `flow doctor`'s automatic repair. Fingerprint capture now lives in one place (`ScreenReelCore.fingerprintFor`) used by the Studio picker, the recorder, and the doctor's scoring.
