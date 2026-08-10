@@ -34,4 +34,28 @@ if (demoButton) {
     document.querySelector('[data-action="open-demo"]')?.addEventListener('click', () => demoButton.click());
   })();
 }
+
+/* Voiceover sample: the real pipeline is `assemble --voice`, which runs macOS `say` (or any TTS
+   CLI) through ffmpeg into the captured MP4 — none of which exists in a browser. This uses
+   speechSynthesis purely so a visitor can hear what narrated talking points sound like; the card
+   says so in as many words. Same stand-in as the showcase's voice chapter. */
+const voiceSample = document.getElementById('voice-sample');
+if (voiceSample && 'speechSynthesis' in window) {
+  const setPressed = (on) => voiceSample.setAttribute('aria-pressed', String(on));
+  setPressed(false);
+  voiceSample.addEventListener('click', () => {
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); setPressed(false); return; }
+    const utterance = new SpeechSynthesisUtterance(voiceSample.dataset.script);
+    utterance.rate = 0.95;
+    utterance.addEventListener('end', () => setPressed(false));
+    utterance.addEventListener('error', () => setPressed(false));
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+    setPressed(true);
+  });
+} else if (voiceSample) {
+  // No speech engine: say so rather than leaving a button that silently does nothing.
+  voiceSample.disabled = true;
+  voiceSample.textContent = 'Speech not available in this browser';
+}
 })();

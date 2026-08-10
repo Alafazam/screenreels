@@ -88,7 +88,7 @@
 
     <section id="features" class="section features">
       <div class="section-head">
-        <div><p class="eyebrow">What makes it different</p><h2>Three things that beat demo rot.</h2></div>
+        <div><p class="eyebrow">What makes it different</p><h2>Six things most demo tools can't do.</h2></div>
         <p>Each one is a live chapter you can play — nothing on those pages is mocked.</p>
       </div>
       <div class="feature-grid">
@@ -102,20 +102,43 @@
           <p class="feature-tag">02 · Maintain</p>
           <h3>It refuses to rot</h3>
           <p>Three sprints later a button gets renamed. <code>flow doctor</code> re-matches it by fingerprint and rewrites only the keys that changed — and the <code>validate-flows</code> CI action fails the pull request that broke it, before a prospect ever sees it.</p>
-          <pre class="feature-term"><code>$ screenreel flow doctor --flow demo.json --fix
-repair  .flow-row → [data-flow-step="1"]
-        confidence 100 — 1 fix applied
+          <pre class="feature-term"><code>$ screenreel flow doctor --fix
+repair  .flow-row
+     →  [data-flow-step="1"]
+confidence 100 — 1 fix applied
 re-run: ok: true</code></pre>
           <a class="feature-link" href="showcase-heal.html">See it repair itself <span aria-hidden="true">→</span></a>
         </article>
         <article class="feature-card">
-          <p class="feature-tag">03 · Engage</p>
+          <p class="feature-tag">03 · Produce</p>
+          <h3>Give it a voice</h3>
+          <p>You already wrote the script — it's the talking points on every scene. <code>assemble --voice</code> speaks them over the captured video: silence-padded, sync-safe, and rendered into the MP4. The default provider is macOS <code>say</code>, so there's no API key.</p>
+          <button id="voice-sample" class="feature-play" type="button" data-script="Revenue is up to two point eight four million, with gross margin holding at forty two point six percent. Assemble dash dash voice reads this line straight from the scene's talking points.">
+            <span aria-hidden="true">▶</span> Hear a narrated line
+          </button>
+          <p class="feature-aside">Played by your browser's speech engine — a stand-in for the <code>say</code> and ffmpeg pipeline that renders the real MP4.</p>
+          <a class="feature-link" href="showcase-voice.html">See it narrated <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="feature-card">
+          <p class="feature-tag">04 · Personalize</p>
+          <h3>Say their name</h3>
+          <p>Declare <code>{{company}}</code> once and every link carries its own value: <code>?srv_company=Northstar</code> personalizes the whole run, across every page it visits. Selectors and navigation URLs are never interpolated, so a link can't steer targeting.</p>
+          <a class="feature-link" href="showcase-personalize.html">See it personalized <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="feature-card">
+          <p class="feature-tag">05 · Distribute</p>
+          <h3>Send it out</h3>
+          <p>A <code>?demo=play</code> link auto-plays with viewer chrome — progress, play/pause, exit. Every run reports its own funnel from <code>view_start</code> to <code>flow_complete</code> or <code>drop_off</code>, and nothing leaves the page unless you point it at a collector.</p>
+          <a class="feature-link" href="showcase-share.html">See it shared <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="feature-card">
+          <p class="feature-tag">06 · Engage</p>
           <h3>Let them drive</h3>
           <p>A <code>choice</code> action shows up to four cards and jumps playback to the scene the viewer picked. Every target is graph-validated, so a branch can never dead-end — and capture auto-picks the default, so the rendered video stays linear.</p>
           <a class="feature-link" href="showcase-branch.html">See it branch <span aria-hidden="true">→</span></a>
         </article>
       </div>
-      <p class="feature-more">It also narrates itself from your talking points, greets each prospect by name from the share link, and reports its own view-to-complete funnel — with no backend. <a href="showcase.html">See the full journey <span aria-hidden="true">→</span></a></p>
+      <p class="feature-more">All six are one runtime with no backend — and the showcase is the proof: a single flow drives itself across seven pages, performing each chapter's feature as it passes through. <a href="showcase.html">See the full journey <span aria-hidden="true">→</span></a></p>
     </section>
 
     <section class="section capabilities">

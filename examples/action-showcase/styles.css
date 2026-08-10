@@ -3,7 +3,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .hero-lede code,.why-copy code,.steps p code,.feature-card>p code{padding:2px 6px;border-radius:5px;background:var(--violet-soft);color:#6d28d9;font-weight:600;font-size:.84em}
 /* minmax(0,…) and min-width:0 keep the terminal block scrolling inside its own card. Grid and flex
    items default to min-width:auto, which lets a wide <pre> stretch its track and scroll the page. */
-.feature-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr);gap:14px;align-items:stretch}
+.feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:stretch}
 .feature-card{min-width:0;display:flex;flex-direction:column;padding:25px;border:1px solid var(--line);border-radius:12px;background:#fff}
 .feature-card-lead{border-color:#ddd6fe;background:linear-gradient(180deg,#faf9ff,#fff)}
 .feature-tag{margin:0;color:#a1a1aa;font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
@@ -11,6 +11,11 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .feature-card>p{margin:0;color:#71717a;line-height:1.6;font-size:14px}
 .feature-term{min-width:0;max-width:100%;overflow-x:auto;margin:18px 0 0;padding:15px 17px;border:1px solid #27272a;border-radius:8px;background:#18181b}
 .feature-term code{color:#f4f4f5;font-size:11.5px;line-height:1.8;white-space:pre}
+.feature-play{align-self:start;min-height:38px;display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:0 14px;border:1px solid #ddd6fe;border-radius:8px;background:var(--violet-soft);color:#5b21b6;font-size:13px;font-weight:700;cursor:pointer}
+.feature-play:hover{background:#ede9fe}
+.feature-play[aria-pressed="true"]{border-color:var(--violet);background:#ede9fe}
+.feature-aside{margin:11px 0 0;color:#a1a1aa;line-height:1.5;font-size:11.5px}
+.feature-aside code{color:#8b5cf6}
 .feature-link{margin-top:auto;padding-top:18px;display:inline-flex;align-items:center;gap:7px;color:var(--violet);text-decoration:none;font-size:13px;font-weight:700}
 .feature-link:hover,.feature-more a:hover{text-decoration:underline}
 .feature-more{max-width:780px;margin:34px 0 0;color:#71717a;line-height:1.65;font-size:14px}
