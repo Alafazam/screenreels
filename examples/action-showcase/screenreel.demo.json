@@ -4,38 +4,38 @@
     {
       "id": "guided-tour", "name": "Guided product tour", "defaults": { "dwellMs": 650, "settleMs": 150 },
       "scenes": [
-        { "id": "tour-opening", "enabled": true, "route": "./", "title": "The story in one flow", "talkingPoints": "The hero card is the flow: highlight the story, interact with the UI, capture and share.", "actions": [
-          { "type": "countdown", "from": 3, "stepMs": 480, "caption": "Your demo is about to play", "note": "Ready…" },
-          { "type": "highlight", "selector": "[data-flow-step=\"1\"]", "holdMs": 1300, "note": "Highlight the story" },
-          { "type": "highlight", "selector": "[data-flow-step=\"2\"]", "holdMs": 1300, "note": "Interact with the UI" },
-          { "type": "highlight", "selector": "[data-flow-step=\"3\"]", "holdMs": 1300, "afterMs": 200, "note": "Capture and share" }
+        { "id": "tour-opening", "enabled": true, "route": "./", "title": "The story in one flow", "talkingPoints": "The hero card is the flow: highlight the story, interact with the UI, capture and share.", "narration": "", "actions": [
+          { "type": "countdown", "from": 3, "stepMs": 550, "caption": "Your demo is about to play", "note": "Ready…", "narration": "This is ScreenReel, running live." },
+          { "type": "highlight", "selector": "[data-flow-step=\"1\"]", "holdMs": 1500, "afterMs": 250, "note": "Highlight the story", "narration": "First, tell the story." },
+          { "type": "highlight", "selector": "[data-flow-step=\"2\"]", "holdMs": 1500, "afterMs": 250, "note": "Interact with the UI", "narration": "Then drive the real product." },
+          { "type": "highlight", "selector": "[data-flow-step=\"3\"]", "holdMs": 1500, "afterMs": 300, "note": "Capture and share", "narration": "Then capture and share it." }
         ]},
-        { "id": "tour-why", "enabled": true, "route": "./", "title": "Why we built it", "talkingPoints": "Demos should not drift every time the product changes.", "actions": [
+        { "id": "tour-why", "enabled": true, "route": "./", "title": "Why we built it", "talkingPoints": "Demos should not drift every time the product changes.", "narration": "", "actions": [
           { "type": "scrollIntoView", "selector": "#why", "block": "start", "note": "Why we built it" },
-          { "type": "reel", "selector": "[data-reel=\"drift\"]", "frames": 4, "stepMs": 260, "holdMs": 700, "afterMs": 150, "note": "A demo should not drift" },
-          { "type": "highlight", "selector": "[data-word=\"product\"]", "holdMs": 1400, "afterMs": 200, "note": "…every time the product changes" }
+          { "type": "reel", "selector": "[data-reel=\"drift\"]", "frames": 4, "stepMs": 260, "holdMs": 900, "afterMs": 300, "note": "A demo should not drift", "narration": "Demos drift. Screens change, scripts go stale." },
+          { "type": "highlight", "selector": "[data-word=\"product\"]", "holdMs": 1400, "afterMs": 200, "note": "…every time the product changes", "narration": "ScreenReel repairs itself instead." }
         ]},
-        { "id": "tour-kpis", "enabled": true, "route": "./", "title": "Highlight product context", "talkingPoints": "Walk the KPIs one by one while the audience keeps its bearings.", "actions": [
+        { "id": "tour-kpis", "enabled": true, "route": "./", "title": "Highlight product context", "talkingPoints": "Walk the KPIs one by one while the audience keeps its bearings.", "narration": "", "actions": [
           { "type": "scrollIntoView", "selector": "#kpis", "block": "start", "note": "Watch the runtime operate a real page" },
-          { "type": "glow", "selector": ".kpi-card", "sequence": true, "count": 4, "stepMs": 750, "afterMs": 200, "note": "Revenue, margin, sell-through, stock" }
+          { "type": "glow", "selector": ".kpi-card", "sequence": true, "count": 4, "stepMs": 750, "afterMs": 200, "note": "Revenue, margin, sell-through, stock", "narration": "It walks real KPIs — revenue, margin, sell-through, and stock." }
         ]},
-        { "id": "tour-controls", "enabled": true, "route": "./", "title": "Work with real controls", "talkingPoints": "Type, select, toggle, and slide real inputs — then rock the demo.", "actions": [
+        { "id": "tour-controls", "enabled": true, "route": "./", "title": "Work with real controls", "talkingPoints": "Type, select, toggle, and slide real inputs — then rock the demo.", "narration": "", "actions": [
           { "type": "scrollIntoView", "selector": "#form", "block": "start", "note": "Work with real controls" },
-          { "type": "type", "selector": "#customer-name", "text": "Northstar Retail", "clearFirst": true, "charMs": 40, "afterMs": 250, "note": "Typing a customer name" },
+          { "type": "type", "selector": "#customer-name", "text": "Northstar Retail", "clearFirst": true, "charMs": 40, "afterMs": 250, "note": "Typing a customer name", "narration": "It types, selects, toggles, and slides — real controls, not mockups." },
           { "type": "set", "selector": "#region", "value": "West", "afterMs": 300, "note": "Choosing a region" },
           { "type": "toggle", "selector": "#priority", "checked": true, "afterMs": 300, "note": "Marking it a priority account" },
           { "type": "lever", "selector": "#confidence", "to": 95, "durMs": 950, "afterMs": 200, "note": "Confidence up to 95%" },
-          { "type": "click", "selector": "#submit-control", "afterMs": 900, "note": "Rock the demo!" }
+          { "type": "click", "selector": "#submit-control", "afterMs": 900, "note": "Rock the demo!", "narration": "Then it submits — for real." }
         ]},
-        { "id": "tour-routes", "enabled": true, "route": "./", "title": "Continue across routes", "talkingPoints": "One click opens the next page and the flow keeps its place.", "actions": [
+        { "id": "tour-routes", "enabled": true, "route": "./", "title": "Continue across routes", "talkingPoints": "One click opens the next page and the flow keeps its place.", "narration": "", "actions": [
           { "type": "scrollIntoView", "selector": "[data-demo-id=\"final-card\"]", "block": "center", "note": "One flow, across pages" },
-          { "type": "highlight", "selector": "[data-demo-id=\"final-card\"]", "holdMs": 1300, "note": "The flow survives a full navigation" },
+          { "type": "highlight", "selector": "[data-demo-id=\"final-card\"]", "holdMs": 1300, "note": "The flow survives a full navigation", "narration": "One flow can even cross pages." },
           { "type": "pointer", "selector": "[data-action=\"destination\"]", "afterMs": 700, "note": "Opening the next page" },
           { "type": "goto", "url": "destination.html?from=showcase", "note": "Navigating across routes" }
         ]},
-        { "id": "tour-home", "enabled": true, "route": "destination.html?from=showcase", "title": "Back to the start", "talkingPoints": "The flow and notes continued across a full navigation, then the tour returns home.", "actions": [
+        { "id": "tour-home", "enabled": true, "route": "destination.html?from=showcase", "title": "Back to the start", "talkingPoints": "The flow and notes continued across a full navigation, then the tour returns home.", "narration": "Same flow — it survived the whole navigation.", "actions": [
           { "type": "highlight", "selector": "[data-demo-id=\"destination-card\"]", "holdMs": 1300, "note": "The flow survived the navigation" },
-          { "type": "pointer", "selector": "[data-demo-id=\"return-home\"]", "afterMs": 700, "note": "Clicking return to ScreenReel" },
+          { "type": "pointer", "selector": "[data-demo-id=\"return-home\"]", "afterMs": 1000, "note": "Clicking return to ScreenReel" },
           { "type": "goto", "url": "./", "note": "Back to the ScreenReel home page" }
         ]}
       ]
