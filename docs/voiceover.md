@@ -19,9 +19,12 @@ Narration happens twice, from the same field, because the two run in different w
 | Overrun handling | Holds the scene until the sentence ends | Freezes the last frame (`overflow`) |
 
 Neither can do the other's job: there is no ffmpeg in a browser, and no `speechSynthesis` in Node.
-So both exist, and both read `scene.narration ?? scene.talkingPoints`. `ScreenReelCore.narrationScript`
-and `narrationText` in `lib/voice.mjs` are pinned against each other by `test/narrator.test.mjs`, so
-the two can never drift into speaking different words for the same scene.
+So both exist, and both speak the same transcript: the scene's own line
+(`scene.narration ?? scene.talkingPoints`) followed by one line per action that has a `narration`.
+`ScreenReelCore.narrationScript` and `narrationText` in `lib/voice.mjs` are pinned against each other
+by `test/narrator.test.mjs`, so the two can never drift into speaking different words for the same
+scene. Only the timing differs, by design: live, the scene line plays as the scene opens and each
+action line as that action runs; captured, the whole transcript plays over the scene's clip.
 
 ## Live narration
 
@@ -84,6 +87,28 @@ bullets, while spoken narration wants full sentences:
 ```
 
 An empty or whitespace-only script means a silent scene. That's not an error.
+
+### Per-action lines
+
+An action can carry its own `narration`, spoken as that action runs — so the words land on the
+highlight, click, or scroll they describe instead of arriving as one paragraph up front:
+
+```json
+{
+  "id": "overview",
+  "talkingPoints": "KPIs first.",
+  "actions": [
+    { "type": "highlight", "selector": "[data-kpi=revenue]", "narration": "Revenue leads the row." },
+    { "type": "click", "selector": "#margin-tab", "narration": "Margin lives one tab over." }
+  ]
+}
+```
+
+Live, each line *replaces* whatever is still speaking: a queue would drift behind the picture, and
+the point is that the words match what is on screen. In a captured video there is no per-action audio
+timeline, so the lines are joined onto the scene's line and spoken over the clip. Studio shows a
+speaker badge on narrated actions in the timeline, and the scene Settings modal can preview a scene's
+line through the same engine a viewer hears. Variables are interpolated in action lines too.
 
 ## Choosing a voice engine
 

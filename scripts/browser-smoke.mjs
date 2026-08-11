@@ -51,7 +51,14 @@ try {
   const localRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase copy' }); assert.equal(await localRow.count(), 1); await localRow.locator('.sr-flow-name').click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
   const editButtons = page.getByRole('button', { name: 'Edit', exact: true }); assert.equal(await editButtons.count(), 4); await editButtons.nth(0).click();
-  const titleField = page.locator('[data-field="title"]'); await titleField.fill('Studio-authored highlight');
+  // Scene settings live in a modal now, so the editor's height belongs to the preview. The route
+  // block must resolve to a real URL: a wrong route is the one scene mistake that plays nothing.
+  await page.locator('[data-settings]').click();
+  await page.locator('[data-key="title"]').fill('Studio-authored highlight');
+  assert.match(await page.locator('.sr-route-resolved').innerText(), /^http/);
+  assert(await page.locator('[data-route-pick] option').count() > 1, 'the route picker should offer known pages');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.locator('.sr-modal').waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 26); assert.equal(await page.locator('[data-recipe]').count(), 6);
   await page.locator('[data-definition="highlight"]').click(); const preview = page.frameLocator('.sr-preview-frame'); const kpiValue = preview.locator('[data-kpi="revenue"] strong'); await kpiValue.click();
   const savedTarget = page.locator('.sr-action small').filter({ hasText: '[data-kpi="revenue"]' }); await savedTarget.waitFor(); assert.equal(await savedTarget.count(), 1);

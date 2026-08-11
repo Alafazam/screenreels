@@ -39,11 +39,13 @@ class Projector {
     if (!narrator?.available()) return null;
     return narrator.configure(this.options.narration === true ? {} : this.options.narration);
   }
-  /* Speak a scene's script. Uses the interpolated text, so a personalized share link is heard
-     saying the prospect's name and not "{{company}}". Silent scenes are a no-op. */
+  /* Speak a scene's own line. Uses the interpolated text, so a personalized share link is heard
+     saying the prospect's name and not "{{company}}". Silent scenes are a no-op. Per-action lines
+     are spoken by the runtime as those actions run (see narrateAction in play()), so this
+     deliberately takes the scene line only — the full transcript would say them twice. */
   async narrate(scene) {
     const narrator = this.narrator(); if (!narrator) return;
-    const script = this.displayText(window.ScreenReelCore.narrationScript(scene));
+    const script = this.displayText(window.ScreenReelCore.sceneNarration(scene));
     if (!script) return;
     const { spoke, reason } = await narrator.speak(script);
     // Autoplay policy blocks audio until the viewer interacts. Say so once rather than leaving
@@ -216,6 +218,10 @@ class Projector {
         pressCursor: this.options.cursor === false ? undefined : async () => { await this.cursor()?.press()?.catch?.(() => {}); },
         scrollCursor: this.options.cursor === false ? undefined : (direction) => this.cursor()?.startBob(direction),
         stopScrollCursor: this.options.cursor === false ? undefined : () => this.cursor()?.stopBob(),
+        // An action's line REPLACES whatever is currently speaking (speak() cancels in flight):
+        // a queue would drift behind the visuals, and the words must land on what is on screen.
+        // narrator() is null when the viewer muted or the host opted out, so this stays silent.
+        narrateAction: (text) => { this.narrator()?.speak(text); },
         navigate: async (route) => {
           // Navigation actions are terminal: persist the next scene before a hard navigation can unload this document.
           const { scenes, position } = this.current(); priorPosition = position;

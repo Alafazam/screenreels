@@ -269,7 +269,7 @@
      break validation guarantees while a URL-controlled goto is an open redirect (the projector's
      default router assigns location.href without re-normalizing at play time). Single pass, no
      recursive expansion; unknown names stay literal so flows without variables are byte-identical. */
-  const INTERPOLATED_FIELDS = ['text', 'note', 'value', 'label', 'code', 'caption', 'goText'];
+  const INTERPOLATED_FIELDS = ['text', 'note', 'value', 'label', 'code', 'caption', 'goText', 'narration'];
   const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_]\w*)\s*\}\}/g;
   function interpolate(value, variables) {
     const missing = [];
@@ -307,6 +307,10 @@
     const action = resolveActionVariables({ ...source, type: actionType(source) }, context.variables, context.warn); const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
     if (!doc) return { ok: false, error: 'document' };
     if (action.note && ctx.announce) ctx.announce(action.note);
+    /* An action's own line is spoken as the action starts and deliberately not awaited: narration
+       runs alongside the visual it describes, and a queued line would drift behind the picture. */
+    const narration = actionNarration(action);
+    if (narration && ctx.narrateAction) ctx.narrateAction(narration);
     if (action.type === 'wait') { await sleep(action.ms || 500, ctx.signal); return { ok: true }; }
     if (action.type === 'countdown') { await runCountdown(action, ctx); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'choice') { const result = await runChoice(action, ctx); if (result.ok && action.afterMs) await sleep(action.afterMs, ctx.signal); return result; }
@@ -403,11 +407,23 @@
   }
   /* The spoken script for a scene. Live narration (packages/core/narrator.js) and Capture's
      voiceover (lib/voice.mjs narrationText) must always speak the same words for the same scene;
-     test/narrator.test.mjs asserts the two agree. Empty means a silent scene, not an error. */
-  function narrationScript(scene) {
+     test/narrator.test.mjs asserts the two agree. Empty means a silent scene, not an error.
+
+     A scene's transcript is its own line followed by one line per action. The two speakers reach it
+     differently and that is the point: the projector speaks sceneNarration() when the scene opens
+     and each actionNarration() as that action runs, so the words land on the thing being shown,
+     while Capture has no per-action audio timeline and speaks the whole narrationScript() over the
+     scene's clip. The words are the shared contract; the timing is each speaker's own. */
+  function sceneNarration(scene) {
     return String(scene?.narration ?? scene?.talkingPoints ?? '').trim();
+  }
+  function actionNarration(action) {
+    return String(action?.narration ?? '').trim();
+  }
+  function narrationScript(scene) {
+    return [sceneNarration(scene), ...(scene?.actions || []).map(actionNarration)].filter(Boolean).join(' ');
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

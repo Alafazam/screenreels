@@ -8,7 +8,7 @@ import '../packages/core/action-runtime.js';
 import { narrationText } from '../lib/voice.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { narrationScript } = globalThis.ScreenReelCore;
+const { narrationScript, sceneNarration, actionNarration } = globalThis.ScreenReelCore;
 
 /* The whole point of the shared field: a scene must be spoken with the same words whether it is
    narrated live in a browser or rendered into an MP4 by ffmpeg. Two implementations are
@@ -27,6 +27,12 @@ test('live narration and captured voiceover choose the same words for every scen
     { id: 'whitespace', talkingPoints: '   ' },
     { id: 'neither' },
     { id: 'padded', talkingPoints: '  Trim me.  ' },
+    { id: 'action-lines-with-scene-line', narration: 'Scene line.', actions: [{ narration: 'Line one.' }, {}, { narration: ' Line two. ' }] },
+    { id: 'action-lines-with-points', talkingPoints: 'Written version.', actions: [{ narration: 'Line one.' }, {}, { narration: ' Line two. ' }] },
+    { id: 'action-lines-only', actions: [{ narration: 'Line one.' }, {}, { narration: ' Line two. ' }] },
+    { id: 'blanked-scene-line-keeps-action-lines', narration: '', talkingPoints: 'no', actions: [{ narration: 'Only this.' }] },
+    { id: 'silent-actions', talkingPoints: 'Written version.', actions: [{}, { narration: '   ' }] },
+    { id: 'no-actions-array', narration: 'Scene line.', actions: [] },
   ];
   for (const scene of scenes) {
     assert.equal(narrationScript(scene), narrationText(scene) ?? '', `diverged on scene "${scene.id}"`);
@@ -48,6 +54,31 @@ test('narrationScript prefers explicit narration, trims, and treats blank as sil
   assert.equal(narrationScript({ talkingPoints: '   ' }), '');
   assert.equal(narrationScript({}), '');
   assert.equal(narrationScript(null), '');
+});
+
+/* A scene's transcript is its own line plus one line per narrated action, in sequence order.
+   Blank and missing action lines contribute nothing rather than a double space, because the
+   transcript is fed to a speech engine verbatim. */
+test('narrationScript composes the scene line and every action line into one transcript', () => {
+  assert.equal(narrationScript({ narration: 'Scene line.', actions: [{ narration: 'Line one.' }, {}, { narration: ' Line two. ' }] }), 'Scene line. Line one. Line two.');
+  assert.equal(narrationScript({ talkingPoints: 'Written version.', actions: [{ narration: 'Line one.' }] }), 'Written version. Line one.');
+  assert.equal(narrationScript({ narration: '', talkingPoints: 'no', actions: [{ narration: 'Only this.' }] }), 'Only this.');
+  assert.equal(narrationScript({ talkingPoints: 'Alone.', actions: [{}, { narration: '  ' }] }), 'Alone.');
+  assert.equal(narrationScript({ actions: [{ narration: 'Actions only.' }] }), 'Actions only.');
+});
+
+test('sceneNarration and actionNarration are the two halves the transcript is built from', () => {
+  assert.equal(sceneNarration({ narration: 'Spoken.', talkingPoints: 'Written.' }), 'Spoken.');
+  assert.equal(sceneNarration({ talkingPoints: '  Written.  ' }), 'Written.');
+  assert.equal(sceneNarration({ narration: '', talkingPoints: 'Written.' }), '', 'a blanked scene narration stays silent');
+  assert.equal(sceneNarration({}), '');
+  assert.equal(sceneNarration(null), '');
+  // Actions have no talkingPoints to fall back to: narration is the only spoken field.
+  assert.equal(actionNarration({ narration: '  Line.  ' }), 'Line.');
+  assert.equal(actionNarration({ narration: '' }), '');
+  assert.equal(actionNarration({ talkingPoints: 'Not spoken.' }), '');
+  assert.equal(actionNarration({}), '');
+  assert.equal(actionNarration(null), '');
 });
 
 /* The narrator is a browser module, so exercise it against a minimal speechSynthesis fake. This

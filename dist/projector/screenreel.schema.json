@@ -164,6 +164,9 @@
         "afterMs": {
           "type": "number"
         },
+        "narration": {
+          "type": "string"
+        },
         "fingerprint": {
           "type": "object",
           "properties": {

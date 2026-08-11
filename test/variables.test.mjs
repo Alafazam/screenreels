@@ -27,7 +27,7 @@ test('variableDefaults accepts string shorthand and object form, rejecting inval
 });
 
 test('resolveActionVariables interpolates only the display/value allowlist — never selectors', () => {
-  const action = { type: 'type', selector: '#field-{{company}}', toSelector: '{{company}}', cursorTo: '{{company}}', fn: '{{company}}', url: '/x?q={{company}}', text: 'Hi {{company}}', note: 'For {{company}}', value: '{{company}}', label: '{{company}}', code: '{{company}}', caption: '{{company}}', goText: '{{company}}' };
+  const action = { type: 'type', selector: '#field-{{company}}', toSelector: '{{company}}', cursorTo: '{{company}}', fn: '{{company}}', url: '/x?q={{company}}', text: 'Hi {{company}}', note: 'For {{company}}', value: '{{company}}', label: '{{company}}', code: '{{company}}', caption: '{{company}}', goText: '{{company}}', narration: 'Now {{company}} sees this' };
   const resolved = resolveActionVariables(action, { company: 'Acme' });
   assert.equal(resolved.text, 'Hi Acme');
   assert.equal(resolved.note, 'For Acme');
@@ -36,6 +36,7 @@ test('resolveActionVariables interpolates only the display/value allowlist — n
   assert.equal(resolved.code, 'Acme');
   assert.equal(resolved.caption, 'Acme');
   assert.equal(resolved.goText, 'Acme');
+  assert.equal(resolved.narration, 'Now Acme sees this');
   // Security-relevant fields stay byte-identical.
   assert.equal(resolved.selector, '#field-{{company}}');
   assert.equal(resolved.toSelector, '{{company}}');
@@ -58,6 +59,17 @@ test('runAction interpolates the announced note inside the executor', async () =
   });
   assert.equal(result.ok, true);
   assert.deepEqual(announced, ['Welcome, Acme']);
+});
+
+/* An action's narration is spoken by the executor as the action starts, so a personalized share
+   link is HEARD saying the prospect's name. Blank lines must never reach the speech engine. */
+test('runAction speaks an action narration through narrateAction, interpolated and never blank', async () => {
+  const spoken = [];
+  const narrateAction = (text) => spoken.push(text);
+  await runAction({ type: 'wait', ms: 1, narration: '  Here is {{company}} revenue.  ' }, { document: {}, window: {}, variables: { company: 'Acme' }, narrateAction });
+  await runAction({ type: 'wait', ms: 1, narration: '   ' }, { document: {}, window: {}, narrateAction });
+  await runAction({ type: 'wait', ms: 1 }, { document: {}, window: {}, narrateAction });
+  assert.deepEqual(spoken, ['Here is Acme revenue.']);
 });
 
 test('share-link srv_ params never affect route matching', () => {
