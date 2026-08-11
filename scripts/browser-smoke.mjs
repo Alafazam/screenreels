@@ -66,7 +66,11 @@ try {
   assert.equal(await page.locator('.sr-dirty').count(), 0);
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 11))));
   // Record-by-doing: trusted interactions inside the preview iframe become actions incrementally,
-  // without a re-render (the checkbox click must NOT double-emit alongside its toggle).
+  // without a re-render (the checkbox click must NOT double-emit alongside its toggle). The form
+  // is scrolled into view BEFORE recording starts: Playwright's own scroll-into-view during the
+  // clicks below is a real scroll the recorder would (correctly) capture, which would make the
+  // action count depend on viewport layout instead of on the interactions under test.
+  await preview.locator('#form').scrollIntoViewIfNeeded(); await page.waitForTimeout(500);
   const recordButton = page.locator('[data-record]'); await recordButton.click();
   await page.locator('.sr-picker-banner').waitFor({ state: 'visible' });
   await preview.locator('#submit-control').click();
