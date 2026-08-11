@@ -11,7 +11,8 @@ Live demo: [Chapter 1 of the showcase](../examples/action-showcase/showcase-crea
 2. Click the **Studio** button in the pill.
 3. Open a flow, then open a scene (**Edit** on any row). You're now in the scene editor, with your
    app in the preview panel on the left.
-4. Press **● Record**. The banner reads *"Recording — interact with the preview · Esc stops"*.
+4. Press **● Record**. The banner reads
+   *"Recording — ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops"*.
 5. **Use your app in the preview.** Click, type, pick from selects, scroll.
 6. Press **Stop** (or `Esc`).
 7. Press **Save**.
@@ -31,9 +32,17 @@ normal action afterwards — reorder it, edit its settings, delete it.
 | Scroll | **One** `scroll` per burst (relative, as a percentage of the viewport) |
 | Pause between actions | `afterMs` on the previous action, so replay keeps your rhythm |
 | Click something that navigates | `goto` — and recording continues on the new page |
+| ⌘/Ctrl+click something | `highlight` on it — and the click itself never reaches your app |
+| Alt+click something | `spotlight` on it — likewise swallowed |
 
 The two "one" rows matter: a 20-character name is one readable `type` action, not twenty
 keystrokes, and a flick of the scroll wheel is one `scroll`, not forty.
+
+The two modifier rows are how you narrate *emphasis* while recording. A demo usually needs to point
+at things it does not click — a KPI, a column, a badge — and stopping to add those from the catalog
+afterwards means finding each element again. Hold ⌘ (or Ctrl) and click it instead: you get a
+`highlight` on exactly what you pointed at, your app never sees the click, and no `click` action is
+recorded alongside it. On macOS Chrome, prefer ⌘ — Ctrl+click is a right-click there.
 
 ## Things worth knowing
 
