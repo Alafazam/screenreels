@@ -12,7 +12,7 @@ import {
   SCROLL_MIN_VIEWPORT_PERCENT,
 } from '../packages/studio/recorder.js';
 
-const DEFAULTS = { type: { charMs: 45 }, 'scroll-by': { durMs: 800 }, lever: { durMs: 1200 } };
+const DEFAULTS = { type: { charMs: 45 }, 'scroll-by': { durMs: 800 }, lever: { durMs: 1200 }, highlight: { holdMs: 1600 }, spotlight: { holdMs: 1800, dim: 0.62 } };
 const make = (route = '/') => new Coalescer({ definitionDefaults: (id) => DEFAULTS[id] || {}, route });
 const appended = (ops) => ops.filter((op) => op.op === 'append').map((op) => op.action);
 
@@ -168,4 +168,32 @@ test('a text-field change commits pending typing without emitting a second actio
   ops.push(...coalescer.push({ kind: 'change', at: 50, selector: '#name', control: 'text', value: 'Acme' }));
   ops.push(...coalescer.flush());
   assert.deepEqual(appended(ops).map((action) => action.type), ['type']);
+});
+
+test('a modifier-click annotate record emits highlight or spotlight with registry defaults', () => {
+  const highlighted = appended(make().push({ kind: 'annotate', annotation: 'highlight', at: 0, selector: '#hero', fingerprint: { text: 'Hero', tag: 'div', role: '' } }));
+  assert.deepEqual(highlighted[0], { type: 'highlight', definitionId: 'highlight', selector: '#hero', holdMs: 1600, fingerprint: { text: 'Hero', tag: 'div', role: '' } });
+  const spotlit = appended(make().push({ kind: 'annotate', annotation: 'spotlight', at: 0, selector: '#panel' }));
+  assert.deepEqual(spotlit[0], { type: 'spotlight', definitionId: 'spotlight', selector: '#panel', holdMs: 1800, dim: 0.62 });
+});
+
+test('an annotate finalizes a pending typing burst first, preserving order', () => {
+  const coalescer = make();
+  const ops = [];
+  ops.push(...coalescer.push({ kind: 'input', at: 0, selector: '#name', value: 'Hi' }));
+  ops.push(...coalescer.push({ kind: 'annotate', annotation: 'highlight', at: 100, selector: '#hero' }));
+  const actions = appended(ops);
+  assert.deepEqual(actions.map((action) => action.type), ['type', 'highlight']);
+  assert.equal(actions[1].selector, '#hero');
+});
+
+test('an idle gap before an annotate patches afterMs onto the previous action', () => {
+  const coalescer = make();
+  const ops = [
+    ...coalescer.push({ kind: 'click', at: 0, selector: '#a' }),
+    ...coalescer.push({ kind: 'annotate', annotation: 'spotlight', at: 1240, selector: '#b' }),
+  ];
+  assert.deepEqual(ops.map((op) => op.op), ['append', 'patchLast', 'append']);
+  assert.equal(ops[1].patch.afterMs, 1200);
+  assert.equal(ops[2].action.type, 'spotlight');
 });

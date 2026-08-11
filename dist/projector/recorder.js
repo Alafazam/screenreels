@@ -62,6 +62,11 @@ export class Coalescer {
     } else if (record.kind === 'click') {
       this.finalizeType(ops);
       this.emit(ops, { type: 'click', definitionId: 'click', selector: record.selector }, record.at, record.at, record.fingerprint);
+    } else if (record.kind === 'annotate') {
+      this.finalizeType(ops);
+      /* highlight/spotlight definitionIds share their type string in the registry (see
+         packages/core/action-runtime.js definitions), so record.annotation doubles as both. */
+      this.emit(ops, { type: record.annotation, definitionId: record.annotation, selector: record.selector, ...this.defaults(record.annotation) }, record.at, record.at, record.fingerprint);
     } else if (record.kind === 'change') {
       const action = this.changeAction(record);
       if (record.control === 'text') { if (this.pendingType?.selector === record.selector) this.finalizeType(ops); return ops; }
@@ -163,7 +168,7 @@ export class Recorder {
     this.active = true;
     this.attach(doc);
     this.frame.addEventListener('load', this.onFrameLoad);
-    if (this.banner) { this.banner.hidden = false; this.banner.textContent = 'Recording — interact with the preview · Esc stops'; }
+    if (this.banner) { this.banner.hidden = false; this.banner.textContent = 'Recording — ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops'; }
     return true;
   }
 
@@ -183,6 +188,9 @@ export class Recorder {
   attach(doc) {
     const win = doc.defaultView;
     const on = (target, type, handler, options) => { target.addEventListener(type, handler, options); this.teardown.push(() => target.removeEventListener(type, handler, options)); };
+    /* Registered on the frame window, before the document click listener, so a modifier-held
+       click is intercepted ahead of both the recorder's own click handler and the host page. */
+    on(win, 'click', (e) => this.handleModifierClick(e), true);
     on(doc, 'click', (e) => this.handleClick(e), true);
     on(doc, 'change', (e) => this.handleChange(e), true);
     on(doc, 'submit', (e) => { if (e.isTrusted) this.apply(this.coalescer.push({ kind: 'submit', at: Date.now() })); }, true);
@@ -210,7 +218,7 @@ export class Recorder {
     const doc = this.frame.contentDocument;
     if (!doc) return this.stop('Recording stopped — preview document is unavailable');
     this.attach(doc);
-    if (this.banner && route) this.banner.textContent = `Recording continues on ${route} · Esc stops`;
+    if (this.banner && route) this.banner.textContent = `Recording continues on ${route} · ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops`;
   }
 
   /* Overlay chrome (ScreenReel's own boxes, ripples, cursor) must never record. */
@@ -221,6 +229,29 @@ export class Recorder {
   targetOf(el) {
     const resolved = this.core.resolvePickerTarget(el, 'interactive', this.doc) || el;
     return { selector: this.core.selectorFor(resolved), fingerprint: this.core.fingerprintFor(resolved) };
+  }
+
+  /* Meta/Ctrl+click records a highlight, Alt+click a spotlight (meta/ctrl wins if both are held).
+     Both are visual-picker annotations rather than real clicks, so the click itself is swallowed:
+     preventDefault stops the host page from reacting, and stopImmediatePropagation keeps it from
+     ever reaching handleClick below (window capture runs before document capture). One
+     limitation: a host listener already registered on window-capture before recording started
+     would still fire ahead of this one. */
+  handleModifierClick(event) {
+    if (!event.isTrusted || !this.active) return;
+    const wantsHighlight = event.metaKey || event.ctrlKey;
+    const wantsSpotlight = event.altKey;
+    if (!wantsHighlight && !wantsSpotlight) return;
+    const target = event.target;
+    if (!target || this.isOverlayTarget(target)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const resolved = this.core.resolvePickerTarget(target, 'visual', this.doc) || target;
+    const selector = this.core.selectorFor(resolved);
+    if (!selector) return;
+    const fingerprint = this.core.fingerprintFor(resolved);
+    const annotation = wantsHighlight ? 'highlight' : 'spotlight';
+    this.apply(this.coalescer.push({ kind: 'annotate', annotation, at: Date.now(), selector, fingerprint }));
   }
 
   handleClick(event) {
