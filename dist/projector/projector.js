@@ -29,7 +29,9 @@ class Projector {
   cursor() {
     if (this.options.cursor === false) return null;
     const cursor = window.__screenreelCursor; if (!cursor) return null;
-    return cursor.configure({ glyph: this.options.cursor === true ? 'dot' : this.options.cursor });
+    const config = { glyph: this.options.cursor === true ? 'dot' : this.options.cursor };
+    if (this.options.cursorMotion) config.motion = this.options.cursorMotion;
+    return cursor.configure(config);
   }
   /* Live narrator, or null when the host opted out, the browser has no speech engine, or the
      viewer muted it. Every call site treats null as "stay silent", so narration is additive. */

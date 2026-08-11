@@ -68,10 +68,27 @@ never shows a stray dot before anyone presses play.
 interactions — a pointer chasing every highlight reads as noise. The cursor appears for things a
 person would actually do: click, type, set, toggle, drag, hover, focus, pointer taps.
 
+### Arc motion
+
+```js
+cursorMotion: 'arc'   // default — moves bow into a slight curve
+cursorMotion: 'line'  // straight lines, no curve
+```
+
+Moves longer than a short hop bow into a shallow curve rather than tracking a straight line, which
+is what a hand-guided pointer actually looks like. The curve's bulge and the side it bulges toward
+are derived from the move's own start and end coordinates, not from `Math.random()` — the same two
+points always produce the same curve, so a captured video renders identically on every run.
+
+Long moves (past 200px) also overshoot slightly past the target and correct back before the arrival
+rings fire, reading as a deliberate landing rather than a robotic snap. Short moves — including
+drag's per-frame nudges — stay straight regardless of `cursorMotion`, since a curve only reads as
+motion once there's distance for the eye to follow.
+
 ### Accessibility
 
-`prefers-reduced-motion: reduce` disables travel, rings, and drift — the cursor jumps straight to
-position. Nothing is lost, only the motion.
+`prefers-reduced-motion: reduce` disables travel, rings, drift, arcing, and overshoot — the cursor
+jumps straight to position. Nothing is lost, only the motion.
 
 ## Under the hood
 

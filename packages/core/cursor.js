@@ -17,6 +17,11 @@
   const PRESS_MS = 180;               // press dip duration
   const BOB_AMPLITUDE_PX = 7;         // vertical drift while the page scrolls
   const BOB_PERIOD_MS = 620;          // one full bob cycle
+  const ARC_RATIO = 0.18;             // control-point offset as a fraction of travel distance
+  const ARC_MAX_PX = 120;             // ceiling on how far a curve bulges, however long the move
+  const ARC_MIN_DISTANCE_PX = 48;     // below this, a curve reads as jitter rather than motion
+  const OVERSHOOT_MAX_PX = 10;        // how far a long move can sail past its target
+  const OVERSHOOT_RETURN_MS = 90;     // beat spent correcting back onto the target
   const STYLE_ID = '__screenreelCursorStyles';
   const NODE_ID = '__screenreelCursor';
 
@@ -49,6 +54,8 @@
 
   let node = null;
   let glyph = 'dot';
+  let motion = 'arc';                 // 'arc' (default) bows moves into a curve; 'line' stays straight
+  let arcSide = 1;                    // alternates which side of the travel line each arc bulges toward
   let x = (root.innerWidth || 0) / 2;
   let y = (root.innerHeight || 0) / 2;
   let bobTimer = null;
@@ -114,15 +121,41 @@
       x = targetX; y = targetY; ensure(); paint();
       return Promise.resolve();
     }
+    const fromX = x;
+    const fromY = y;
+    const distance = Math.hypot(targetX - fromX, targetY - fromY);
+    // Short hops (drag's per-frame 1ms calls included) stay straight — a curve only reads as
+    // motion once there's enough distance for the eye to follow it.
+    const arced = motion === 'arc' && distance >= ARC_MIN_DISTANCE_PX;
+    let controlX = 0;
+    let controlY = 0;
+    if (arced) {
+      arcSide = -arcSide; // alternate which side of the travel line successive arcs bulge toward
+      const midX = (fromX + targetX) / 2;
+      const midY = (fromY + targetY) / 2;
+      const perpX = -(targetY - fromY) / distance;
+      const perpY = (targetX - fromX) / distance;
+      // Deterministic "jitter" derived from the endpoint coordinates rather than Math.random():
+      // the same start/end points always produce the same curve, so a captured video is
+      // reproducible frame-for-frame across runs.
+      const jitter = 0.75 + ((Math.abs(Math.round(fromX + fromY * 7 + targetX * 13 + targetY * 31)) % 100) / 100) * 0.5;
+      const offset = Math.min(ARC_MAX_PX, distance * ARC_RATIO) * jitter * arcSide;
+      controlX = midX + perpX * offset;
+      controlY = midY + perpY * offset;
+    }
     return new Promise((resolve) => {
-      const fromX = x;
-      const fromY = y;
       const start = performance.now();
       const frame = (now) => {
         const t = Math.min(1, (now - start) / ms);
         const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        x = fromX + (targetX - fromX) * eased;
-        y = fromY + (targetY - fromY) * eased;
+        if (arced) {
+          const inv = 1 - eased;
+          x = inv * inv * fromX + 2 * inv * eased * controlX + eased * eased * targetX;
+          y = inv * inv * fromY + 2 * inv * eased * controlY + eased * eased * targetY;
+        } else {
+          x = fromX + (targetX - fromX) * eased;
+          y = fromY + (targetY - fromY) * eased;
+        }
         ensure();
         paint();
         if (t < 1) root.requestAnimationFrame(frame); else resolve();
@@ -135,14 +168,33 @@
     return Math.min(TRAVEL_MAX_MS, TRAVEL_BASE_MS + distance * TRAVEL_PER_PX_MS);
   }
 
+  /* Travels to a point, overshooting slightly past it on long arced moves and correcting back —
+     the settle reads as a deliberate arrival rather than a robotic snap onto the target. Short
+     moves, straight-line motion, and reduced-motion all skip straight to a plain tween. */
+  async function tweenWithOvershoot(toX, toY, ms) {
+    const distance = Math.hypot(toX - x, toY - y);
+    if (motion === 'arc' && distance > 200 && !reducedMotion()) {
+      const overshootPx = Math.min(OVERSHOOT_MAX_PX, distance * 0.03);
+      const dirX = (toX - x) / distance;
+      const dirY = (toY - y) / distance;
+      await tween(toX + dirX * overshootPx, toY + dirY * overshootPx, ms);
+      await tween(toX, toY, OVERSHOOT_RETURN_MS);
+      return;
+    }
+    await tween(toX, toY, ms);
+  }
+
   root.__screenreelCursor = {
-    /* Pick the pointer glyph: 'dot' (agent style) or 'arrow' (classic capture look). */
+    /* Pick the pointer glyph ('dot' agent style or 'arrow' classic capture look) and travel
+       style ('arc', the default, or 'line'). Invalid values are ignored so a bad option never
+       stomps the current setting. */
     configure(options = {}) {
       if (options.glyph && GLYPHS[options.glyph] && options.glyph !== glyph) {
         glyph = options.glyph;
         node?.remove();
         node = null;
       }
+      if (options.motion === 'arc' || options.motion === 'line') motion = options.motion;
       return this;
     },
     /* Reveals an existing pointer. It deliberately does not create one: the cursor must not
@@ -161,7 +213,7 @@
       const toX = rect.left + rect.width / 2;
       const toY = rect.top + rect.height / 2;
       const distance = Math.hypot(toX - x, toY - y);
-      await tween(toX, toY, ms || travelMs(distance));
+      await tweenWithOvershoot(toX, toY, ms || travelMs(distance));
       ping();
       await wait(SETTLE_MS);
       return this;
@@ -169,7 +221,7 @@
 
     async moveToPoint(pointX, pointY, ms) {
       ensure();
-      await tween(pointX, pointY, ms == null ? travelMs(Math.hypot(pointX - x, pointY - y)) : ms);
+      await tweenWithOvershoot(pointX, pointY, ms == null ? travelMs(Math.hypot(pointX - x, pointY - y)) : ms);
       return this;
     },
 
