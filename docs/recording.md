@@ -38,11 +38,14 @@ normal action afterwards — reorder it, edit its settings, delete it.
 The two "one" rows matter: a 20-character name is one readable `type` action, not twenty
 keystrokes, and a flick of the scroll wheel is one `scroll`, not forty.
 
-The two modifier rows are how you narrate *emphasis* while recording. A demo usually needs to point
-at things it does not click — a KPI, a column, a badge — and stopping to add those from the catalog
-afterwards means finding each element again. Hold ⌘ (or Ctrl) and click it instead: you get a
-`highlight` on exactly what you pointed at, your app never sees the click, and no `click` action is
-recorded alongside it. On macOS Chrome, prefer ⌘ — Ctrl+click is a right-click there.
+The two modifier rows are how you add *emphasis*. A demo usually needs to point at things it does not
+click — a KPI, a column, a badge — and adding those from the catalog means finding each element
+again. Hold ⌘ (or Ctrl) and click it instead: you get a `highlight` on exactly what you pointed at,
+your app never sees the click, and no `click` action is recorded alongside it.
+
+**These two gestures work whenever the preview is loaded, not just while recording** — ⌘-click is
+the fastest way to grab any element, whether or not a take is running. On macOS Chrome, prefer ⌘;
+Ctrl+click is a right-click there.
 
 ## Things worth knowing
 

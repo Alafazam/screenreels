@@ -46,7 +46,7 @@ try {
   await page.screenshot({ path: path.join(output, 'projector-destination-1280x720.png') });
   await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await visiblePill(page);
-  await page.locator('button[title="Open ScreenReel Studio"]').click(); const heading = page.getByRole('heading', { name: 'Demo flows', exact: true }); await heading.waitFor();
+  await page.locator('button[data-cmd="studio"]').click(); const heading = page.getByRole('heading', { name: 'Demo flows', exact: true }); await heading.waitFor();
   const showcaseRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase' }).first(); await showcaseRow.getByRole('button', { name: 'Duplicate', exact: true }).click();
   const localRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase copy' }); assert.equal(await localRow.count(), 1); await localRow.locator('.sr-flow-name').click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
@@ -122,7 +122,7 @@ try {
   await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
   await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
   await inlinePage.close();
-  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[title="Open ScreenReel Studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
   // stable session id. Fresh context so presenter-mode session state can't leak in.
   const shareContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -132,7 +132,7 @@ try {
   const sharePill = await visiblePill(sharePage);
   assert.equal(await sharePill.evaluate((node) => node.classList.contains('sr-pill--share')), true);
   assert.equal(await sharePage.locator('.sr-flow').count(), 0);
-  assert.equal(await sharePage.locator('button[title="Open ScreenReel Studio"]').count(), 0);
+  assert.equal(await sharePage.locator('button[data-cmd="studio"]').count(), 0);
   await sharePage.waitForFunction(() => (window.__analyticsEvents || []).some((item) => item.event === 'scene_enter'), null, { timeout: 9000 });
   const funnel = await sharePage.evaluate(() => window.__analyticsEvents);
   assert.equal(funnel[0].event, 'view_start');
