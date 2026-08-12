@@ -7,7 +7,18 @@
 /* Timing and thresholds. Canonical per-action defaults (charMs 45, lever durMs 1200, …) are NOT
    re-declared here — the Coalescer reads them through the injected definitionDefaults lookup so
    the action registry stays the single source of truth. */
-export const SCROLL_SETTLE_MS = 350;          // quiet gap that ends a scroll burst
+/* A read-and-scroll rhythm pauses 0.5-1.5s between flicks, so the merge window has to outlast
+   that without swallowing genuinely separate beats. It must also stay BELOW IDLE_GAP_MAX_MS so
+   any pause long enough to split a scroll burst is still fully replayable as afterMs. */
+export const SCROLL_BURST_GAP_MS = 2500;
+/* The debounce that ends a burst and calls flush() must outlast the merge window above it, or
+   flush() ends the burst before a same-window scroll ever arrives, making the window dead code. */
+export const SCROLL_FLUSH_MS = SCROLL_BURST_GAP_MS + 100;
+/* durMs is written onto a scroll-by action whose field spec is min:100,max:10000 (see
+   packages/core/action-runtime.js), enforced by validate() — a measured value must never be one
+   save() would reject. */
+export const SCROLL_DUR_MIN_MS = 200;
+export const SCROLL_DUR_MAX_MS = 4000;
 export const IDLE_GAP_MIN_MS = 300;           // pauses shorter than this are not worth replaying
 export const IDLE_GAP_MAX_MS = 5000;          // cap replayed pauses; nobody wants a 30s afterMs
 export const IDLE_GAP_ROUND_MS = 100;         // round pauses so manifests stay tidy
@@ -15,7 +26,8 @@ export const CHAR_MS_MIN = 20;                // clamp measured typing speed to 
 export const CHAR_MS_MAX = 200;
 export const NAV_ATTRIBUTION_MS = 1500;       // a navigation this soon after a click IS that click
 export const CHANGE_CLICK_MERGE_MS = 120;     // change this soon after a same-target click replaces it
-export const SCROLL_MIN_VIEWPORT_PERCENT = 2; // ignore sub-2% scroll noise
+// The smallest scroll worth its OWN action; smaller remainders merge into the scroll they continue.
+export const SCROLL_MIN_VIEWPORT_PERCENT = 2;
 export const SENSITIVE_INPUT_TYPES = ['password'];
 const TEXT_INPUT_TYPES = ['text', 'email', 'search', 'tel', 'url', 'number'];
 const CLICK_KEEP_INPUT_TYPES = ['button', 'submit', 'reset', 'image'];
@@ -33,6 +45,8 @@ export class Coalescer {
     this.route = route;
     this.pendingType = null;    // { selector, value, lastAt, firstAt, gaps: [] }
     this.pendingScroll = null;  // { selector, deltaX, deltaY, firstAt, lastAt, viewportW, viewportH }
+    this.scrollCarry = null;    // sub-threshold remainder with nowhere to go yet: { selector, deltaX, deltaY, viewportW, viewportH }
+    this.lastScroll = null;     // mirror of the last APPENDED scroll: { selector, direction, amount, durMs }
     this.lastEmitted = null;    // { type, selector, at } of the last appended action
     this.emittedCount = 0;
   }
@@ -41,16 +55,21 @@ export class Coalescer {
     const ops = [];
     if (record.kind === 'scroll') {
       this.finalizeType(ops);
-      const sameBurst = this.pendingScroll && this.pendingScroll.selector === record.selector && record.at - this.pendingScroll.lastAt <= SCROLL_SETTLE_MS;
+      const sameBurst = this.pendingScroll && this.pendingScroll.selector === record.selector && record.at - this.pendingScroll.lastAt <= SCROLL_BURST_GAP_MS && !this.reverses(record);
       if (sameBurst) {
         this.pendingScroll.deltaX += record.deltaX; this.pendingScroll.deltaY += record.deltaY; this.pendingScroll.lastAt = record.at;
       } else {
         this.finalizeScroll(ops);
         this.pendingScroll = { selector: record.selector, deltaX: record.deltaX, deltaY: record.deltaY, firstAt: record.at, lastAt: record.at, viewportW: record.viewportW, viewportH: record.viewportH };
+        this.absorbCarry();
       }
       return ops;
     }
     this.finalizeScroll(ops);
+    // Nothing outside a scroll burst can ever claim a sub-threshold carry, so any non-scroll
+    // record (click, type, annotate, ...) ends its life here rather than let it leak into a
+    // later, unrelated scroll.
+    this.scrollCarry = null;
     if (record.kind === 'input') {
       if (this.pendingType && this.pendingType.selector === record.selector) {
         this.pendingType.gaps.push(record.at - this.pendingType.lastAt);
@@ -77,6 +96,7 @@ export class Coalescer {
       if (this.lastEmitted?.type === 'click' && this.lastEmitted.selector === record.selector && record.at - this.lastEmitted.at <= CHANGE_CLICK_MERGE_MS) {
         ops.push({ op: 'replaceLast', action });
         this.lastEmitted = { type: action.type, selector: record.selector, at: record.at };
+        this.lastScroll = null; // replaced row is never a scroll, so the mirror must not point at it
       } else {
         this.emit(ops, action, record.at, record.at, record.fingerprint);
       }
@@ -106,13 +126,50 @@ export class Coalescer {
     if (this.lastEmitted?.type === 'click' && at - this.lastEmitted.at <= NAV_ATTRIBUTION_MS) {
       ops.push({ op: 'replaceLast', action: goto });
       this.lastEmitted = { type: 'goto', selector: null, at };
+      this.lastScroll = null; // replaced row is never a scroll, so the mirror must not point at it
     } else {
       this.emit(ops, goto, at, at);
     }
     return ops;
   }
 
-  flush() { const ops = []; this.finalizeType(ops); this.finalizeScroll(ops); return ops; }
+  /* A scroll burst never survives a flush: there is no future burst left to carry a remainder
+     into, and no previous scroll to patch it onto (finalizeScroll already had its chance).
+     Inventing an amount:0 action would be worse than dropping — it replays as a visible no-op
+     that still costs durMs. */
+  flush() { const ops = []; this.finalizeType(ops); this.finalizeScroll(ops); this.scrollCarry = null; return ops; }
+
+  /* True only when the incoming delta reverses the OPEN burst's dominant axis and that burst is
+     already big enough to be a real scroll. `direction` is a semantic field ('down'/'up'/...), so
+     one action cannot express there-and-back — algebraic summing would silently delete BOTH
+     halves of an explore-and-return. The size guard keeps trackpad rubber-banding (a stream of
+     sub-floor wobbles) from splitting the burst into a chain of throwaway actions; comparing only
+     on the open burst's dominant axis keeps diagonal trackpad drift from splitting anything. */
+  reverses(record) {
+    const pending = this.pendingScroll;
+    if (!pending) return false;
+    const vertical = Math.abs(pending.deltaY) >= Math.abs(pending.deltaX);
+    const pendingDelta = vertical ? pending.deltaY : pending.deltaX;
+    const incomingDelta = vertical ? record.deltaY : record.deltaX;
+    if (pendingDelta === 0 || incomingDelta === 0 || Math.sign(pendingDelta) === Math.sign(incomingDelta)) return false;
+    const basis = vertical ? pending.viewportH : pending.viewportW;
+    const amount = basis ? Math.abs(pendingDelta) / basis * 100 : 0;
+    return amount >= SCROLL_MIN_VIEWPORT_PERCENT;
+  }
+
+  /* Folds a parked sub-threshold remainder into the burst that just started, but ONLY the
+     pixels — the carry's own firstAt is deliberately discarded in favour of the new burst's, so
+     carried wall-clock cannot inflate durMs. Pacing across the gap is already modelled by the
+     afterMs patch (or, for a merged tail, by span alone); durMs is an animation duration, not a
+     stopwatch. */
+  absorbCarry() {
+    // Normalized on both sides, as `mergeable` does: the carry stores `?? null`, and a root-scroll
+    // record can reach a Coalescer with no selector key at all, which must still match null.
+    if (!this.scrollCarry || this.scrollCarry.selector !== (this.pendingScroll.selector ?? null)) return;
+    this.pendingScroll.deltaX += this.scrollCarry.deltaX;
+    this.pendingScroll.deltaY += this.scrollCarry.deltaY;
+    this.scrollCarry = null;
+  }
 
   finalizeType(ops) {
     if (!this.pendingType) return;
@@ -128,10 +185,42 @@ export class Coalescer {
     const delta = vertical ? pending.deltaY : pending.deltaX;
     const basis = vertical ? pending.viewportH : pending.viewportW;
     const amount = basis ? Math.round(Math.abs(delta) / basis * 100) : 0;
-    if (amount < SCROLL_MIN_VIEWPORT_PERCENT) return;
-    const action = { type: 'scroll', definitionId: 'scroll-by', mode: 'relative', direction: vertical ? (delta > 0 ? 'down' : 'up') : (delta > 0 ? 'right' : 'left'), amount, unit: 'viewportPercent', durMs: this.defaults('scroll-by').durMs };
-    if (pending.selector) action.selector = pending.selector;
-    this.emit(ops, action, pending.firstAt, pending.lastAt);
+    const direction = vertical ? (delta > 0 ? 'down' : 'up') : (delta > 0 ? 'right' : 'left');
+    const span = pending.lastAt - pending.firstAt;
+    if (amount === 0) return; // genuinely no movement — nothing to emit, nothing to carry
+
+    if (amount >= SCROLL_MIN_VIEWPORT_PERCENT) {
+      /* A full-size burst ALWAYS appends its own action, even when it could patch onto the
+         previous scroll: two same-direction bursts separated by more than the burst gap are two
+         beats of the demo, and the pause between them is worth replaying as its own afterMs.
+         Only sub-threshold remainders (below) merge into what came before. */
+      const durMs = clamp(span, SCROLL_DUR_MIN_MS, SCROLL_DUR_MAX_MS);
+      const action = { type: 'scroll', definitionId: 'scroll-by', mode: 'relative', direction, amount, unit: 'viewportPercent', durMs };
+      if (pending.selector) action.selector = pending.selector;
+      this.emit(ops, action, pending.firstAt, pending.lastAt);
+      return;
+    }
+
+    const mergeable = this.lastScroll && this.lastEmitted?.type === 'scroll' && this.lastScroll.selector === (pending.selector ?? null) && this.lastScroll.direction === direction;
+    if (mergeable) {
+      /* This path deliberately never calls emit(): emittedCount stays put and no afterMs patch
+         is produced, because an intra-scroll gap must never be charged to the previous action. */
+      const amountPatch = this.lastScroll.amount + amount;
+      // durMs adds only this tail's own span, not the gap before it — durMs is an animation
+      // duration, not wall-clock, so the pause leading into the tail must not inflate it.
+      const durMsPatch = clamp(this.lastScroll.durMs + span, SCROLL_DUR_MIN_MS, SCROLL_DUR_MAX_MS);
+      ops.push({ op: 'patchLast', patch: { amount: amountPatch, durMs: durMsPatch } });
+      this.lastScroll.amount = amountPatch; this.lastScroll.durMs = durMsPatch;
+      /* Without this, the gap before this tail would later be charged as afterMs on the scroll
+         itself when the next action emits — exactly the "3s scroll replays as 8-10s" symptom. */
+      this.lastEmitted.at = pending.lastAt;
+      return;
+    }
+
+    /* Sub-threshold with nowhere to merge yet: park it. Five small flicks spread over several
+       seconds are each individually invisible, but dropping every one of them (the old
+       amount < MIN early-return) makes the whole scroll vanish — carry it forward instead. */
+    this.scrollCarry = { selector: pending.selector ?? null, deltaX: pending.deltaX, deltaY: pending.deltaY, viewportW: pending.viewportW, viewportH: pending.viewportH };
   }
 
   /* Idle gaps between interactions become afterMs on the PREVIOUS action, so replay keeps the
@@ -144,6 +233,8 @@ export class Coalescer {
     }
     ops.push({ op: 'append', action });
     this.lastEmitted = { type: action.type, selector: action.selector ?? null, at: lastAt };
+    // Self-clears on any non-scroll append, so a later patchLast can never hit the wrong row.
+    this.lastScroll = action.type === 'scroll' ? { selector: action.selector ?? null, direction: action.direction, amount: action.amount, durMs: action.durMs } : null;
     this.emittedCount += 1;
   }
 }
@@ -158,7 +249,12 @@ export class Recorder {
     this.onOp = onOp || (() => {}); this.onStop = onStop || (() => {});
     this.coalescer = new Coalescer({ definitionDefaults: (id) => core.getDefinition(id)?.defaults || {}, route });
     this.active = false; this.teardown = []; this.scrollTimer = null;
-    this.scrollPositions = new Map(); this.scrollSelectorCache = null;
+    // WeakMap over Map for both: a Map keyed by element leaks detached containers for the life
+    // of the session (removed panels, torn-down SPA routes, ...) since nothing ever deletes the
+    // entry; WeakMap lets them be collected once nothing else references them. `doc` is a valid
+    // WeakMap key too, so the root-scroll baseline gets the same treatment.
+    this.scrollPositions = new WeakMap();
+    this.scrollSelectorMemo = new WeakMap(); // element -> selector ('' caches an unselectable container)
     this.onFrameLoad = () => this.handleNavigation();
   }
 
@@ -201,7 +297,11 @@ export class Recorder {
     this.doc = doc;
   }
 
-  detach() { for (const fn of this.teardown.splice(0)) fn(); this.doc = null; this.scrollPositions.clear(); this.scrollSelectorCache = null; }
+  /* WeakMap has no .clear(), so a fresh page needs a fresh map — reassigning is also required
+     for correctness, not just cleanup: after a navigation the scroll baseline must be
+     re-established, or the first post-nav scroll event diffs against the OLD page's scrollTop
+     and produces a bogus delta. */
+  detach() { for (const fn of this.teardown.splice(0)) fn(); this.doc = null; this.scrollPositions = new WeakMap(); this.scrollSelectorMemo = new WeakMap(); }
 
   handleNavigation() {
     if (!this.active) return;
@@ -296,6 +396,9 @@ export class Recorder {
     this.apply(this.coalescer.push(record));
   }
 
+  /* No isTrusted guard here, unlike the other handlers above: element.scrollTo() dispatches
+     trusted scroll events too, so checking isTrusted would filter out nothing a programmatic
+     scroll couldn't already fake. */
   handleScroll(event) {
     if (!this.active) return;
     const doc = this.doc; const win = doc.defaultView;
@@ -311,12 +414,13 @@ export class Recorder {
     if (!previous) return; // first event of a container establishes the baseline
     let selector = null;
     if (el) {
-      if (this.scrollSelectorCache?.el !== el) this.scrollSelectorCache = { el, selector: this.core.selectorFor(el) };
-      selector = this.scrollSelectorCache.selector;
+      // Cache '' for an unselectable container too, so it isn't re-walked on every scroll event.
+      if (!this.scrollSelectorMemo.has(el)) this.scrollSelectorMemo.set(el, this.core.selectorFor(el) || '');
+      selector = this.scrollSelectorMemo.get(el) || null;
       if (!selector) return;
     }
     this.apply(this.coalescer.push({ kind: 'scroll', at: Date.now(), selector, deltaX: left - previous.left, deltaY: top - previous.top, viewportW: win.innerWidth, viewportH: win.innerHeight }));
     clearTimeout(this.scrollTimer);
-    this.scrollTimer = setTimeout(() => { if (this.active) this.apply(this.coalescer.flush()); }, SCROLL_SETTLE_MS);
+    this.scrollTimer = setTimeout(() => { if (this.active) this.apply(this.coalescer.flush()); }, SCROLL_FLUSH_MS);
   }
 }
