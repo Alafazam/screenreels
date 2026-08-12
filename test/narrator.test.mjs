@@ -158,6 +158,51 @@ test('cancel releases a pending settle instead of leaving the tour awaiting fore
   assert.equal(narrator.speaking(), false);
 });
 
+test('estimateMs treats empty and blank scripts as zero-length', () => {
+  const { narrator } = loadNarrator();
+  assert.equal(narrator.estimateMs(''), 0);
+  assert.equal(narrator.estimateMs('   '), 0);
+  assert.equal(narrator.estimateMs(null), 0);
+  assert.equal(narrator.estimateMs(undefined), 0);
+});
+
+test('estimateMs is proportional to the trimmed script length', () => {
+  const { narrator } = loadNarrator();
+  const short = narrator.estimateMs('hi');
+  const long = narrator.estimateMs('hi'.repeat(10));
+  assert.ok(long > short, 'a longer script should estimate longer');
+  assert.equal(long, short * 10);
+  assert.equal(narrator.estimateMs('  hi  '), narrator.estimateMs('hi'), 'surrounding whitespace is not spoken');
+});
+
+test('a slower configured rate roughly doubles the estimate, and an explicit rate overrides it', () => {
+  const { narrator } = loadNarrator();
+  const atDefault = narrator.estimateMs('A reasonably long sentence to narrate.');
+  narrator.configure({ rate: 0.49 }); // half the default rate: speaking twice as slowly
+  const atHalfRate = narrator.estimateMs('A reasonably long sentence to narrate.');
+  const ratio = atHalfRate / atDefault;
+  assert.ok(ratio > 1.9 && ratio < 2.1, `expected roughly 2x at half the rate, got ${ratio}`);
+  // An explicit rate argument wins over whatever configure() left in settings.
+  const overridden = narrator.estimateMs('A reasonably long sentence to narrate.', 0.98);
+  assert.equal(overridden, atDefault);
+});
+
+test('settleCapMs exposes the runtime\'s own settle ceiling for callers to reuse', () => {
+  const { narrator } = loadNarrator();
+  assert.equal(narrator.settleCapMs, 6000);
+});
+
+/* Regression: the watchdog used to size itself off the raw character count regardless of the
+   configured rate, so a slow rate made the watchdog fire before a real utterance could finish —
+   killing `current` and letting settle() return early mid-sentence. */
+test('a slow configured rate does not let the watchdog fire before speech would finish', async () => {
+  const { narrator } = loadNarrator({ autoStart: true, autoEnd: false });
+  narrator.configure({ rate: 0.1 }); // far slower than default, so the old fixed-rate watchdog would fire far too early
+  await narrator.speak('Short line.');
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(narrator.speaking(), true, 'the watchdog must not settle before the slow-rate estimate elapses');
+});
+
 test('no speech engine is reported as unavailable rather than throwing', async () => {
   const source = fs.readFileSync(path.join(root, 'packages/core/narrator.js'), 'utf8');
   const window = { document: { documentElement: {} }, setTimeout, clearTimeout };

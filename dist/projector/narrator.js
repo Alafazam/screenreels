@@ -60,8 +60,18 @@
     const finish = current.resolve; current = null; finish?.();
   }
 
+  /* Rough spoken length. MS_PER_CHAR was calibrated at DEFAULT_RATE, so scale by the configured
+     rate: at the default this is byte-identical to the old watchdog arithmetic. */
+  const speechMs = (text, rate) => {
+    const script = String(text ?? '').trim(); if (!script) return 0;
+    const r = Number(rate) > 0 ? Number(rate) : (Number(settings.rate) > 0 ? Number(settings.rate) : DEFAULT_RATE);
+    return Math.round(script.length * MS_PER_CHAR * (DEFAULT_RATE / r));
+  };
+
   root.__screenreelNarrator = {
     available,
+    estimateMs(text, rate) { return speechMs(text, rate); },
+    settleCapMs: SETTLE_CAP_MS,
     configure(options = {}) {
       settings = { ...settings, ...options };
       if (settings.rate == null) settings.rate = DEFAULT_RATE;
@@ -100,7 +110,7 @@
       utterance.addEventListener('error', settle, { once: true });
       // Chrome intermittently drops 'end' on long utterances; without this the tour would wait
       // out the full settle cap on every such scene.
-      entry.watchdog = setTimeout(settle, script.length * MS_PER_CHAR + WATCHDOG_SLACK_MS);
+      entry.watchdog = setTimeout(settle, speechMs(script) + WATCHDOG_SLACK_MS);
 
       synth.speak(utterance);
       const spoke = await started;
