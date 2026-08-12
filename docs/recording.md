@@ -11,7 +11,8 @@ Live demo: [Chapter 1 of the showcase](../examples/action-showcase/showcase-crea
 2. Click the **Studio** button in the pill.
 3. Open a flow, then open a scene (**Edit** on any row). You're now in the scene editor, with your
    app in the preview panel on the left.
-4. Press **● Record**. The banner reads
+4. Press **● Record**. The first time, a short primer lists exactly what gets captured — tick
+   *Don't show this again* once you know. Then the banner reads
    *"Recording — ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops"*.
 5. **Use your app in the preview.** Click, type, pick from selects, scroll.
 6. Press **Stop** (or `Esc`).
@@ -38,14 +39,24 @@ normal action afterwards — reorder it, edit its settings, delete it.
 The two "one" rows matter: a 20-character name is one readable `type` action, not twenty
 keystrokes, and a flick of the scroll wheel is one `scroll`, not forty.
 
-The two modifier rows are how you add *emphasis*. A demo usually needs to point at things it does not
-click — a KPI, a column, a badge — and adding those from the catalog means finding each element
-again. Hold ⌘ (or Ctrl) and click it instead: you get a `highlight` on exactly what you pointed at,
-your app never sees the click, and no `click` action is recorded alongside it.
+## Pointing at things: hold, then click
 
-**These two gestures work whenever the preview is loaded, not just while recording** — ⌘-click is
-the fastest way to grab any element, whether or not a take is running. On macOS Chrome, prefer ⌘;
-Ctrl+click is a right-click there.
+A demo usually needs to point at things it does not click — a KPI, a column, a badge — and adding
+those from the catalog means finding each element all over again.
+
+**Hold ⌘** (Ctrl on Windows) over the preview instead. A box follows your pointer showing exactly
+what will be captured: the selector it resolved to, and how many elements that selector matches. Then
+
+- **↑** widens the target to its container, **↓** narrows it back down,
+- **click** commits it — your app never sees that click, and no `click` action is recorded,
+- **Esc**, or letting go of the key, cancels.
+
+Hold **Alt** for a `spotlight` instead of a `highlight`. If the box says more than one match, widen
+or narrow until it says one: an ambiguous selector is a scene that will not save.
+
+**This works whenever the preview is loaded, not just while recording.** Mid-take the annotation
+joins the same coalesced sequence as everything else. On macOS Chrome, prefer ⌘; Ctrl+click is a
+right-click there.
 
 ## Things worth knowing
 

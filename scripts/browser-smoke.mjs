@@ -7,6 +7,20 @@ import { resolveChrome } from '../lib/config.mjs';
 const baseUrl = process.env.SCREENREEL_EXAMPLE_URL || 'http://127.0.0.1:4173/examples/action-showcase/';
 const output = path.resolve('./screenreel-output/browser-smoke'); fs.rmSync(output, { recursive: true, force: true }); fs.mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: resolveChrome(), args: ['--hide-scrollbars'] });
+/* Narration is on by default, so an unguarded run speaks every scene out loud through the machine's
+   real voice — intolerable on a developer's laptop and pointless in CI. This drives the same
+   start/end handshake the narrator listens for without handing the utterance to the engine, so
+   available() stays true (three assertions below depend on it) and nothing is ever audible. It runs
+   before any page script, so the narrator captures this speak() when it loads. */
+const silenceSpeech = (target) => target.addInitScript(() => {
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+  synth.speak = (utterance) => setTimeout(() => { utterance.dispatchEvent(new Event('start')); setTimeout(() => utterance.dispatchEvent(new Event('end')), 0); }, 0);
+});
+/* Wrapped once rather than at each of the eight call sites, so a page added later cannot forget. */
+const openPage = browser.newPage.bind(browser); const openContext = browser.newContext.bind(browser);
+browser.newPage = async (...args) => { const created = await openPage(...args); await silenceSpeech(created); return created; };
+browser.newContext = async (...args) => { const created = await openContext(...args); await silenceSpeech(created); return created; };
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 async function visiblePill(targetPage) {
   const pill = targetPage.locator('.sr-pill');
@@ -34,6 +48,7 @@ try {
   await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 9000 });
   // Narration is on by default, so the pill must offer a speaker and report itself unmuted. A
   // missing button means narrator.js did not load and the tour has silently gone quiet.
+  assert.equal(await page.locator('.sr-pill [data-cmd="capture"]').count(), 0);
   assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').count(), 1);
   assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').getAttribute('aria-pressed'), 'true');
   assert.equal(await page.evaluate(() => Boolean(window.__screenreelNarrator?.available())), true);
@@ -62,9 +77,32 @@ try {
   await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 26); assert.equal(await page.locator('[data-recipe]').count(), 6);
   await page.locator('[data-definition="highlight"]').click(); const preview = page.frameLocator('.sr-preview-frame'); const kpiValue = preview.locator('[data-kpi="revenue"] strong'); await kpiValue.click();
   const savedTarget = page.locator('.sr-action small').filter({ hasText: '[data-kpi="revenue"]' }); await savedTarget.waitFor(); assert.equal(await savedTarget.count(), 1);
+  // Holding a modifier must OUTLINE what will be captured and name its match count before any
+  // click — that preview is the whole feature, and its absence is what made ⌘-click land on the
+  // wrong element. Meta rather than Control: Ctrl+click is a contextmenu on macOS.
+  const stockKpi = preview.locator('[data-kpi="stock"] strong');
+  await stockKpi.hover();
+  await page.keyboard.down('Meta');
+  const outline = preview.locator('.sr-selector-outline');
+  await outline.waitFor({ state: 'visible' });
+  assert.match(await preview.locator('.sr-selector-label').innerText(), /\[data-kpi="stock"\][\s\S]*1 match/);
+  await stockKpi.click();
+  await page.keyboard.up('Meta');
+  await outline.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('.sr-action').count(), 12);
+  assert.equal(await page.locator('.sr-dirty').count(), 1); // appended incrementally, no re-render
+  // Voiceover is authored from the action's own row, and Studio writes the timing the line needs
+  // into the flow — a paced hold is what stops the next action's line from cutting this one off.
+  await page.locator('.sr-action').last().locator('[data-action-voice]').click();
+  await page.locator('[data-key="narration"]').fill('Weeks of stock is the one to watch.');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.locator('.sr-modal').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.sr-action').last().locator('.sr-action-voice').count(), 1);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal(await page.locator('.sr-dirty').count(), 0);
-  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 11))));
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 12))));
+  // The paced hold is the point of writing timing into the flow rather than waiting at play time.
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.some((action) => action.narration === 'Weeks of stock is the one to watch.' && action.pace?.field === 'holdMs' && action.holdMs > action.pace.addedMs)))));
   // Record-by-doing: trusted interactions inside the preview iframe become actions incrementally,
   // without a re-render (the checkbox click must NOT double-emit alongside its toggle). The form
   // is scrolled into view BEFORE recording starts: Playwright's own scroll-into-view during the
@@ -72,17 +110,33 @@ try {
   // action count depend on viewport layout instead of on the interactions under test.
   await preview.locator('#form').scrollIntoViewIfNeeded(); await page.waitForTimeout(500);
   const recordButton = page.locator('[data-record]'); await recordButton.click();
+  // Record explains itself before it starts. The voice toggle is deliberately inert, and ticking
+  // the skip box persists the preference the same way the mute does.
+  await page.locator('.sr-primer-list').waitFor();
+  assert.equal(await page.locator('[data-record-voice]').isDisabled(), true);
+  await page.locator('[data-record-skip]').check();
+  await page.locator('[data-record-start]').click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('screenreel:action-showcase:record-primer:v1')), '1');
   await page.locator('.sr-picker-banner').waitFor({ state: 'visible' });
   await preview.locator('#submit-control').click();
   await preview.locator('#customer-name').pressSequentially('Recorded Co', { delay: 40 });
   await preview.locator('#priority').check();
+  // The same gesture mid-take, on an element the take already clicked normally: the highlight is
+  // recorded and the click is swallowed, so the pair proves both commit paths stay distinguishable.
+  await preview.locator('#submit-control').hover();
+  await page.keyboard.down('Meta');
+  await preview.locator('#submit-control').click();
+  await page.keyboard.up('Meta');
   await recordButton.click();
   await page.locator('.sr-picker-banner').waitFor({ state: 'hidden' });
-  assert.equal(await page.locator('.sr-action').count(), 14);
+  assert.equal(await page.locator('.sr-action').count(), 16);
   assert.equal(await page.locator('.sr-action small').filter({ hasText: '#customer-name' }).count(), 1);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal(await page.locator('.sr-dirty').count(), 0);
-  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.length === 14 && scene.actions.some((action) => action.type === 'type' && action.text === 'Recorded Co')))));
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.length === 16 && scene.actions.some((action) => action.type === 'type' && action.text === 'Recorded Co')))));
+  // Recorded through the coalescer (which stamps the fingerprint), and the swallowed ⌘-click left
+  // exactly one real click on that button rather than a second one.
+  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.filter((action) => action.type === 'click' && action.selector === '#submit-control').length === 1 && scene.actions.some((action) => action.type === 'highlight' && action.selector === '#submit-control' && action.fingerprint)))));
   await page.getByRole('button', { name: 'Back to scenes', exact: true }).click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').filter({ hasText: 'Studio-authored highlight' }).count(), 1);
   await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-1440x900.png') });
@@ -101,8 +155,10 @@ try {
     const target = document.createElement('button'); target.id = 'strict-demo'; document.body.appendChild(target);
     const projector = await window.ScreenReel.mount(target, { projectId: 'strict-example', strict: true, loop: false, routesEqual: (current, scene) => current.includes('/inline-flow/') && scene === '/legacy.html', flow: { data: { schemaVersion: 1, flows: [{ id: 'strict', name: 'Strict', scenes: [{ id: 'missing', route: '/legacy.html', actions: [{ type: 'highlight', selector: '#does-not-exist' }] }] }] } } });
     const report = projector.validateScene(); projector.enable(); await projector.play(); const playing = projector.store.playing(); const matched = projector.routeMatches({ route: '/legacy.html' }); projector.destroy(); target.remove();
-    return { report, playing, matched };
+    return { report, playing, matched, capture: typeof projector.captureCurrent };
   });
+  // The pill no longer offers capture, but the method behind it is still part of the API.
+  assert.equal(contracts.capture, 'function');
   assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false);
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {

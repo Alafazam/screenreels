@@ -167,6 +167,27 @@
         "narration": {
           "type": "string"
         },
+        "pace": {
+          "type": "object",
+          "required": [
+            "field",
+            "addedMs"
+          ],
+          "properties": {
+            "field": {
+              "enum": [
+                "holdMs",
+                "ms",
+                "afterMs"
+              ]
+            },
+            "addedMs": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
         "fingerprint": {
           "type": "object",
           "properties": {

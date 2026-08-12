@@ -244,9 +244,13 @@ export class Coalescer {
    same-origin navigations via the frame's own load event (the frame element lives in the parent
    document, so that one listener survives). */
 export class Recorder {
-  constructor({ frame, core, banner, onOp, onStop, route }) {
+  constructor({ frame, core, banner, onOp, onStop, route, shouldStopOnEscape }) {
     this.frame = frame; this.core = core; this.banner = banner;
     this.onOp = onOp || (() => {}); this.onStop = onStop || (() => {});
+    /* Escape is shared with Studio's ⌘-hold gesture, whose listener sits on the same frame window in
+       capture phase — and their relative order is re-derived on every frame load. Asking the owner
+       is stable where listener order is not. */
+    this.shouldStopOnEscape = shouldStopOnEscape || (() => true);
     this.coalescer = new Coalescer({ definitionDefaults: (id) => core.getDefinition(id)?.defaults || {}, route });
     this.active = false; this.teardown = []; this.scrollTimer = null;
     // WeakMap over Map for both: a Map keyed by element leaks detached containers for the life
@@ -284,15 +288,19 @@ export class Recorder {
   attach(doc) {
     const win = doc.defaultView;
     const on = (target, type, handler, options) => { target.addEventListener(type, handler, options); this.teardown.push(() => target.removeEventListener(type, handler, options)); };
-    /* Registered on the frame window, before the document click listener, so a modifier-held
-       click is intercepted ahead of both the recorder's own click handler and the host page. */
-    on(win, 'click', (e) => this.handleModifierClick(e), true);
+    /* No modifier-click handler here: Studio's GestureHighlighter owns that gesture for the whole
+       editor view and commits through annotate() below, so one implementation serves a running take
+       and an idle preview alike. Its click listener sits on the frame WINDOW in capture phase while
+       handleClick sits on the frame DOCUMENT in capture, and window-capture structurally precedes
+       document-capture — so a swallowed ⌘-click can never also record a click, whatever order the
+       two were registered in. One limitation stands: a host listener already on window-capture
+       before Studio armed still runs first. */
     on(doc, 'click', (e) => this.handleClick(e), true);
     on(doc, 'change', (e) => this.handleChange(e), true);
     on(doc, 'submit', (e) => { if (e.isTrusted) this.apply(this.coalescer.push({ kind: 'submit', at: Date.now() })); }, true);
     on(doc, 'input', (e) => this.handleInput(e), { capture: true, passive: true });
     on(doc, 'scroll', (e) => this.handleScroll(e), { capture: true, passive: true });
-    on(win, 'keydown', (e) => { if (e.key === 'Escape') this.stop(); }, true);
+    on(win, 'keydown', (e) => { if (e.key === 'Escape' && this.shouldStopOnEscape()) this.stop(); }, true);
     on(win, 'hashchange', () => this.handleNavigation(), false);
     this.doc = doc;
   }
@@ -331,26 +339,12 @@ export class Recorder {
     return { selector: this.core.selectorFor(resolved), fingerprint: this.core.fingerprintFor(resolved) };
   }
 
-  /* Meta/Ctrl+click records a highlight, Alt+click a spotlight (meta/ctrl wins if both are held).
-     Both are visual-picker annotations rather than real clicks, so the click itself is swallowed:
-     preventDefault stops the host page from reacting, and stopImmediatePropagation keeps it from
-     ever reaching handleClick below (window capture runs before document capture). One
-     limitation: a host listener already registered on window-capture before recording started
-     would still fire ahead of this one. */
-  handleModifierClick(event) {
-    if (!event.isTrusted || !this.active) return;
-    const wantsHighlight = event.metaKey || event.ctrlKey;
-    const wantsSpotlight = event.altKey;
-    if (!wantsHighlight && !wantsSpotlight) return;
-    const target = event.target;
-    if (!target || this.isOverlayTarget(target)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const resolved = this.core.resolvePickerTarget(target, 'visual', this.doc) || target;
-    const selector = this.core.selectorFor(resolved);
-    if (!selector) return;
-    const fingerprint = this.core.fingerprintFor(resolved);
-    const annotation = wantsHighlight ? 'highlight' : 'spotlight';
+  /* A highlight/spotlight added by Studio's ⌘-hold gesture during a take. It goes through the
+     coalescer rather than straight to the timeline so the take stays ONE sequence: the idle gap
+     before it still lands as afterMs on the previous action, and a typing burst still finalizes
+     ahead of it. Ignored when no take is running — Studio appends directly in that case. */
+  annotate({ annotation, selector, fingerprint }) {
+    if (!this.active) return;
     this.apply(this.coalescer.push({ kind: 'annotate', annotation, at: Date.now(), selector, fingerprint }));
   }
 

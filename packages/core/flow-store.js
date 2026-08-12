@@ -122,6 +122,11 @@
        Stored rather than in-memory so silencing it survives the flow's own hard navigations. */
     muted() { return this.storage.getItem(this.key('narration-muted')) === '1'; }
     setMuted(value) { value ? this.storage.setItem(this.key('narration-muted'), '1') : this.storage.removeItem(this.key('narration-muted')); }
+    /* The Record primer is a first-run explainer, so the persisted key records that it HAS been
+       seen — absent means "show it". Same key() prefix as everything else, so "Clear local data"
+       brings the explanation back along with the rest of a fresh start. */
+    recordPrimerSeen() { return this.storage.getItem(this.key('record-primer')) === '1'; }
+    setRecordPrimerSeen(value) { value ? this.storage.setItem(this.key('record-primer'), '1') : this.storage.removeItem(this.key('record-primer')); }
     enabled() { return this.storage.getItem(this.key('enabled')) === '1'; }
     setEnabled(value) { value ? this.storage.setItem(this.key('enabled'), '1') : this.storage.removeItem(this.key('enabled')); }
     position() { return Math.max(0, Number(this.session.getItem(this.sessionKey('position'))) || 0); }

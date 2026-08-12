@@ -106,9 +106,19 @@ highlight, click, or scroll they describe instead of arriving as one paragraph u
 
 Live, each line *replaces* whatever is still speaking: a queue would drift behind the picture, and
 the point is that the words match what is on screen. In a captured video there is no per-action audio
-timeline, so the lines are joined onto the scene's line and spoken over the clip. Studio shows a
-speaker badge on narrated actions in the timeline, and the scene Settings modal can preview a scene's
-line through the same engine a viewer hears. Variables are interpolated in action lines too.
+timeline, so the lines are joined onto the scene's line and spoken over the clip. Variables are
+interpolated in action lines too.
+
+In Studio, every action row carries a **speaker button** that opens just that line — tinted when a
+line exists, so the timeline shows at a glance which actions speak. Both that modal and the scene's
+**Voice** button preview through the same engine a viewer hears.
+
+Writing a line also **fits the action around it**: Studio lengthens that action's own duration (its
+`holdMs`, or `ms`, or failing those the delay after it) so the sentence finishes before the next
+action starts, and records what it added so shortening the line gives your own number back. Type a
+duration yourself and that number becomes the new baseline — a hold you set deliberately is never
+clawed back. A line too long for any single action to hold says so instead, and wants splitting in
+two.
 
 ## Choosing a voice engine
 
