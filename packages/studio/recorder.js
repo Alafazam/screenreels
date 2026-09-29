@@ -26,6 +26,9 @@ export const CHAR_MS_MIN = 20;                // clamp measured typing speed to 
 export const CHAR_MS_MAX = 200;
 export const NAV_ATTRIBUTION_MS = 1500;       // a navigation this soon after a click IS that click
 export const CHANGE_CLICK_MERGE_MS = 120;     // change this soon after a same-target click replaces it
+export const DRAG_MIN_DISTANCE_PX = 12;        // pointer jitter and ordinary clicks stay clicks
+export const DRAG_DUR_MIN_MS = 100;
+export const DRAG_DUR_MAX_MS = 10000;
 // The smallest scroll worth its OWN action; smaller remainders merge into the scroll they continue.
 export const SCROLL_MIN_VIEWPORT_PERCENT = 2;
 export const SENSITIVE_INPUT_TYPES = ['password'];
@@ -86,6 +89,12 @@ export class Coalescer {
       /* highlight/spotlight definitionIds share their type string in the registry (see
          packages/core/action-runtime.js definitions), so record.annotation doubles as both. */
       this.emit(ops, { type: record.annotation, definitionId: record.annotation, selector: record.selector, ...this.defaults(record.annotation) }, record.at, record.at, record.fingerprint);
+    } else if (record.kind === 'drag') {
+      this.finalizeType(ops);
+      const action = { type: 'drag', definitionId: 'drag', selector: record.selector, durMs: clamp(record.durationMs, DRAG_DUR_MIN_MS, DRAG_DUR_MAX_MS) };
+      if (record.toSelector && record.toSelector !== record.selector) action.toSelector = record.toSelector;
+      else { action.dx = Math.round(record.dx); action.dy = Math.round(record.dy); }
+      this.emit(ops, action, record.firstAt, record.at, record.fingerprint);
     } else if (record.kind === 'change') {
       const action = this.changeAction(record);
       if (record.control === 'text') { if (this.pendingType?.selector === record.selector) this.finalizeType(ops); return ops; }
@@ -251,8 +260,9 @@ export class Recorder {
        capture phase — and their relative order is re-derived on every frame load. Asking the owner
        is stable where listener order is not. */
     this.shouldStopOnEscape = shouldStopOnEscape || (() => true);
-    this.coalescer = new Coalescer({ definitionDefaults: (id) => core.getDefinition(id)?.defaults || {}, route });
-    this.active = false; this.teardown = []; this.scrollTimer = null;
+    this.definitionDefaults = (id) => core.getDefinition(id)?.defaults || {};
+    this.coalescer = new Coalescer({ definitionDefaults: this.definitionDefaults, route });
+    this.active = false; this.teardown = []; this.scrollTimer = null; this.pendingPointer = null; this.ignoreClickUntil = 0;
     // WeakMap over Map for both: a Map keyed by element leaks detached containers for the life
     // of the session (removed panels, torn-down SPA routes, ...) since nothing ever deletes the
     // entry; WeakMap lets them be collected once nothing else references them. `doc` is a valid
@@ -283,6 +293,17 @@ export class Recorder {
     this.onStop(reason);
   }
 
+  /* Undo is a recording boundary, not just an array pop. Flush first so an open typing or scroll
+     burst is the thing the author just saw and expects to remove, then reset coalescing history so
+     the next interaction cannot patch timing onto an action that no longer exists. */
+  undo() {
+    if (!this.active) return;
+    clearTimeout(this.scrollTimer);
+    this.apply(this.coalescer.flush());
+    this.onOp({ op: 'removeLast' });
+    this.coalescer = new Coalescer({ definitionDefaults: this.definitionDefaults, route: this.coalescer.route });
+  }
+
   apply(ops) { for (const op of ops) this.onOp(op); }
 
   attach(doc) {
@@ -296,12 +317,21 @@ export class Recorder {
        two were registered in. One limitation stands: a host listener already on window-capture
        before Studio armed still runs first. */
     on(doc, 'click', (e) => this.handleClick(e), true);
+    on(doc, 'pointerdown', (e) => this.handlePointerDown(e), { capture: true, passive: true });
+    on(doc, 'pointerup', (e) => this.handlePointerUp(e), { capture: true, passive: true });
+    on(doc, 'pointercancel', () => { this.pendingPointer = null; }, { capture: true, passive: true });
     on(doc, 'change', (e) => this.handleChange(e), true);
     on(doc, 'submit', (e) => { if (e.isTrusted) this.apply(this.coalescer.push({ kind: 'submit', at: Date.now() })); }, true);
     on(doc, 'input', (e) => this.handleInput(e), { capture: true, passive: true });
     on(doc, 'scroll', (e) => this.handleScroll(e), { capture: true, passive: true });
     on(win, 'keydown', (e) => { if (e.key === 'Escape' && this.shouldStopOnEscape()) this.stop(); }, true);
     on(win, 'hashchange', () => this.handleNavigation(), false);
+    on(win, 'popstate', () => this.handleNavigation(), false);
+    for (const method of ['pushState', 'replaceState']) {
+      const original = win.history[method];
+      win.history[method] = (...args) => { const result = original.apply(win.history, args); queueMicrotask(() => this.handleNavigation()); return result; };
+      this.teardown.push(() => { win.history[method] = original; });
+    }
     this.doc = doc;
   }
 
@@ -350,6 +380,7 @@ export class Recorder {
 
   handleClick(event) {
     if (!event.isTrusted || !this.active) return;
+    if (Date.now() <= this.ignoreClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); return; }
     const target = event.target;
     if (!target || this.isOverlayTarget(target)) return;
     /* Controls that speak through input/change events must not double-emit via their click. */
@@ -361,6 +392,23 @@ export class Recorder {
     const { selector, fingerprint } = this.targetOf(target);
     if (!selector) return;
     this.apply(this.coalescer.push({ kind: 'click', at: Date.now(), selector, fingerprint }));
+  }
+
+  handlePointerDown(event) {
+    if (!event.isTrusted || !this.active || event.button !== 0 || this.isOverlayTarget(event.target)) return;
+    const { selector, fingerprint } = this.targetOf(event.target); if (!selector) return;
+    this.pendingPointer = { pointerId: event.pointerId, selector, fingerprint, x: event.clientX, y: event.clientY, at: Date.now() };
+  }
+
+  handlePointerUp(event) {
+    const start = this.pendingPointer; this.pendingPointer = null;
+    if (!event.isTrusted || !this.active || !start || start.pointerId !== event.pointerId) return;
+    const dx = event.clientX - start.x; const dy = event.clientY - start.y;
+    if (Math.hypot(dx, dy) < DRAG_MIN_DISTANCE_PX) return;
+    const destination = this.core.resolvePickerTarget(event.target, 'visual', this.doc) || event.target;
+    const toSelector = this.core.selectorFor(destination) || null; const at = Date.now();
+    this.ignoreClickUntil = at + CHANGE_CLICK_MERGE_MS;
+    this.apply(this.coalescer.push({ kind: 'drag', firstAt: start.at, at, selector: start.selector, fingerprint: start.fingerprint, toSelector, dx, dy, durationMs: at - start.at }));
   }
 
   handleInput(event) {

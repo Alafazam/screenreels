@@ -50,7 +50,7 @@ because it never waits for a click.
 
 ## Validation catches dead branches
 
-Every target is checked against the flow's scenes, on **Save** in Studio and in
+Every target is checked against the flow's scenes, on **Finish scene** in Studio and in
 `screenreel flow validate`:
 
 ```
@@ -95,7 +95,7 @@ Add action → **Viewer choice** (Navigation). `options` is a JSON field in v1:
 [{ "label": "Reporting", "scene": "tour-kpis" }, { "label": "Setup", "scene": "tour-controls" }]
 ```
 
-Scene ids are on the scene list. Save validates the whole graph, so a typo is caught immediately.
+Scene ids are on the scene list. Finish scene validates the whole graph, so a typo is caught immediately.
 
 **Duplicating a flow remaps branches automatically** — scene ids are regenerated on copy, and choice
 targets follow. Your duplicate's branches point at the duplicate's scenes, not the original's.

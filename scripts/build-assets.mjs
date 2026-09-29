@@ -31,10 +31,10 @@ const ogHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
   .foot .tags span{color:#d4d4d8;margin:0 10px}
 </style></head><body>
   <div class="brand">${MARK}<b>ScreenReel</b></div>
-  <div><div class="eyebrow">Open-source product demo toolkit</div>
-    <h1>One flow for live demos and polished video.</h1></div>
+  <div><div class="eyebrow">Open-source product demo recorder</div>
+    <h1>A demo recorder that ships with your product.</h1></div>
   <div class="foot"><span class="url">alafazam.com/screenreels</span>
-    <span class="tags">Projector<span>·</span>Studio<span>·</span>Capture</span></div>
+    <span class="tags">Live<span>·</span>Link<span>·</span>Video</span></div>
 </body></html>`;
 
 const iconHtml = `<!doctype html><html><head><meta charset="utf-8"><style>

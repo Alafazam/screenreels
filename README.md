@@ -1,8 +1,8 @@
 # ScreenReel
 
-Author one scripted product journey, present it live inside the product, and capture the same flow as polished video.
+ScreenReel is an open-source product demo recorder. Use your app normally, keep the resulting walkthrough as a readable flow in the repository, then replay it live inside the product, share it as a self-playing link, or render it as video.
 
-**Live demo: [alafazam.com/screenreels](https://alafazam.com/screenreels/)** — the guided tour plays automatically when you press *Open live demo*. Deployed from `main` by `.github/workflows/pages.yml`; the published artifact is built by `npm run build:pages`.
+**Live demo: [alafazam.com/screenreels](https://alafazam.com/screenreels/)** — press *Run the live demo* to play the six-scene ScreenReel dogfood flow. Use `?variant=repo-native` or `?variant=product-in-product` to preview either landing-page position without changing the stored experiment assignment. Deployed from `main` by `.github/workflows/pages.yml`; the published artifact is built by `pnpm build:pages`.
 
 ScreenReel contains two independent products backed by one action runtime:
 
@@ -16,7 +16,7 @@ No backend, account, analytics service, or model provider is required.
 Build and copy the browser distribution into your application:
 
 ```bash
-npm run build
+pnpm build
 node bin/screenreel.mjs projector install --out /path/to/app/public/vendor/screenreel
 ```
 
@@ -44,11 +44,13 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
   timeScale: 1,     // pacing multiplier for every delay in the runtime
   cursor: 'dot',    // 'dot', 'arrow', or false to hide the agent cursor
   narration: true,  // speak each scene's talking points aloud; false to disable
+  advance: 'auto',  // 'guided' waits for Next after each scene instead of the dwell timer
+  dim: 0.45,        // background dimming behind highlights and callouts; false to disable
   pages: ['/dashboard', '/reports']  // optional: routes Studio offers when picking a scene's route
 });
 ```
 
-Projector provides flow selection, play/pause, previous/next, presenter notes, Capture Current Page, Studio, and Exit. Studio is a lazy-loaded full-screen overlay; personal flows stay in project-scoped local storage.
+Projector keeps the presenter toolbar focused on flow selection, progress, previous/play/next, narration, notes, and exit. Studio remains available as a separated authoring utility rather than a highlighted playback control. Studio is a lazy-loaded full-screen overlay; personal flows stay in project-scoped local storage.
 
 ## Guides
 
@@ -63,6 +65,7 @@ Task-oriented walkthroughs for each capability live in **[docs/](docs/README.md)
 | [Sharing and analytics](docs/sharing-and-analytics.md) | Hand over a self-playing link and see what viewers did |
 | [Branching with choices](docs/branching.md) | Let the viewer pick what they see |
 | [Pacing and the cursor](docs/pacing-and-cursor.md) | Make it calmer; change or hide the pointer |
+| [Landing demo recording worksheet](docs/landing-demo-recording-worksheet.md) | Record the deterministic six-scene marketing demo and log dogfooding findings |
 
 The sections below are the reference: formats, options, and CLI surface.
 
@@ -71,6 +74,8 @@ The sections below are the reference: formats, options, and CLI surface.
 Projector and Capture share one pointer implementation, so a live tour and a recorded video show the same cursor: it travels to each interaction target, emits rings on arrival, dips on click, and drifts while the page scrolls. `cursor: 'dot'` (default), `'arrow'`, or `false`. `prefers-reduced-motion: reduce` disables the motion.
 
 `timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and internal constants (countdown steps, flash pulses, reveal fades) that manifest rewriting cannot reach. Timeouts and scroll-settle limits are excluded: those are limits, not pacing. Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, `settleMs` to `flow.defaults.settleMs`.
+
+`advance: 'guided'` turns the tour into a click-through: each finished scene waits for Next instead of its `dwellMs`. Flows can default it with `defaults.advance`; the mount option wins. The `<screenreel-projector>` element accepts `advance="guided"`.
 
 See [Pacing and the cursor](docs/pacing-and-cursor.md).
 
@@ -241,8 +246,8 @@ Capture uses local Chrome or `CHROME_PATH`. FFmpeg and ffprobe ship with the sou
 ## Examples
 
 ```bash
-npm run build
-npm run example:serve
+pnpm build
+pnpm example:serve
 ```
 
 Open `http://127.0.0.1:4173/examples/action-showcase/`. The same page is deployed at [alafazam.com/screenreels](https://alafazam.com/screenreels/).
@@ -254,9 +259,9 @@ Open `http://127.0.0.1:4173/examples/action-showcase/`. The same page is deploye
 With the example server running:
 
 ```bash
-npm run example:validate
-npm run example:test
-npm run example:capture
+pnpm example:validate
+pnpm example:test
+pnpm example:capture
 ```
 
 ## Skills and AI enablement
@@ -276,10 +281,10 @@ Navigation is same-origin by default. Page-function actions accept a named globa
 ## Development
 
 ```bash
-npm run build
-npm test
-npm run build:pages    # required before test:browser — it covers the deployed artifact
-npm run test:browser
+pnpm build
+pnpm test
+pnpm build:pages    # required before test:browser — it covers the deployed artifact
+pnpm test:browser
 ```
 
 The build generates browser assets, JSON Schema, TypeScript declarations, and skill action references from the shared action registry. See `docs-architecture.md`, `CONTRIBUTING.md`, and `SECURITY.md`.

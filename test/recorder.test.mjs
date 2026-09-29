@@ -12,6 +12,9 @@ import {
   CHAR_MS_MAX,
   NAV_ATTRIBUTION_MS,
   CHANGE_CLICK_MERGE_MS,
+  DRAG_MIN_DISTANCE_PX,
+  DRAG_DUR_MIN_MS,
+  DRAG_DUR_MAX_MS,
   SCROLL_MIN_VIEWPORT_PERCENT,
 } from '../packages/studio/recorder.js';
 
@@ -34,6 +37,7 @@ test('recorder constants are self-consistent', () => {
   // never be one save() would reject.
   assert(SCROLL_DUR_MIN_MS >= 100 && SCROLL_DUR_MAX_MS <= 10000);
   assert(NAV_ATTRIBUTION_MS > 0 && CHANGE_CLICK_MERGE_MS > 0 && SCROLL_MIN_VIEWPORT_PERCENT > 0);
+  assert(DRAG_MIN_DISTANCE_PX > 0 && DRAG_DUR_MIN_MS >= 100 && DRAG_DUR_MAX_MS <= 10000);
 });
 
 test('a keystroke burst coalesces into one type action with median charMs', () => {
@@ -337,4 +341,14 @@ test('an idle gap before an annotate patches afterMs onto the previous action', 
   assert.deepEqual(ops.map((op) => op.op), ['append', 'patchLast', 'append']);
   assert.equal(ops[1].patch.afterMs, 1200);
   assert.equal(ops[2].action.type, 'spotlight');
+});
+
+test('a drag records a destination selector and measured duration', () => {
+  const action = appended(make().push({ kind: 'drag', firstAt: 100, at: 850, selector: '#card', toSelector: '#lane-two', dx: 340, dy: 8, durationMs: 750, fingerprint: { text: 'Card', tag: 'div', role: '' } }))[0];
+  assert.deepEqual(action, { type: 'drag', definitionId: 'drag', selector: '#card', toSelector: '#lane-two', durMs: 750, fingerprint: { text: 'Card', tag: 'div', role: '' } });
+});
+
+test('a drag without a distinct destination stores a replayable distance and clamps duration', () => {
+  const action = appended(make().push({ kind: 'drag', firstAt: 0, at: 30, selector: '#slider', toSelector: '#slider', dx: 42.4, dy: -3.6, durationMs: 30 }))[0];
+  assert.deepEqual(action, { type: 'drag', definitionId: 'drag', selector: '#slider', dx: 42, dy: -4, durMs: DRAG_DUR_MIN_MS });
 });

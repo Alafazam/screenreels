@@ -6,6 +6,10 @@ const functions = new Map();
 const TOAST_MS = 2600;
 const PILL_INTRO_MS = 1100;
 const VARIABLE_PARAM_PREFIX = 'srv_';
+/* 'auto' advances after each scene's dwell; 'guided' holds on the finished scene until the
+   viewer presses Next. */
+const ADVANCE_MODES = ['auto', 'guided'];
+const DEFAULT_ADVANCE_MODE = 'auto';
 let publicApi;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const event = (name, detail) => window.dispatchEvent(new CustomEvent(`screenreel:${name}`, { detail }));
@@ -23,6 +27,14 @@ class Projector {
     this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, timeScale: 1, cursor: 'dot', narration: true, ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
+  }
+  /* Mount option wins over the flow's `defaults.advance`, so one flow can run guided inside the
+     product and auto on a share link. An unknown value warns and falls back to auto. */
+  advanceMode() {
+    const mode = this.options.advance ?? this.store.activeFlow()?.defaults?.advance ?? DEFAULT_ADVANCE_MODE;
+    if (ADVANCE_MODES.includes(mode)) return mode;
+    console.warn(`[screenreel] Unknown advance mode "${mode}"; expected ${ADVANCE_MODES.join(' or ')}`);
+    return DEFAULT_ADVANCE_MODE;
   }
   assetUrl(name) { const url = new URL(name, this.assetBase); if (this.assetVersion) url.search = this.assetVersion; return url.href; }
   /* Shared agent cursor, configured to this projector's glyph. Null when the host opted out. */
@@ -104,13 +116,14 @@ class Projector {
     const playButton = `<button data-cmd="play" class="sr-play" title="${this.store.playing() ? 'Pause' : 'Play'}">${icon(this.store.playing() ? 'pause' : 'play')}</button>`;
     // Narration control rides in both chromes: a viewer on a share link needs it most, and a
     // presenter talking over the demo needs to silence it fast. Hidden when there is no engine.
+    const nextButton = `<button data-cmd="next" class="${this.awaitingNext ? 'sr-await-next' : ''}" title="Next scene">${icon('right')}</button>`;
     const muted = this.store.muted();
     const soundButton = this.options.narration === false || !window.__screenreelNarrator?.available()
       ? ''
       : `<button data-cmd="sound" class="${muted ? '' : 'active'}${this.narrationBlocked ? ' sr-needs-sound' : ''}" title="${muted ? 'Turn on narration' : 'Mute narration'}" aria-pressed="${String(!muted)}">${icon(muted ? 'mute' : 'sound')}</button>`;
     this.pill.innerHTML = share
-      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${playButton}${soundButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
-      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button>${playButton}<button data-cmd="next" title="Next scene">${icon('right')}</button>${soundButton}<button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><button data-cmd="studio" class="sr-pill-studio" title="Open ScreenReel Studio — edit this demo">${icon('pencil')} Studio</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
+      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${playButton}${this.advanceMode() === 'guided' ? nextButton : ''}${soundButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
+      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button>${playButton}${nextButton}${soundButton}<button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><span class="sr-pill-separator" aria-hidden="true"></span><button data-cmd="studio" class="sr-pill-studio" title="Open Studio" aria-label="Open Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
     const flowSelect = this.pill.querySelector('.sr-flow'); if (flowSelect) flowSelect.onchange = (e) => { this.pause(); this.store.setActive(e.target.value); this.store.setPosition(0); this.render(); };
     this.pill.querySelectorAll('[data-cmd]').forEach((button) => { button.onclick = () => this.command(button.dataset.cmd); });
     this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(share ? null : scene);
@@ -126,7 +139,9 @@ class Projector {
     if (!visible && this.originalPadding != null) { document.body.style.paddingBottom = this.originalPadding; this.originalPadding = null; }
   }
   command(command) {
-    if (command === 'prev') this.previous(); else if (command === 'next') this.next(); else if (command === 'play') this.store.playing() ? this.pause() : this.play();
+    // A guided tour waiting on its finished scene continues exactly as an auto advance would,
+    // so Next on the last scene of a non-looping flow completes it instead of wrapping.
+    if (command === 'prev') this.previous(); else if (command === 'next') this.awaitingNext ? this.next(true) : this.next(); else if (command === 'play') this.store.playing() ? this.pause() : this.play();
     else if (command === 'notes') { this.store.setNotesVisible(!this.store.notesVisible()); this.render(); }
     /* Unmuting is itself the user gesture the autoplay policy wants, so speak the current scene
        immediately — otherwise the viewer waits until the next scene to hear anything. */
@@ -145,7 +160,7 @@ class Projector {
      the emphasis it is narrating (the main reason the tour read as rushed). */
   toast(message) { if (!this.toastNode) return; this.toastNode.textContent = message; this.toastNode.hidden = false; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => { this.toastNode.hidden = true; }, TOAST_MS * (Number(this.options.timeScale) || 1)); }
   enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); this.cursor()?.show(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
-  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
+  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
   current() { const scenes = this.store.enabledScenes(); return { scenes, position: Math.min(this.store.position(), Math.max(0, scenes.length - 1)), scene: scenes[Math.min(this.store.position(), Math.max(0, scenes.length - 1))] }; }
   routeMatches(scene) {
     const currentRoute = this.router.getRoute();
@@ -184,7 +199,7 @@ class Projector {
     event('validation', { projectId: this.store.projectId, report }); this.toast(actionIndex < 0 ? 'Scene readiness failed' : `Scene stopped at action ${actionIndex + 1}`); this.pause(); return report;
   }
   async play() {
-    const { scene } = this.current(); if (!scene) return; const generation = ++this.playGeneration; clearTimeout(this.timer); this.timer = null; this.store.setPlaying(true); this.render();
+    const { scene } = this.current(); if (!scene) return; const generation = ++this.playGeneration; clearTimeout(this.timer); this.timer = null; this.awaitingNext = false; this.store.setPlaying(true); this.render();
     if (!this.routeMatches(scene)) {
       const sameDocument = await this.navigate(scene.route);
       if (sameDocument && generation === this.playGeneration && this.store.playing() && this.routeMatches(scene)) return this.play();
@@ -234,6 +249,7 @@ class Projector {
           if (position >= scenes.length - 1 && this.options.loop === false) this.complete(); else this.advancePosition();
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
+        dim: this.options.dim,
         announce: (message) => this.toast(message),
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
@@ -261,24 +277,28 @@ class Projector {
        never stall the tour. Scenes with no narration are unaffected. */
     await this.narrator()?.settle(Number(scene.narrationCapMs) || undefined);
     if (generation !== this.playGeneration || !this.store.playing()) return;
-    this.analytics.emit('scene_complete'); const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
+    this.analytics.emit('scene_complete');
+    if (this.advanceMode() === 'guided') { this.awaitingNext = true; this.render(); event('awaitingnext', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id }); return; }
+    const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
   /* Introduce the control pill before the first action runs, so the viewer sees which flow is
      about to play and where the controls are. Resolves when the beat is over. */
   async introducePill() {
-    if (!this.pill || this.pill.dataset.intro === 'done') return;
+    const pill = this.pill;
+    if (!pill || pill.dataset.intro === 'done') return;
     const beat = PILL_INTRO_MS * (Number(this.options.timeScale) || 1);
-    this.pill.style.setProperty('--sr-pill-intro', `${beat}ms`);
-    this.pill.dataset.intro = 'true';
+    pill.style.setProperty('--sr-pill-intro', `${beat}ms`);
+    pill.dataset.intro = 'true';
     await window.ScreenReelCore.sleep(PILL_INTRO_MS, this.controller?.signal);
-    this.pill.dataset.intro = 'done';
+    // Held by reference: disable() (or opening Studio) during the beat drops this.pill to null.
+    pill.dataset.intro = 'done';
   }
-  pause() { this.playGeneration++; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
+  pause() { this.playGeneration++; this.awaitingNext = false; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
     const current = this.current(); if (autoPlay && this.options.loop === false && current.position >= current.scenes.length - 1) return this.complete();
     const shouldPlay = autoPlay || this.store.playing(); const scene = this.advancePosition(); if (!scene) return;
-    const generation = ++this.playGeneration; this.controller?.abort(); clearTimeout(this.timer); this.timer = null;
+    const generation = ++this.playGeneration; this.awaitingNext = false; this.controller?.abort(); clearTimeout(this.timer); this.timer = null;
     if (!this.routeMatches(scene)) {
       const sameDocument = await this.navigate(scene.route);
       if (sameDocument && generation === this.playGeneration && shouldPlay && this.store.playing() && this.routeMatches(scene)) return this.play();
@@ -310,7 +330,7 @@ export function createPublicApi(assetBase, assetVersion = '') {
       if (this.instance) return; const shadow = this.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; const styleUrl = new URL('screenreel.css', assetBase); if (assetVersion) styleUrl.search = assetVersion; link.href = styleUrl.href; shadow.appendChild(link);
       const button = document.createElement('button'); button.className = 'sr-trigger'; button.title = 'Toggle ScreenReel demo'; button.setAttribute('aria-label', 'Toggle ScreenReel demo'); button.innerHTML = icon('presentation', 18); shadow.appendChild(button);
       let data; const inlineId = this.getAttribute('flow-data'); if (inlineId) { const node = document.getElementById(inlineId); if (node) data = JSON.parse(node.textContent); }
-      this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict') });
+      this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict'), ...(this.hasAttribute('advance') ? { advance: this.getAttribute('advance') } : {}) });
     }
     disconnectedCallback() { this.instance?.destroy(); this.instance = null; }
   }

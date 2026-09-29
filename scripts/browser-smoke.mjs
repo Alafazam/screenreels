@@ -22,6 +22,7 @@ const openPage = browser.newPage.bind(browser); const openContext = browser.newC
 browser.newPage = async (...args) => { const created = await openPage(...args); await silenceSpeech(created); return created; };
 browser.newContext = async (...args) => { const created = await openContext(...args); await silenceSpeech(created); return created; };
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const pageErrors = [];
 async function visiblePill(targetPage) {
   const pill = targetPage.locator('.sr-pill');
   await pill.waitFor();
@@ -31,16 +32,51 @@ async function visiblePill(targetPage) {
 }
 try {
   page.on('console', (message) => { if (message.type() === 'error') console.error('[browser]', message.text()); });
-  page.on('pageerror', (error) => console.error('[pageerror]', error.message));
+  page.on('pageerror', (error) => { pageErrors.push(error.message); console.error('[pageerror]', error.message); });
   page.on('response', (response) => { if (response.status() >= 400) console.error('[response]', response.status(), response.url()); });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }); await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
-  assert.equal(await page.locator('h1').innerText(), 'Record it once.\nIt repairs itself.');
-  // Clicking "Open live demo" plays the default guided tour (with a countdown as its first action).
+  assert.equal(await page.locator('[data-variant-panel="repo-native"] h1').innerText(), 'A demo recorder\nthat ships with\nyour product.');
+  assert.equal(await page.locator('[data-variant-panel="repo-native"]').isVisible(), true);
+  assert.equal(await page.locator('[data-variant-panel="product-in-product"]').isVisible(), false);
+  await page.goto(`${baseUrl}?variant=product-in-product`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
+  assert.equal(await page.locator('[data-variant-panel="product-in-product"] h1').innerText(), 'Record product demos\nthat live inside your\nproduct.');
+  assert.equal(await page.evaluate(() => localStorage.getItem('screenreel:landing-hero:v1')), null);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true);
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true');
+  const productConversion = await page.evaluate(() => new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(null), 1000);
+    addEventListener('screenreel:landing-conversion', (event) => { clearTimeout(timeout); resolve(event.detail); }, { once: true });
+    document.querySelector('#demo-button').click();
+  }));
+  await visiblePill(page);
+  const productValidation = await page.evaluate(() => window.ScreenReel.validateScene());
+  assert.equal(productValidation.ok, true); assert.equal(productValidation.sceneId, 'open-source-hook');
+  assert.deepEqual(productConversion, { event: 'live_demo_start', variant: 'product-in-product' });
+  await page.locator('#demo-button').click();
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.getAttribute('aria-pressed') === 'false');
+  await page.goto(`${baseUrl}?variant=product-in-product`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileOverflow = await page.evaluate(() => ({ root: [document.documentElement.clientWidth, document.documentElement.scrollWidth], nodes: [...document.querySelectorAll('body *')].filter((element) => element.getBoundingClientRect().right > document.documentElement.clientWidth + 1 || element.getBoundingClientRect().left < -1 || element.scrollWidth > element.clientWidth + 1).slice(0, 12).map((element) => ({ tag: element.tagName, className: element.className, left: Math.round(element.getBoundingClientRect().left), right: Math.round(element.getBoundingClientRect().right), clientWidth: element.clientWidth, scrollWidth: element.scrollWidth })) }));
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, JSON.stringify(mobileOverflow));
+  await page.screenshot({ path: path.join(output, 'landing-product-mobile-390x844.png'), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${baseUrl}?variant=repo-native&screenreelPreview=1`, { waitUntil: 'domcontentloaded' });
+  assert.equal(await page.locator('#demo-button').count(), 0, 'Studio previews must not mount a nested ScreenReel projector');
+  await page.getByRole('button', { name: 'Run the live demo' }).click(); // one CTA per variant panel; only repo-native is visible
+  assert.equal(await page.locator('.sr-pill').count(), 0, 'the landing CTA must remain inert while it is a recording target');
+  await page.goto(`${baseUrl}?variant=repo-native`, { waitUntil: 'domcontentloaded' });
+  // The tour's final scene highlights this group; a full-width box put the ring around empty space.
+  const heroActions = await page.locator('[data-variant-panel]:not([hidden]) [data-demo-id="hero-actions"]').evaluate((group) => ({ group: group.getBoundingClientRect().right, last: group.lastElementChild.getBoundingClientRect().right }));
+  assert(heroActions.group <= heroActions.last + 1, `hero-actions spans past its buttons: ${JSON.stringify(heroActions)}`);
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
+  // Both forced variants launch the same canonical six-scene dogfooding demo.
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
-  const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'tour-opening');
+  const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'open-source-hook');
   assert.equal(await page.locator('.sr-count').innerText(), '1/6');
   await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 9000 });
   // The agent cursor must be live during playback: the Projector supplies moveCursor to the
@@ -53,18 +89,58 @@ try {
   assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').getAttribute('aria-pressed'), 'true');
   assert.equal(await page.evaluate(() => Boolean(window.__screenreelNarrator?.available())), true);
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
-  await page.waitForFunction(() => document.querySelector('#customer-name')?.value === 'Northstar Retail' && document.querySelector('#region')?.value === 'West' && document.querySelector('#priority')?.checked && document.querySelector('#confidence')?.value === '95', null, { timeout: 45000 });
-  assert((await page.evaluate(() => window.scrollY)) > 0);
-  await page.waitForURL(/destination\.html\?from=showcase/, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await visiblePill(page); await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 6000 });
-  assert.equal(await page.locator('.sr-count').innerText(), '6/6');
-  await page.screenshot({ path: path.join(output, 'projector-destination-1280x720.png') });
+  await page.waitForURL(/demo-lab\.html$/, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#dl-demo-name')?.value === 'ScreenReel in 90 seconds' && document.querySelector('#dl-audience')?.value === 'engineering-leaders' && document.querySelector('#dl-presenter-notes')?.checked && document.querySelector('#dl-pacing')?.value === '3', null, { timeout: 45000 });
+  await page.waitForURL(/demo-lab-output\.html$/, { waitUntil: 'domcontentloaded', timeout: 35000 });
+  await visiblePill(page);
+  await page.locator('[data-demo-id="doctor-output"]').waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await visiblePill(page); assert.equal(await page.locator('.sr-count').innerText(), '6/6');
+  await page.screenshot({ path: path.join(output, 'projector-complete-1280x720.png') });
   await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await visiblePill(page);
-  await page.locator('button[data-cmd="studio"]').click(); const heading = page.getByRole('heading', { name: 'Demo flows', exact: true }); await heading.waitFor();
+  await page.locator('button[data-cmd="studio"]').click(); const heading = page.getByRole('heading', { name: 'Studio flows', exact: true }); await heading.waitFor();
+  // New flow uses an in-Studio form rather than a browser prompt: the action is visible, testable,
+  // and cannot appear to do nothing when system dialogs are suppressed by the host browser.
+  await page.getByRole('button', { name: 'New flow', exact: true }).click();
+  await page.getByRole('heading', { name: 'Create flow', exact: true }).waitFor();
+  await page.locator('[data-flow-name]').fill('Browser smoke empty flow');
+  await page.getByRole('button', { name: 'Create flow', exact: true }).click();
+  await page.getByRole('heading', { name: 'Browser smoke empty flow', exact: true }).waitFor();
+  assert.equal(await page.locator('.sr-empty').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Create first scene', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Back to flows', exact: true }).innerText(), 'Back to flows');
+  assert.deepEqual(pageErrors, [], 'creating an empty flow must not throw in Studio');
+  await page.getByRole('button', { name: 'Back to flows', exact: true }).click();
+  const emptyFlowRow = page.locator('.sr-flow-row').filter({ hasText: 'Browser smoke empty flow' });
+  page.once('dialog', (dialog) => dialog.accept()); await emptyFlowRow.getByRole('button', { name: 'Delete', exact: true }).click();
+  assert.equal(await page.locator('.sr-flow-row').filter({ hasText: 'Browser smoke empty flow' }).count(), 0);
   const showcaseRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase' }).first(); await showcaseRow.getByRole('button', { name: 'Duplicate', exact: true }).click();
   const localRow = page.locator('.sr-flow-row').filter({ hasText: 'All actions showcase copy' }); assert.equal(await localRow.count(), 1); await localRow.locator('.sr-flow-name').click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
+  // Adding a scene is a real create/cancel boundary: opening the dialog must not fork or dirty the
+  // flow, and timing stays behind an explicit advanced disclosure for the common path.
+  await page.getByRole('button', { name: 'Add scene', exact: true }).click();
+  await page.getByRole('heading', { name: 'Create scene', exact: true }).waitFor();
+  assert.equal(await page.locator('.sr-advanced').getAttribute('open'), null);
+  assert.match(await page.locator('[data-save-status]').innerText(), /Draft saved locally/);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
+  assert.match(await page.locator('[data-save-status]').innerText(), /Draft saved locally/);
+  // Creating the scene lands in the focused Ready state; there is one preview iframe and no
+  // timeline editing chrome competing with the primary recording action.
+  await page.getByRole('button', { name: 'Add scene', exact: true }).click();
+  await page.locator('[data-key="title"]').fill('Ready state check');
+  await page.getByRole('button', { name: 'Create scene', exact: true }).click();
+  assert.equal(await page.locator('[data-editor-phase="ready"]').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Back to scenes', exact: true }).innerText(), 'Back to scenes');
+  assert.equal(await page.locator('.sr-preview-frame').count(), 1);
+  await page.getByRole('heading', { name: 'Press Start recording, then use your app', exact: true }).waitFor();
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-ready-1440x900.png') });
+  await page.getByRole('button', { name: 'Back to scenes', exact: true }).click();
+  const readyRow = page.locator('.sr-scene-table tbody tr').filter({ hasText: 'Ready state check' });
+  page.once('dialog', (dialog) => dialog.accept()); await readyRow.getByRole('button', { name: 'Delete scene', exact: true }).click();
+  assert.equal(await page.locator('.sr-scene-table tbody tr').count(), 4);
   const editButtons = page.getByRole('button', { name: 'Edit', exact: true }); assert.equal(await editButtons.count(), 4); await editButtons.nth(0).click();
   // Scene settings live in a modal now, so the editor's height belongs to the preview. The route
   // block must resolve to a real URL: a wrong route is the one scene mistake that plays nothing.
@@ -74,7 +150,35 @@ try {
   assert(await page.locator('[data-route-pick] option').count() > 1, 'the route picker should offer known pages');
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await page.locator('.sr-modal').waitFor({ state: 'detached' });
-  await page.getByRole('button', { name: 'Add action', exact: true }).click(); assert.equal(await page.locator('[data-definition]').count(), 26); assert.equal(await page.locator('[data-recipe]').count(), 6);
+  assert.equal(await page.locator('[data-editor-phase="review"]').count(), 1);
+  await page.screenshot({ path: path.join(output, 'studio-review-1440x900.png') });
+  // Reload means reset to the configured scene route, not refresh whichever page a previous
+  // interaction happened to leave in the iframe. It must also restore preview isolation.
+  const configuredPreviewSrc = await page.locator('.sr-preview-frame').getAttribute('src');
+  await page.locator('.sr-preview-frame').evaluate((frame) => frame.contentWindow.history.replaceState({}, '', '/examples/action-showcase/destination.html'));
+  await page.locator('[data-reload]').click();
+  // Studio renders in a shadow root, so document.querySelector cannot see the frame; poll through a handle.
+  const previewFrame = await page.locator('.sr-preview-frame').elementHandle();
+  await page.waitForFunction(([frame, expected]) => frame.contentWindow.location.href.endsWith(expected), [previewFrame, configuredPreviewSrc]);
+  assert.match(await page.locator('.sr-preview-frame').getAttribute('src'), /screenreelPreview=1/);
+  // Review playback must explain itself: the button reports progress, the active action is
+  // highlighted, and an explicit afterMs is shown before playback and counted down while it runs.
+  const firstAction = page.locator('.sr-action').first();
+  await firstAction.locator('[data-action-edit]').click();
+  await page.locator('[data-key="afterMs"]').fill('2100');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.locator('.sr-modal').waitFor({ state: 'detached' });
+  assert.match(await firstAction.locator('[data-action-wait]').innerText(), /Wait after · 2\.1s/);
+  await page.locator('[data-play-scene]').click();
+  await page.locator('.sr-action.is-running').waitFor({ state: 'visible' });
+  assert.match(await page.locator('[data-play-label]').innerText(), /Playing · 1 of/);
+  assert.equal(await firstAction.getAttribute('aria-current'), 'step');
+  await firstAction.locator('[data-action-wait]').filter({ hasText: 'Waiting' }).waitFor({ state: 'visible', timeout: 10000 });
+  assert.match(await firstAction.locator('[data-action-wait]').innerText(), /Waiting · [123]s/);
+  await page.locator('[data-play-scene]').click();
+  assert.equal(await page.locator('[data-play-label]').innerText(), 'Play scene');
+  assert.equal(await page.locator('.sr-action.is-running').count(), 0);
+  await page.locator('[data-timeline-head] [data-add-action]').click(); assert.equal(await page.locator('[data-definition]').count(), 26); assert.equal(await page.locator('[data-recipe]').count(), 6);
   await page.locator('[data-definition="highlight"]').click(); const preview = page.frameLocator('.sr-preview-frame'); const kpiValue = preview.locator('[data-kpi="revenue"] strong'); await kpiValue.click();
   const savedTarget = page.locator('.sr-action small').filter({ hasText: '[data-kpi="revenue"]' }); await savedTarget.waitFor(); assert.equal(await savedTarget.count(), 1);
   // Holding a modifier must OUTLINE what will be captured and name its match count before any
@@ -90,7 +194,7 @@ try {
   await page.keyboard.up('Meta');
   await outline.waitFor({ state: 'hidden' });
   assert.equal(await page.locator('.sr-action').count(), 12);
-  assert.equal(await page.locator('.sr-dirty').count(), 1); // appended incrementally, no re-render
+  await page.locator('[data-save-status]').filter({ hasText: 'Draft saved locally' }).waitFor();
   // Voiceover is authored from the action's own row, and Studio writes the timing the line needs
   // into the flow — a paced hold is what stops the next action's line from cutting this one off.
   await page.locator('.sr-action').last().locator('[data-action-voice]').click();
@@ -98,8 +202,7 @@ try {
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await page.locator('.sr-modal').waitFor({ state: 'detached' });
   assert.equal(await page.locator('.sr-action').last().locator('.sr-action-voice').count(), 1);
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  assert.equal(await page.locator('.sr-dirty').count(), 0);
+  await page.locator('[data-save-status]').filter({ hasText: 'Draft saved locally' }).waitFor();
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.title === 'Studio-authored highlight' && scene.actions.length === 12))));
   // The paced hold is the point of writing timing into the flow rather than waiting at play time.
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.some((action) => action.narration === 'Weeks of stock is the one to watch.' && action.pace?.field === 'holdMs' && action.holdMs > action.pace.addedMs)))));
@@ -118,6 +221,9 @@ try {
   await page.locator('[data-record-start]').click();
   assert.equal(await page.evaluate(() => localStorage.getItem('screenreel:action-showcase:record-primer:v1')), '1');
   await page.locator('.sr-picker-banner').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-editor-phase="recording"]').count(), 1);
+  assert.equal(await page.locator('[data-undo-recording]').count(), 1);
+  await page.screenshot({ path: path.join(output, 'studio-recording-1440x900.png') });
   await preview.locator('#submit-control').click();
   await preview.locator('#customer-name').pressSequentially('Recorded Co', { delay: 40 });
   await preview.locator('#priority').check();
@@ -127,17 +233,15 @@ try {
   await page.keyboard.down('Meta');
   await preview.locator('#submit-control').click();
   await page.keyboard.up('Meta');
-  await recordButton.click();
+  await page.locator('[data-stop-recording]').click();
   await page.locator('.sr-picker-banner').waitFor({ state: 'hidden' });
   assert.equal(await page.locator('.sr-action').count(), 16);
   assert.equal(await page.locator('.sr-action small').filter({ hasText: '#customer-name' }).count(), 1);
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  assert.equal(await page.locator('.sr-dirty').count(), 0);
+  await page.getByRole('button', { name: 'Finish scene', exact: true }).click();
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.length === 16 && scene.actions.some((action) => action.type === 'type' && action.text === 'Recorded Co')))));
   // Recorded through the coalescer (which stamps the fingerprint), and the swallowed ⌘-click left
   // exactly one real click on that button rather than a second one.
   assert(await page.evaluate(() => JSON.parse(localStorage.getItem('screenreel:action-showcase:flows:v1')).flows.some((flow) => flow.scenes.some((scene) => scene.actions.filter((action) => action.type === 'click' && action.selector === '#submit-control').length === 1 && scene.actions.some((action) => action.type === 'highlight' && action.selector === '#submit-control' && action.fingerprint)))));
-  await page.getByRole('button', { name: 'Back to scenes', exact: true }).click();
   await page.getByRole('heading', { name: 'All actions showcase copy', exact: true }).waitFor(); assert.equal(await page.locator('.sr-scene-table tbody tr').filter({ hasText: 'Studio-authored highlight' }).count(), 1);
   await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-1440x900.png') });
   await page.getByRole('button', { name: 'Play flow', exact: true }).click();
@@ -160,6 +264,23 @@ try {
   // The pill no longer offers capture, but the method behind it is still part of the API.
   assert.equal(contracts.capture, 'function');
   assert.equal(contracts.matched, true); assert.equal(contracts.report.ok, false); assert.equal(contracts.report.actions[0].errors[0], 'selector has no matches'); assert.equal(contracts.playing, false);
+  // Guided advance: a finished scene waits for Next (pulsing it) instead of the dwell timer, and
+  // Next on the last scene of a non-looping flow completes the tour. Highlights dim the page.
+  const guided = await inlinePage.evaluate(async () => {
+    const target = document.createElement('button'); target.id = 'guided-demo'; document.body.appendChild(target);
+    const spot = document.createElement('div'); spot.id = 'guided-spot'; spot.textContent = 'Guided target'; document.body.appendChild(spot);
+    const projector = await window.ScreenReel.mount(target, { projectId: 'guided-example', advance: 'guided', loop: false, narration: false, cursor: false, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [{ id: 'guided', name: 'Guided', defaults: { dwellMs: 50 }, scenes: [{ id: 'one', route: '/', actions: [{ type: 'highlight', selector: '#guided-spot', holdMs: 300 }] }, { id: 'two', route: '/', actions: [{ type: 'highlight', selector: '#guided-spot', holdMs: 300 }] }] }] } } });
+    const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
+    let dimmed = false; const observer = new MutationObserver(() => { if (document.querySelector('.sr-dim-backdrop')) dimmed = true; }); observer.observe(document.body, { childList: true });
+    projector.enable(); const firstWait = once('awaitingnext'); projector.play(); const first = await firstWait;
+    await new Promise((resolve) => setTimeout(resolve, 300)); // a dwell timer would have advanced by now
+    const heldPosition = projector.store.position(); const pulsing = !!projector.pill.querySelector('[data-cmd="next"].sr-await-next');
+    const secondWait = once('awaitingnext'); projector.command('next'); const second = await secondWait;
+    const completed = once('complete'); projector.command('next'); await completed;
+    observer.disconnect(); projector.destroy(); target.remove(); spot.remove();
+    return { first: first.sceneId, second: second.sceneId, heldPosition, pulsing, dimmed, playingAfter: projector.store.playing() };
+  });
+  assert.deepEqual(guided, { first: 'one', second: 'two', heldPosition: 0, pulsing: true, dimmed: true, playingAfter: false });
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);
@@ -199,6 +320,16 @@ try {
   await sharePage.locator('.sr-pill').waitFor({ state: 'detached' });
   await shareContext.close();
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } }); await mobilePage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await mobilePage.locator('#demo-button').waitFor(); assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true); await mobilePage.screenshot({ path: path.join(output, 'landing-mobile-390x844.png'), fullPage: true }); await mobilePage.close();
+  // Studio's review timeline leaves the product preview about 738px wide. Keep the opening compact
+  // there: the badge should not float inside desktop-scale whitespace in a short authoring canvas.
+  const studioPreviewPage = await browser.newPage({ viewport: { width: 738, height: 796 } });
+  await studioPreviewPage.goto(`${baseUrl}?variant=repo-native&screenreelPreview=1`, { waitUntil: 'domcontentloaded' });
+  const compactHero = await studioPreviewPage.evaluate(() => {
+    const topbar = document.querySelector('.landing-topbar'); const hero = document.querySelector('.landing-hero--repo'); const pill = document.querySelector('.open-source-pill'); const title = document.querySelector('.landing-hero h1');
+    return { topbarHeight: topbar.getBoundingClientRect().height, heroPaddingTop: parseFloat(getComputedStyle(hero).paddingTop), pillGap: title.getBoundingClientRect().top - pill.getBoundingClientRect().bottom, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  assert(compactHero.topbarHeight <= 60, JSON.stringify(compactHero)); assert(compactHero.heroPaddingTop <= 24, JSON.stringify(compactHero)); assert(compactHero.pillGap <= 20, JSON.stringify(compactHero)); assert.equal(compactHero.overflow, false, JSON.stringify(compactHero));
+  await studioPreviewPage.screenshot({ path: path.join(output, 'landing-studio-preview-738x796.png'), fullPage: true }); await studioPreviewPage.close();
   // The deployed artifact is _site/, not examples/: it has rewritten asset paths and cache-busting
   // queries, and its page scripts share one global scope. Exercising only examples/ once let a
   // broken bundle reach production, so the built artifact gets its own end-to-end check.

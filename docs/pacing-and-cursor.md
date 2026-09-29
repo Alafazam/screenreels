@@ -44,6 +44,33 @@ Per-scene estimates show in Studio's scene table. For a real number, time it in 
 window — headless and backgrounded tabs throttle `requestAnimationFrame` and timers hard, so any
 measurement taken there is fiction.
 
+## Guided or automatic advance
+
+```js
+advance: 'auto'    // default — each finished scene rests for dwellMs, then the next one plays
+advance: 'guided'  // each finished scene waits until the viewer presses Next
+```
+
+A flow can set its own mode with `"defaults": { "advance": "guided" }`; the mount option wins, so
+the same flow can run guided inside the product and automatic on a share link. In guided mode the
+Next button pulses while the tour is waiting, share links get a Next button too, and Next on the
+last scene of a `loop: false` flow completes the tour (`screenreel:complete`). Each wait also
+dispatches `screenreel:awaitingnext` with `{ projectId, flowId, sceneId }`. The step is a scene:
+the actions inside a scene still run back to back.
+
+## Dimming behind highlights
+
+`highlight`, `highlight sequence`, and `callout` dim the rest of the page to `0.45` so the eye
+lands on the target; `spotlight` keeps its stronger `0.62`. Set `dim` on an action to tune one
+beat, or on the mount options to change the default everywhere:
+
+```js
+dim: 0.3     // lighter background dimming for every highlight and callout
+dim: false   // no dimming (an action's own dim still applies)
+```
+
+`0` or `false` on an action turns it off for that beat. The presenter pill is never dimmed.
+
 ## The agent cursor
 
 A pointer travels to each target before the action fires, emits rings on arrival to mark its

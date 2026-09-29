@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ScreenReel Demo Lab — Author a product demo</title>
+<meta name="description" content="Use the deterministic ScreenReel Demo Lab to author a product walkthrough.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="demo-lab.css">
+</head>
+<body class="dl-page">
+  <header class="topbar dl-topbar">
+    <a class="brand" href="./"><img class="brand-logo" src="logo.svg" alt="" width="36" height="24" aria-hidden="true">ScreenReel</a>
+    <span class="dl-topbar-status"><span class="dl-status-dot" aria-hidden="true"></span> Demo Lab</span>
+    <button id="demo-button" class="header-cta dl-demo-control" type="button">Demo controls</button>
+    <a class="header-cta" href="https://github.com/Alafazam/screenreels">View on GitHub</a>
+  </header>
+  <main class="dl-shell">
+    <div class="dl-breadcrumb"><a href="./">ScreenReel</a><span aria-hidden="true">/</span><strong>Demo Lab</strong></div>
+    <section class="dl-intro">
+      <div><p class="dl-eyebrow">AUTHOR BY DOING</p><h1>Build a demo by using your product.</h1><p class="dl-lede">Set the story, rehearse the moments, and generate a flow you can replay live, share, or render. Every control below is a real recording target.</p></div>
+      <div class="dl-intro-badge"><span aria-hidden="true">✦</span><strong>Deterministic fixture</strong><small>Ready for recording</small></div>
+    </section>
+    <div class="dl-layout">
+      <section class="dl-card dl-editor" aria-labelledby="dl-editor-title">
+        <div class="dl-card-heading"><div><p class="dl-kicker">01 · AUTHOR</p><h2 id="dl-editor-title">Demo brief</h2></div><span class="dl-step-pill">Draft</span></div>
+        <div class="dl-field"><label for="dl-demo-name">Demo name</label><input data-demo-id="demo-name" id="dl-demo-name" type="text" value="The story in one flow" autocomplete="off"></div>
+        <div class="dl-field"><label for="dl-audience">Audience</label><select data-demo-id="audience" id="dl-audience"><option value="product-teams">Product teams</option><option value="engineering-leaders">Engineering leaders</option><option value="customers">Customers</option></select></div>
+        <label class="dl-check-row" data-demo-id="presenter-notes"><input id="dl-presenter-notes" type="checkbox"><span><strong>Presenter notes</strong><small>Keep talking points beside the flow</small></span></label>
+        <div class="dl-field"><label for="dl-pacing">Pacing <output id="dl-pacing-output" for="dl-pacing">Balanced</output></label><input data-demo-id="pacing" id="dl-pacing" type="range" min="1" max="3" value="2"><div class="dl-range-labels"><span>Quick</span><span>Balanced</span><span>Measured</span></div></div>
+        <div class="dl-divider"></div>
+        <div class="dl-card-heading dl-scenes-heading"><div><p class="dl-kicker">02 · FLOW</p><h2>Scenes</h2></div><span id="dl-scene-count">3 scenes</span></div>
+        <p class="dl-help">Drag a scene to change the order. The flow stays readable in your repository.</p>
+        <ol class="dl-scene-list" id="dl-scene-list" aria-label="Demo scenes">
+          <li class="dl-scene is-selected" draggable="true" data-demo-id="scene-01" data-scene="01"><span class="dl-drag" aria-hidden="true">⠿</span><span class="dl-scene-num">01</span><span class="dl-scene-copy"><strong>Open with the outcome</strong><small>Navigation · 4 actions</small></span><button class="dl-scene-select" type="button" aria-label="Select Open with the outcome">›</button></li>
+          <li class="dl-scene" draggable="true" data-demo-id="scene-02" data-scene="02"><span class="dl-drag" aria-hidden="true">⠿</span><span class="dl-scene-num">02</span><span class="dl-scene-copy"><strong>Show the connected tools</strong><small>Highlight · 4 actions</small></span><button class="dl-scene-select" type="button" aria-label="Select Show the connected tools">›</button></li>
+          <li class="dl-scene" draggable="true" data-demo-id="scene-03" data-scene="03"><span class="dl-drag" aria-hidden="true">⠿</span><span class="dl-scene-num">03</span><span class="dl-scene-copy"><strong>Close with the next step</strong><small>Click · 3 actions</small></span><button class="dl-scene-select" type="button" aria-label="Select Close with the next step">›</button></li>
+        </ol>
+        <button class="dl-add-scene" type="button" disabled aria-disabled="true">+ Add scene <span>Use Studio to record</span></button>
+      </section>
+      <section class="dl-card dl-preview" aria-labelledby="dl-preview-title">
+        <div class="dl-card-heading"><div><p class="dl-kicker">03 · PREVIEW</p><h2 id="dl-preview-title">Your demo, at a glance</h2></div><span class="dl-live-pill"><span aria-hidden="true"></span>Live preview</span></div>
+        <div class="dl-product-window" data-demo-id="result-preview">
+          <div class="dl-window-bar"><span class="dl-window-dots" aria-hidden="true">● ● ●</span><span>acme.app / projects</span><span aria-hidden="true">⋯</span></div>
+          <div class="dl-window-body"><aside><strong>ACME</strong><a class="is-active" href="#overview">Overview</a><a href="#projects">Projects</a><a href="#metrics">Metrics</a><a href="#settings">Settings</a></aside><div class="dl-product-content"><div class="dl-product-heading"><div><span class="dl-mini-label">PROJECTS</span><h3>Build momentum, visibly.</h3></div><button class="dl-purple-button" type="button" data-demo-id="preview-action">New project</button></div><div class="dl-hero-stat"><span>Q2 launch</span><strong>On track</strong><small>24 tasks · 6 owners · updated 2h ago</small></div><div class="dl-product-grid"><div><span class="dl-mini-label">RECENT ACTIVITY</span><p>Design review completed <b>Today</b></p><p>Launch checklist shared <b>Yesterday</b></p></div><div class="dl-highlight"><span>✦ Guided by ScreenReel</span><strong>One flow. Every output.</strong></div></div></div></div>
+        </div>
+        <div class="dl-ack" id="dl-ack" role="status" aria-live="polite"><span class="dl-ack-icon" aria-hidden="true">✓</span><div><strong>Ready to capture</strong><span>Use the controls to shape your story.</span></div></div>
+        <div class="dl-preview-actions"><button class="dl-button dl-button-primary" id="dl-generate" data-demo-id="generate-outputs" type="button">Generate demo outputs <span aria-hidden="true">→</span></button><a class="dl-button dl-button-quiet" href="showcase-create.html">Open Studio</a></div>
+      </section>
+    </div>
+    <nav class="dl-bottom-nav" aria-label="Demo Lab navigation"><a href="./">← Back to ScreenReel</a><a href="demo-lab-output.html">See the generated outputs →</a></nav>
+  </main>
+  <script data-cfasync="false" src="../../dist/projector/screenreel.js?v=0.3.0"></script>
+  <script data-cfasync="false" src="demo-lab.js"></script>
+</body>
+</html>

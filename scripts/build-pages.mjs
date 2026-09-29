@@ -20,7 +20,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 fs.rmSync(site, { recursive: true, force: true });
 fs.mkdirSync(site, { recursive: true });
-for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html', 'showcase.css', 'showcase.js', 'showcase.demo.json', 'styles.css', 'app.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
+for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html', 'demo-lab.html', 'demo-lab-output.html', 'showcase.css', 'showcase.js', 'showcase.demo.json', 'styles.css', 'landing.css', 'demo-lab.css', 'app.js', 'landing-experiment.js', 'demo-lab.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'github-mark.png', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
   fs.copyFileSync(path.join(example, name), path.join(site, name));
 }
 fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), { recursive: true });
@@ -30,14 +30,26 @@ fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), 
    cursor.js when only those change. */
 const runtimeDir = path.join(site, 'dist/projector');
 const runtimeKey = hashOf(...fs.readdirSync(runtimeDir).sort().map((name) => fs.readFileSync(path.join(runtimeDir, name))));
-const pageKeys = { 'app.js': hashFile(path.join(site, 'app.js')), 'fixtures.js': hashFile(path.join(site, 'fixtures.js')), 'showcase.js': hashFile(path.join(site, 'showcase.js')) };
+const landingExperimentKey = hashFile(path.join(site, 'landing-experiment.js'));
+const stagedApp = path.join(site, 'app.js');
+fs.writeFileSync(stagedApp, fs.readFileSync(stagedApp, 'utf8').replace("'./landing-experiment.js'", `'./landing-experiment.js?v=${landingExperimentKey}'`));
+const pageKeys = {
+  'app.js': hashFile(stagedApp),
+  'fixtures.js': hashFile(path.join(site, 'fixtures.js')),
+  'showcase.js': hashFile(path.join(site, 'showcase.js')),
+  'demo-lab.js': hashFile(path.join(site, 'demo-lab.js')),
+  'landing.css': hashFile(path.join(site, 'landing.css')),
+  'demo-lab.css': hashFile(path.join(site, 'demo-lab.css')),
+};
 
-for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html']) {
+for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html', 'demo-lab.html', 'demo-lab-output.html']) {
   const target = path.join(site, name);
   let html = fs.readFileSync(target, 'utf8')
     .replaceAll('../../dist/projector/', './dist/projector/')
-    .replaceAll('src="./dist/projector/screenreel.js"', `src="./dist/projector/screenreel.js?v=${runtimeKey}"`);
-  for (const [asset, key] of Object.entries(pageKeys)) html = html.replaceAll(`src="${asset}"`, `src="${asset}?v=${key}"`);
+    .replace(/src="\.\/dist\/projector\/screenreel\.js(?:\?v=[^"]+)?"/g, `src="./dist/projector/screenreel.js?v=${runtimeKey}"`);
+  for (const [asset, key] of Object.entries(pageKeys)) {
+    html = html.replaceAll(`src="${asset}"`, `src="${asset}?v=${key}"`).replaceAll(`href="${asset}"`, `href="${asset}?v=${key}"`);
+  }
   fs.writeFileSync(target, html);
 }
 fs.writeFileSync(path.join(site, '.nojekyll'), '');
@@ -45,8 +57,14 @@ fs.writeFileSync(path.join(site, '.nojekyll'), '');
 const required = [
   'index.html',
   'destination.html',
+  'demo-lab.html',
+  'demo-lab-output.html',
   'styles.css',
+  'landing.css',
+  'demo-lab.css',
   'app.js',
+  'landing-experiment.js',
+  'demo-lab.js',
   'fixtures.js',
   'showcase.html',
   'showcase.js',
@@ -54,6 +72,7 @@ const required = [
   'showcase.demo.json',
   'screenreel.demo.json',
   'logo.svg',
+  'github-mark.png',
   'favicon.svg',
   'og-image.png',
   'apple-touch-icon.png',
@@ -66,15 +85,15 @@ const required = [
 for (const name of required) {
   if (!fs.existsSync(path.join(site, name))) throw new Error(`Pages artifact is missing ${name}`);
 }
-const stagedText = ['index.html', 'destination.html', 'showcase.html', 'showcase.demo.json', 'screenreel.demo.json']
+const stagedText = ['index.html', 'destination.html', 'showcase.html', 'demo-lab.html', 'demo-lab-output.html', 'app.js', 'showcase.demo.json', 'screenreel.demo.json']
   .map((name) => fs.readFileSync(path.join(site, name), 'utf8'))
   .join('\n');
 if (stagedText.includes('../../dist/projector/')) throw new Error('Pages artifact contains a broken projector asset path');
 if (stagedText.includes('/examples/action-showcase')) throw new Error('Pages artifact contains an old absolute example route');
 if (!stagedText.includes('data-cfasync="false"')) throw new Error('Pages scripts must opt out of Cloudflare Rocket Loader');
 // Every cache-busted asset must carry its content key, or the CDN will serve a stale copy.
-for (const [asset, key] of [['./dist/projector/screenreel.js', runtimeKey], ...Object.entries(pageKeys)]) {
-  if (!stagedText.includes(`src="${asset}?v=${key}"`)) throw new Error(`Pages artifact is missing the content cache key for ${asset}`);
+for (const [asset, key] of [['./dist/projector/screenreel.js', runtimeKey], ['landing-experiment.js', landingExperimentKey], ...Object.entries(pageKeys)]) {
+  if (!stagedText.includes(`${asset}?v=${key}`)) throw new Error(`Pages artifact is missing the content cache key for ${asset}`);
 }
 if (/\?v=\d+\.\d+\.\d+"/.test(stagedText)) throw new Error('Pages artifact still uses release-version cache keys, which go stale without a version bump');
 if (fs.existsSync(path.join(site, 'CNAME'))) throw new Error('Pages artifact must not claim the user-site custom domain');

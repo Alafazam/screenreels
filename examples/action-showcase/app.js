@@ -1,61 +1,99 @@
-/* ScreenReel action-showcase page: mounts Projector and launches the guided tour.
-   Page fixtures live in fixtures.js, shared with destination.html.
-   Tour pacing lives in screenreel.demo.json — the timings there are the real durations, so
-   Studio shows true numbers. Pass `timeScale` to mount if you want to stretch or compress
-   everything uniformly (it reaches the runtime's internal constants too, which rewriting the
-   manifest cannot).
+import {
+  DEFAULT_LANDING_VARIANT,
+  createLandingAnalytics,
+  selectLandingVariant,
+} from './landing-experiment.js';
 
-   Wrapped in an IIFE: this and fixtures.js are classic scripts sharing one global scope, so any
-   top-level binding here could collide with one there and kill the whole script. */
-(function initDemoPage() {
-const demoButton = document.getElementById('demo-button');
-if (demoButton) {
+const LANDING_ALLOCATION_ENABLED = false;
+const LANDING_EVENT_NAME = 'screenreel:landing-conversion';
+const IS_STUDIO_PREVIEW = new URLSearchParams(location.search).has('screenreelPreview');
+
+function browserRandom() {
+  if (!globalThis.crypto?.getRandomValues) return Math.random();
+  const value = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(value);
+  return value[0] / 0x100000000;
+}
+
+function resolveVariant() {
+  try {
+    return selectLandingVariant({
+      search: location.search,
+      storage: localStorage,
+      allocationEnabled: LANDING_ALLOCATION_ENABLED,
+      random: browserRandom,
+    });
+  } catch (error) {
+    console.warn('[screenreel] landing variant fallback', error);
+    return DEFAULT_LANDING_VARIANT;
+  }
+}
+
+function showVariant(variant) {
+  document.documentElement.dataset.landingVariant = variant;
+  for (const panel of document.querySelectorAll('[data-variant-panel]')) {
+    panel.hidden = panel.dataset.variantPanel !== variant;
+  }
+  return document.querySelector(`[data-variant-panel="${variant}"]`);
+}
+
+const variant = resolveVariant();
+const activePanel = showVariant(variant);
+const analytics = createLandingAnalytics({
+  onEvent: (payload) => dispatchEvent(new CustomEvent(LANDING_EVENT_NAME, { detail: payload })),
+});
+
+for (const target of document.querySelectorAll('[data-conversion]')) {
+  target.addEventListener('click', () => analytics.emit(target.dataset.conversion, { variant }));
+}
+
+const demoButton = activePanel?.querySelector('.landing-demo-button');
+if (demoButton && !IS_STUDIO_PREVIEW) {
+  demoButton.id = 'demo-button';
   (async () => {
     const projector = await window.ScreenReel.mount(demoButton, {
       projectId: 'action-showcase',
       flow: { src: 'screenreel.demo.json' },
       loop: false,
+      pages: ['./', 'demo-lab.html', 'demo-lab-output.html', 'showcase-heal.html'],
     });
     let launching = false;
-    // Capture phase + stopImmediatePropagation so this pre-empts the projector's own toggle
-    // handler: the button should always force-play the guided tour from the start.
     demoButton.addEventListener('click', async (event) => {
       event.stopImmediatePropagation();
-      if (projector.store.enabled()) { projector.disable(); return; }
+      if (projector.store.enabled()) {
+        projector.disable();
+        return;
+      }
       if (launching) return;
       launching = true;
       try {
+        analytics.emit('live_demo_start', { variant });
         projector.store.setActive('guided-tour');
         projector.enable();
         projector.store.setPosition(0);
         await projector.play();
-      } finally { launching = false; }
+      } finally {
+        launching = false;
+      }
     }, true);
-    document.querySelector('[data-action="open-demo"]')?.addEventListener('click', () => demoButton.click());
-  })();
+    demoButton.dataset.landingReady = 'true';
+  })().catch((error) => {
+    console.error('[screenreel] landing demo failed to initialize', error);
+    demoButton.disabled = true;
+  });
 }
 
-/* Voiceover sample: the real pipeline is `assemble --voice`, which runs macOS `say` (or any TTS
-   CLI) through ffmpeg into the captured MP4 — none of which exists in a browser. This uses
-   speechSynthesis purely so a visitor can hear what narrated talking points sound like; the card
-   says so in as many words. Same stand-in as the showcase's voice chapter. */
-const voiceSample = document.getElementById('voice-sample');
-if (voiceSample && 'speechSynthesis' in window) {
-  const setPressed = (on) => voiceSample.setAttribute('aria-pressed', String(on));
-  setPressed(false);
-  voiceSample.addEventListener('click', () => {
-    if (speechSynthesis.speaking) { speechSynthesis.cancel(); setPressed(false); return; }
-    const utterance = new SpeechSynthesisUtterance(voiceSample.dataset.script);
-    utterance.rate = 0.95;
-    utterance.addEventListener('end', () => setPressed(false));
-    utterance.addEventListener('error', () => setPressed(false));
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utterance);
-    setPressed(true);
-  });
-} else if (voiceSample) {
-  // No speech engine: say so rather than leaving a button that silently does nothing.
-  voiceSample.disabled = true;
-  voiceSample.textContent = 'Speech not available in this browser';
-}
-})();
+const emittedPlaybackConversions = new Set();
+addEventListener('screenreel:analytics', (event) => {
+  const detail = event.detail || {};
+  const emitOnce = (conversion) => {
+    if (emittedPlaybackConversions.has(conversion)) return;
+    emittedPlaybackConversions.add(conversion);
+    analytics.emit(conversion, { variant, flowId: detail.flowId, sceneId: detail.sceneId });
+  };
+  if (Number(detail.percentComplete) >= 50) emitOnce('demo_progress_50');
+  if (detail.event === 'flow_complete') emitOnce('demo_complete');
+  if (detail.event === 'drop_off') emitOnce('demo_drop_off');
+});
+
+document.querySelector('[data-action="open-demo"]')?.addEventListener('click', () => demoButton?.click());

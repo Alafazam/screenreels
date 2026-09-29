@@ -9,14 +9,15 @@ Live demo: [Chapter 1 of the showcase](../examples/action-showcase/showcase-crea
 
 1. Open your app with Projector mounted, and turn demo mode on (the pill appears).
 2. Click the **Studio** button in the pill.
-3. Open a flow, then open a scene (**Edit** on any row). You're now in the scene editor, with your
-   app in the preview panel on the left.
+3. Open a flow. Choose **Add scene**, give it a name and optional talking points, then choose
+   **Create scene**. The current page is selected automatically; readiness and timing stay under
+   **Advanced timing** when you need them. To continue an existing scene, choose **Edit** instead.
 4. Press **● Record**. The first time, a short primer lists exactly what gets captured — tick
    *Don't show this again* once you know. Then the banner reads
    *"Recording — ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops"*.
 5. **Use your app in the preview.** Click, type, pick from selects, scroll.
-6. Press **Stop** (or `Esc`).
-7. Press **Save**.
+6. Press **Stop & review** (or `Esc`).
+7. Press **Finish scene** to validate it and return to the scene list.
 
 Actions appear in the timeline on the right *as you go*, so you can see it working. Every one is a
 normal action afterwards — reorder it, edit its settings, delete it.
@@ -29,11 +30,12 @@ normal action afterwards — reorder it, edit its settings, delete it.
 | Tick a checkbox | `toggle` with the finishing state |
 | Choose from a `<select>` | `set` with the chosen value |
 | Drag a range slider | `lever` with the final value |
+| Drag an element to another target | `drag` with the destination selector (or distance fallback) |
 | Click a button or link | `click` |
 | Scroll | **One** `scroll` per burst (relative, as a percentage of the viewport) |
 | Pause between actions | `afterMs` on the previous action, so replay keeps your rhythm |
-| Click something that navigates | `goto` — and recording continues on the new page |
-| ⌘/Ctrl+click something | `highlight` on it — and the click itself never reaches your app |
+| Click something that navigates | `goto` — including `pushState`, `replaceState`, history, hash, and full-page navigation |
+| ⌘+click (Mac) / Ctrl+click (Windows/Linux) | `highlight` on it — and the click itself never reaches your app |
 | Alt+click something | `spotlight` on it — likewise swallowed |
 
 The two "one" rows matter: a 20-character name is one readable `type` action, not twenty
@@ -44,8 +46,9 @@ keystrokes, and a flick of the scroll wheel is one `scroll`, not forty.
 A demo usually needs to point at things it does not click — a KPI, a column, a badge — and adding
 those from the catalog means finding each element all over again.
 
-**Hold ⌘** (Ctrl on Windows) over the preview instead. A box follows your pointer showing exactly
-what will be captured: the selector it resolved to, and how many elements that selector matches. Then
+On macOS, hold **Ctrl** to preview the element under the cursor without committing anything. Hold
+**⌘** (Ctrl on Windows/Linux) when you are ready to capture it. A box follows your pointer showing
+the selector it resolved to and how many elements that selector matches. Then
 
 - **↑** widens the target to its container, **↓** narrows it back down,
 - **click** commits it — your app never sees that click, and no `click` action is recorded,
@@ -60,22 +63,38 @@ right-click there.
 
 ## Things worth knowing
 
-**Recording stops if you edit the timeline.** Deleting a row, reordering, going back, or saving all
-end the session — the preview has to be rebuilt, which would lose your app's state. The banner
-disappearing is the signal. Record, stop, *then* edit.
+**The editor has three explicit states.** Ready explains the gestures; Recording keeps the product
+fully interactive while locking sequence editing; Review enables editing, reordering, manual action
+insertion, playback, notes, and voice. Use **Undo last** during a take or **Stop & review** when the
+interaction is complete. The preview iframe is preserved across these state changes, so product
+state does not reset.
+
+**Draft changes autosave in this browser.** “Finish scene” is still deliberate: it validates routes,
+selectors, action fields, and the flow graph before returning to the scene list. Autosave protects
+work; Finish proves the scene is replayable.
+
+**Play scene keeps its progress visible in Review.** The playback button reports the current action,
+the running action is highlighted in the timeline, and completed actions are marked as done. If an
+action has an `afterMs` pause, its row shows that wait before playback and counts down the remaining
+seconds while the pause is running. Press the playback button again to stop the preview.
+
+**Reload preview resets the product to the scene's configured page.** It does not reload an
+accidental intermediate URL. Studio also restores its preview marker so a demo already embedded in
+the product cannot start another projector inside the recording canvas.
 
 **Password fields are never recorded.** Neither is anything the app dispatches itself
 (synthetic events); only real user input is captured.
 
-**After recording across a navigation, split the scene.** Save-time validation checks selectors
+**After recording across a navigation, split the scene.** Finish-scene validation checks selectors
 against the page currently in the preview, so a scene containing actions from two different pages
 will flag the ones from the page you're no longer on. Cut the scene at the `goto` and give the
 second half its own scene with the new `route`.
 
-**Single-page apps that navigate via `pushState`** don't emit a `goto` (there's no page load to
-detect). Recording continues correctly; you just add the `goto` yourself.
-
-**Not captured:** shadow-DOM internals, `contenteditable` regions, and file inputs.
+**Not captured automatically:** author-intent actions such as waits, wait-for conditions, callouts,
+countdowns, branching choices, narration, function calls, and exact visual sequences. Add those in
+Review with **Add action**, or insert them at a precise point from the plus button on an action row.
+Shadow-DOM internals, `contenteditable` regions, and file inputs also remain manual because capturing
+them generically would be unreliable or unsafe.
 
 ## Tuning the result
 

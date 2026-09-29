@@ -2,41 +2,39 @@
   "schemaVersion": 1,
   "flows": [
     {
-      "id": "guided-tour", "name": "Guided product tour", "defaults": { "dwellMs": 650, "settleMs": 150 },
+      "id": "guided-tour", "name": "ScreenReel in 90 seconds", "defaults": { "dwellMs": 650, "settleMs": 150 },
       "scenes": [
-        { "id": "tour-opening", "enabled": true, "route": "./", "title": "The story in one flow", "talkingPoints": "The hero card is the flow: highlight the story, interact with the UI, capture and share.", "narration": "", "actions": [
-          { "type": "countdown", "from": 3, "stepMs": 550, "caption": "Your demo is about to play", "note": "Ready…", "narration": "This is ScreenReel, running live." },
-          { "type": "highlight", "selector": "[data-flow-step=\"1\"]", "holdMs": 1500, "afterMs": 250, "note": "Highlight the story", "narration": "First, tell the story." },
-          { "type": "highlight", "selector": "[data-flow-step=\"2\"]", "holdMs": 1500, "afterMs": 250, "note": "Interact with the UI", "narration": "Then drive the real product." },
-          { "type": "highlight", "selector": "[data-flow-step=\"3\"]", "holdMs": 1500, "afterMs": 300, "note": "Capture and share", "narration": "Then capture and share it." }
+        { "id": "open-source-hook", "enabled": true, "route": "./", "title": "Open-source product demos", "talkingPoints": "Lead with the product category, ownership model, and zero-backend boundary.", "narration": "ScreenReel is an open-source demo recorder that ships with your product. No account, backend, or hosted workspace.", "actions": [
+          { "type": "highlight", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"open-source-badge\"]", "holdMs": 2600, "note": "Free and open source" },
+          { "type": "spotlight", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"hero-statement\"]", "holdMs": 4300, "dim": 0.38, "note": "A demo recorder that ships with your product" },
+          { "type": "pointer", "selector": "[data-demo-id=\"demo-lab-link\"]", "afterMs": 650, "note": "Open the deterministic Demo Lab" },
+          { "type": "goto", "url": "demo-lab.html", "note": "Move to a new scene before navigation" }
         ]},
-        { "id": "tour-why", "enabled": true, "route": "./", "title": "Why we built it", "talkingPoints": "Demos should not drift every time the product changes.", "narration": "", "actions": [
-          { "type": "scrollIntoView", "selector": "#why", "block": "start", "note": "Why we built it" },
-          { "type": "reel", "selector": "[data-reel=\"drift\"]", "frames": 4, "stepMs": 260, "holdMs": 900, "afterMs": 300, "note": "A demo should not drift", "narration": "Demos drift. Screens change, scripts go stale." },
-          { "type": "highlight", "selector": "[data-word=\"product\"]", "holdMs": 1400, "afterMs": 200, "note": "…every time the product changes", "narration": "ScreenReel repairs itself instead." }
+        { "id": "author-the-story", "enabled": true, "route": "demo-lab.html", "title": "Record by using the app", "talkingPoints": "Capture typing, selects, toggles, sliders, clicks, and navigation as editable actions.", "narration": "Open Studio, press record, and use your app normally. Typing, selects, toggles, sliders, clicks, and navigation become editable actions.", "actions": [
+          { "type": "type", "selector": "#dl-demo-name", "text": "ScreenReel in 90 seconds", "clearFirst": true, "charMs": 35, "afterMs": 300, "note": "Name the story" },
+          { "type": "set", "selector": "#dl-audience", "value": "engineering-leaders", "afterMs": 350, "note": "Choose engineering leaders" },
+          { "type": "toggle", "selector": "#dl-presenter-notes", "checked": true, "afterMs": 350, "note": "Keep presenter notes beside the flow" },
+          { "type": "lever", "selector": "#dl-pacing", "to": 3, "durMs": 900, "afterMs": 700, "note": "Set measured pacing" }
         ]},
-        { "id": "tour-kpis", "enabled": true, "route": "./", "title": "Highlight product context", "talkingPoints": "Walk the KPIs one by one while the audience keeps its bearings.", "narration": "", "actions": [
-          { "type": "scrollIntoView", "selector": "#kpis", "block": "start", "note": "Watch the runtime operate a real page" },
-          { "type": "glow", "selector": ".kpi-card", "sequence": true, "count": 4, "stepMs": 750, "afterMs": 200, "note": "Revenue, margin, sell-through, stock", "narration": "It walks real KPIs — revenue, margin, sell-through, and stock." }
+        { "id": "emphasise-real-elements", "enabled": true, "route": "demo-lab.html", "title": "Emphasise the real interface", "talkingPoints": "Reorder a scene, then capture highlight and spotlight actions on stable real targets.", "narration": "When a moment needs emphasis, point at the real element and capture a highlight or spotlight. Your demo remains a readable flow in the repository.", "actions": [
+          { "type": "drag", "selector": "[data-demo-id=\"scene-03\"]", "toSelector": "[data-demo-id=\"scene-02\"]", "durMs": 850, "afterMs": 350, "note": "Reorder the closing scene" },
+          { "type": "highlight", "selector": "[data-demo-id=\"scene-01\"]", "holdMs": 1900, "note": "Highlight a real scene" },
+          { "type": "spotlight", "selector": "[data-demo-id=\"result-preview\"]", "holdMs": 2500, "dim": 0.42, "note": "Spotlight the live result" },
+          { "type": "pointer", "selector": "[data-demo-id=\"generate-outputs\"]", "afterMs": 550, "note": "Generate the three outputs" },
+          { "type": "goto", "url": "demo-lab-output.html", "note": "Move to a new scene before navigation" }
         ]},
-        { "id": "tour-controls", "enabled": true, "route": "./", "title": "Work with real controls", "talkingPoints": "Type, select, toggle, and slide real inputs — then rock the demo.", "narration": "", "actions": [
-          { "type": "scrollIntoView", "selector": "#form", "block": "start", "note": "Work with real controls" },
-          { "type": "type", "selector": "#customer-name", "text": "Northstar Retail", "clearFirst": true, "charMs": 40, "afterMs": 250, "note": "Typing a customer name", "narration": "It types, selects, toggles, and slides — real controls, not mockups." },
-          { "type": "set", "selector": "#region", "value": "West", "afterMs": 300, "note": "Choosing a region" },
-          { "type": "toggle", "selector": "#priority", "checked": true, "afterMs": 300, "note": "Marking it a priority account" },
-          { "type": "lever", "selector": "#confidence", "to": 95, "durMs": 950, "afterMs": 200, "note": "Confidence up to 95%" },
-          { "type": "click", "selector": "#submit-control", "afterMs": 900, "note": "Rock the demo!", "narration": "Then it submits — for real." }
+        { "id": "one-flow-three-outputs", "enabled": true, "route": "demo-lab-output.html", "title": "One flow, three outputs", "talkingPoints": "Show live playback, self-playing link, rendered video, and the repository source together.", "narration": "That one flow now plays live inside the product, opens as a self-playing link, and renders to video. Projector, Studio, and Capture share the same source.", "actions": [
+          { "type": "glow", "selector": ".dl-output-card", "sequence": true, "count": 3, "stepMs": 1100, "afterMs": 350, "note": "Live, link, and video" },
+          { "type": "highlight", "selector": "[data-demo-id=\"readable-flow\"]", "holdMs": 3300, "note": "One readable source in the repository" }
         ]},
-        { "id": "tour-routes", "enabled": true, "route": "./", "title": "Continue across routes", "talkingPoints": "One click opens the next page and the flow keeps its place.", "narration": "", "actions": [
-          { "type": "scrollIntoView", "selector": "[data-demo-id=\"final-card\"]", "block": "center", "note": "One flow, across pages" },
-          { "type": "highlight", "selector": "[data-demo-id=\"final-card\"]", "holdMs": 1300, "note": "The flow survives a full navigation", "narration": "One flow can even cross pages." },
-          { "type": "pointer", "selector": "[data-action=\"destination\"]", "afterMs": 700, "note": "Opening the next page" },
-          { "type": "goto", "url": "destination.html?from=showcase", "note": "Navigating across routes" }
+        { "id": "repair-before-it-breaks", "enabled": true, "route": "demo-lab-output.html", "title": "Repair before customers see a break", "talkingPoints": "Validation catches missing targets and Flow Doctor repairs fingerprinted selectors.", "narration": "When the product changes, validation catches broken targets, and flow doctor can repair fingerprinted selectors before a customer sees the break.", "actions": [
+          { "type": "scrollIntoView", "selector": "[data-demo-id=\"maintenance\"]", "block": "center", "note": "Maintenance is part of the workflow" },
+          { "type": "spotlight", "selector": "[data-demo-id=\"doctor-output\"]", "holdMs": 4200, "dim": 0.35, "note": "Genuine repair output" },
+          { "type": "goto", "url": "./", "note": "Return to the landing page for the close" }
         ]},
-        { "id": "tour-home", "enabled": true, "route": "destination.html?from=showcase", "title": "Back to the start", "talkingPoints": "The flow and notes continued across a full navigation, then the tour returns home.", "narration": "Same flow — it survived the whole navigation.", "actions": [
-          { "type": "highlight", "selector": "[data-demo-id=\"destination-card\"]", "holdMs": 1300, "note": "The flow survived the navigation" },
-          { "type": "pointer", "selector": "[data-demo-id=\"return-home\"]", "afterMs": 1000, "note": "Clicking return to ScreenReel" },
-          { "type": "goto", "url": "./", "note": "Back to the ScreenReel home page" }
+        { "id": "own-the-stack", "enabled": true, "route": "./", "title": "Watch it, inspect it, own it", "talkingPoints": "Close on the two highest-intent actions: the live demo and the repository.", "narration": "Everything stays in your stack. Watch the live demo, inspect every line on GitHub, and use ScreenReel in your own product.", "actions": [
+          { "type": "highlight", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"hero-actions\"]", "holdMs": 2900, "note": "Run the live demo or inspect the repository" },
+          { "type": "pointer", "selector": "[data-demo-id=\"github-star\"]", "afterMs": 1600, "note": "Star ScreenReel on GitHub" }
         ]}
       ]
     },
