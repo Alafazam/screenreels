@@ -14,6 +14,7 @@ are the "how do I actually do this" walkthroughs, in the order you'd meet them.
 | **[Pacing and the cursor](pacing-and-cursor.md)** | The demo feels rushed / I want to change the pointer. |
 | **[Theming](theming.md)** | How do I make the callouts, rings, and countdown match my design system? |
 | **[Guided tours and onboarding](guided-tours.md)** | How do I let the viewer click Next through a tour, and keep them from breaking the app mid-flow? |
+| **[Roadmap](roadmap.md)** | What is planned but not built yet, such as pre-recorded AI-voice narration? |
 
 ## Before you start
 

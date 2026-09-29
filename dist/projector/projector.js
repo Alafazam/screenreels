@@ -27,7 +27,10 @@ const GUIDED_SHARE_CONTROLS = ['count', 'prev', 'play', 'next', 'sound', 'exit']
 const PILL_POSITIONS = ['right', 'center'];
 /* Authoring controls a share-link viewer never gets, whatever `controls` says. */
 const PRESENTER_ONLY_CONTROLS = new Set(['flow', 'notes', 'studio']);
-/* Stacking, bottom to top: app < click shield < dim backdrop (runtime) < projector shell. */
+/* The tour layer's own box: full-screen and click-through, overriding the UA popover style (a
+   centred, bordered, fit-content box). Inline, so a missing stylesheet cannot break it. */
+const LAYER_STYLE = 'position:fixed;inset:0;margin:0;padding:0;border:0;width:auto;height:auto;max-width:none;max-height:none;overflow:visible;background:transparent;color:inherit;pointer-events:none;';
+/* Stacking inside the tour layer, bottom to top: click shield < dim backdrop (runtime) < projector shell. */
 const SHIELD_Z_INDEX = 2147481990;
 /* Guided-tour keys, the ones a slide deck uses. */
 const GUIDED_KEYS = { ArrowRight: 'next', Enter: 'next', ArrowLeft: 'prev', Escape: 'exit' };
@@ -141,7 +144,7 @@ class Projector {
   displayText(value) { return window.ScreenReelCore.interpolate(value, this.variablesFor()).value; }
   mountUi() {
     if (this.rootHost) return;
-    this.rootHost = document.createElement('div'); this.rootHost.id = `screenreel-projector-${this.store.projectId}`; document.body.appendChild(this.rootHost); this.shadow = this.rootHost.attachShadow({ mode: 'open' });
+    this.ensureLayer(); this.rootHost = document.createElement('div'); this.rootHost.id = `screenreel-projector-${this.store.projectId}`; this.layer.appendChild(this.rootHost); this.shadow = this.rootHost.attachShadow({ mode: 'open' });
     const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = this.assetUrl('screenreel.css'); this.shadow.appendChild(link);
     const shell = document.createElement('div'); shell.className = 'sr-shell'; shell.innerHTML = '<div class="sr-pill" role="toolbar" aria-label="ScreenReel projector"></div><section class="sr-notes" hidden></section><div class="sr-toast" hidden></div><div class="sr-chooser-layer" hidden></div>'; this.shadow.appendChild(shell);
     this.chooserLayer = shell.querySelector('.sr-chooser-layer');
@@ -191,6 +194,30 @@ class Projector {
     this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(share ? null : scene);
     this.syncShield();
   }
+  /* The tour layer: one root for the pill, shield, cursor, and every overlay the runtime draws.
+     Host pop-ups (CDK overlays, popovers, <dialog>) open in the browser's top layer above every
+     z-index, so the layer is a top-layer popover too, re-raised whenever the tour may have been
+     covered (top-layer order is show order). A modal <dialog> makes everything outside it inert,
+     so while one is open the layer moves inside it. Without the Popover API it is a plain fixed
+     layer in <body>, which is how ScreenReel behaved before. */
+  ensureLayer() {
+    const id = window.ScreenReelCore.LAYER_ID;
+    let layer = document.getElementById(id);
+    if (!layer) {
+      layer = document.createElement('div'); layer.id = id; layer.style.cssText = LAYER_STYLE;
+      if (typeof layer.showPopover === 'function') layer.setAttribute('popover', 'manual');
+      document.body.appendChild(layer);
+    }
+    this.layer = layer; this.raiseLayer();
+  }
+  raiseLayer() {
+    const layer = this.layer; if (!layer?.isConnected || typeof layer.showPopover !== 'function') return;
+    const modal = [...document.querySelectorAll('dialog')].reverse().find((dialog) => dialog.matches(':modal'));
+    const parent = modal || document.body;
+    if (layer.matches(':popover-open')) layer.hidePopover();
+    if (layer.parentNode !== parent) parent.appendChild(layer);
+    layer.showPopover();
+  }
   /* A transparent layer over the app while a tour plays, so a stray viewer click, drag, or wheel
      cannot change the app mid-flow. The tour's own clicks go straight to their targets
      (el.click()), and the pill, callout controls, and choice cards all sit above it. Its layout is
@@ -209,7 +236,7 @@ class Projector {
         const onTrigger = clickEvent.clientX >= rect.left && clickEvent.clientX <= rect.right && clickEvent.clientY >= rect.top && clickEvent.clientY <= rect.bottom;
         if (onTrigger) this.target.click();
       });
-      document.body.appendChild(node); this.shieldNode = node;
+      node.style.pointerEvents = 'auto'; this.layer.prepend(node); this.shieldNode = node;
     }
     if (!wanted && this.shieldNode) { this.shieldNode.remove(); this.shieldNode = null; }
   }
@@ -266,6 +293,7 @@ class Projector {
     document.removeEventListener('keydown', this.keyHandler); this.keyHandler = null;
     this.resolveChooser?.(null);
     this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
+    this.layer?.remove(); this.layer = null;
     if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason });
     if (wasEnabled && origin && this.options.restoreOnExit && (reason === 'user' || reason === 'complete')) this.restoreOrigin(origin);
     return this;
@@ -444,6 +472,7 @@ class Projector {
          buttons are never live while nothing is listening; everything else plays through. */
       const step = guided && window.ScreenReelCore.actionType(action) === 'callout';
       const holder = step ? this.stepReleases : this.retained;
+      this.raiseLayer(); // the previous action may have opened a host pop-up over the tour
       const result = await window.ScreenReelCore.runAction(action, {
         document, window, signal: this.controller.signal, resolveFunction: (name) => this.resolveFunction(name), strictFunctions: this.strictFunctions(),
         variables: this.variablesFor(),
@@ -487,6 +516,7 @@ class Projector {
         return;
       }
       if (!result.ok && this.options.strict) return this.actionFailed(scene, action, actionIndex, result);
+      this.raiseLayer();
       if (step && result.ok && generation === this.playGeneration && this.store.playing()) {
         event('awaitingnext', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, actionIndex });
         await this.waitForStep();

@@ -292,7 +292,7 @@ try {
     const spot = document.createElement('div'); spot.id = 'guided-spot'; spot.textContent = 'Guided target'; document.body.appendChild(spot);
     const projector = await window.ScreenReel.mount(target, { projectId: 'guided-example', advance: 'guided', loop: false, narration: false, cursor: false, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [{ id: 'guided', name: 'Guided', defaults: { dwellMs: 50 }, scenes: [{ id: 'one', route: '/', actions: [{ type: 'callout', selector: '#guided-spot', text: 'One', holdMs: 300 }] }, { id: 'two', route: '/', actions: [{ type: 'callout', selector: '#guided-spot', text: 'Two', holdMs: 300 }] }] }] } } });
     const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
-    let dimmed = false; const observer = new MutationObserver(() => { if (document.querySelector('.sr-dim-backdrop')) dimmed = true; }); observer.observe(document.body, { childList: true });
+    let dimmed = false; const observer = new MutationObserver(() => { if (document.querySelector('.sr-dim-backdrop')) dimmed = true; }); observer.observe(document.body, { childList: true, subtree: true }); // overlays live inside the tour layer
     projector.enable(); const firstWait = once('awaitingnext'); projector.play(); const first = await firstWait;
     await new Promise((resolve) => setTimeout(resolve, 300)); // a dwell timer would have advanced by now
     const heldPosition = projector.store.position(); const pulsing = !!projector.pill.querySelector('[data-cmd="next"].sr-await-next');
@@ -471,6 +471,20 @@ try {
     events: ['awaitingnext:pair', 'awaitingnext:pair', 'awaitingnext:branch', 'choice:branch', 'awaitingnext:last', 'complete:last', 'exit:last:complete'],
     shield: false, enabled: false,
   });
+  // Top layer: a host modal <dialog> opened by the tour must not cover the next callout — its Next
+  // button stays clickable (the tour layer moves into the open modal and is re-raised).
+  await inlinePage.evaluate(async () => {
+    const dialog = document.createElement('dialog'); dialog.id = 'host-modal'; dialog.style.cssText = 'width:80vw;height:80vh'; dialog.textContent = 'Choose a module'; document.body.appendChild(dialog);
+    const target = document.createElement('button'); target.id = 'modal-demo'; document.body.appendChild(target);
+    window.ScreenReel.registerFn('openHostModal', () => dialog.showModal());
+    const flow = { id: 'modal', name: 'Modal', scenes: [{ id: 'm', route: '/', actions: [{ type: 'call', fn: 'openHostModal', args: [] }, { type: 'callout', selector: '#host-modal', text: 'Pick a module', placement: 'auto' }] }] };
+    window.__modalTour = await window.ScreenReel.mount(target, { projectId: 'modal-example', loop: false, narration: false, cursor: false, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [flow] } } });
+    await window.__modalTour.start('modal', { mode: 'guided' });
+  });
+  await inlinePage.locator('.sr-callout-next').waitFor();
+  await inlinePage.locator('.sr-callout-next').click({ timeout: 3000 }); // a real click: fails if the modal covers it
+  await inlinePage.waitForFunction(() => !window.__modalTour.store.playing() || !document.querySelector('.sr-callout-next'));
+  await inlinePage.evaluate(() => { window.__modalTour.destroy(); document.getElementById('host-modal').close(); document.getElementById('host-modal').remove(); document.getElementById('modal-demo').remove(); });
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);

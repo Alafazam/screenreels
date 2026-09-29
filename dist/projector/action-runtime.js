@@ -126,6 +126,11 @@
     style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:var(--sr-ring-radius,14px);border:3px solid var(--sr-ring-color,var(--sr-accent,#7c3aed));box-shadow:var(--sr-ring-shadow,0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48));transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:var(--sr-glow,conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e)) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;box-sizing:border-box;max-width:var(--sr-callout-width,300px);padding:12px 14px;border:var(--sr-callout-border,1px solid #e4e4e7);border-radius:var(--sr-callout-radius,10px);background:var(--sr-callout-bg,#fff);color:var(--sr-callout-fg,#18181b);font:500 var(--sr-callout-font-size,13px)/1.45 var(--sr-font-family,system-ui,sans-serif);box-shadow:var(--sr-callout-shadow,0 12px 32px rgba(15,23,42,.16));pointer-events:none}.sr-action-callout.sr-callout--interactive{pointer-events:auto}.sr-callout-title{margin:0 0 3px;font-weight:600;font-size:var(--sr-callout-title-size,14px);color:var(--sr-callout-title-fg,inherit)}.sr-callout-body{color:var(--sr-callout-body-fg,#52525b)}.sr-callout-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.sr-callout-actions button{padding:5px 12px;border:1px solid var(--sr-callout-button-border,#e4e4e7);border-radius:var(--sr-button-radius,7px);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer}.sr-callout-actions .sr-callout-next{border-color:var(--sr-accent,#7c3aed);background:var(--sr-accent,#7c3aed);color:var(--sr-accent-foreground,#fff)}.sr-callout-actions button:focus-visible{outline:2px solid var(--sr-accent,#7c3aed);outline-offset:2px}.sr-callout-step{margin-right:auto;align-self:center;color:var(--sr-callout-muted,#71717a);font-weight:500}.sr-callout-actions .sr-callout-skip{border-color:transparent;color:var(--sr-callout-muted,#71717a)}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--sr-ripple-color,var(--sr-accent,#7c3aed));pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:var(--sr-countdown-backdrop,transparent);backdrop-filter:var(--sr-countdown-backdrop-filter,none)}.sr-count-num{font:800 var(--sr-countdown-size,220px)/1 var(--sr-font-family,system-ui,sans-serif);letter-spacing:-.04em;color:var(--sr-countdown-color,rgba(63,63,70,.24));text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 var(--sr-font-family,system-ui,sans-serif);color:var(--sr-countdown-caption-color,rgba(63,63,70,.5))}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--sr-choice-backdrop,rgba(9,9,11,.52));pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 var(--sr-font-family,system-ui,sans-serif);color:var(--sr-choice-prompt-color,#fff);text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:var(--sr-choice-radius,14px);border:1px solid rgba(255,255,255,.16);background:var(--sr-choice-card-bg,#fff);color:var(--sr-choice-card-fg,#18181b);font:700 15px/1.35 var(--sr-font-family,system-ui,sans-serif);cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid var(--sr-accent,#7c3aed)}';
     doc.head.prepend(style); // first in <head>, so a host's own rules win at equal specificity
   }
+  /* Everything ScreenReel draws goes into one layer. The Projector makes it a top-layer popover so
+     host dialogs and CDK overlays (which live in the browser's top layer, above every z-index)
+     cannot cover the tour; without a Projector (Capture, a bare runtime) overlays go into <body>. */
+  const LAYER_ID = '__screenreelLayer';
+  function overlayParent(doc) { return doc.getElementById?.(LAYER_ID) || doc.body; }
   function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
   /* Highlight, highlight sequence, and callout dim the rest of the page so the eye lands on the
      target. Precedence: the action's own `dim`, then the host's context default (Projector's
@@ -143,10 +148,10 @@
      else. Placed before insertion so the hole never animates in from the corner. */
   function createDimBackdrop(doc, el, level) {
     const node = doc.createElement('div'); node.className = 'sr-dim-backdrop';
-    node.style.boxShadow = `0 0 0 9999px rgba(var(--sr-dim-rgb, 9, 9, 11), ${level})`; placeBox(node, el); doc.body.appendChild(node); return node;
+    node.style.boxShadow = `0 0 0 9999px rgba(var(--sr-dim-rgb, 9, 9, 11), ${level})`; placeBox(node, el); overlayParent(doc).appendChild(node); return node;
   }
   function createRing(doc, el) {
-    const ring = doc.createElement('div'); ring.className = 'sr-glow-box'; placeBox(ring, el); doc.body.appendChild(ring); return ring;
+    const ring = doc.createElement('div'); ring.className = 'sr-glow-box'; placeBox(ring, el); overlayParent(doc).appendChild(ring); return ring;
   }
   /* Where a callout goes. Pure geometry so it can be tested without a browser.
      - `left`/`right` centre vertically on the target; `top`/`bottom` align to its left edge.
@@ -218,7 +223,7 @@
     const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null;
     const ring = action.highlight ? createRing(doc, el) : null;
     const controls = ctx.persist ? ctx.calloutControls : null;
-    const tip = buildCallout(doc, action, controls); doc.body.appendChild(tip);
+    const tip = buildCallout(doc, action, controls); overlayParent(doc).appendChild(tip);
     const place = () => {
       if (backdrop) placeBox(backdrop, el); if (ring) placeBox(ring, el);
       const measured = tip.getBoundingClientRect();
@@ -299,7 +304,7 @@
     const img = doc.createElement('img'); img.className = 'sr-reveal';
     try { img.src = new URL(action.src, win.location.href).href; } catch { img.src = action.src; }
     Object.assign(img.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` });
-    doc.body.appendChild(img); await sleep(REVEAL_FADE_IN_MS, ctx.signal); img.classList.add('show');
+    overlayParent(doc).appendChild(img); await sleep(REVEAL_FADE_IN_MS, ctx.signal); img.classList.add('show');
     await sleep(action.holdMs || DEFAULTS.reveal.holdMs, ctx.signal); img.classList.remove('show'); await sleep(REVEAL_FADE_OUT_MS, ctx.signal); img.remove();
   }
   /* Side panel holding the code a developer would write for the target being shown.
@@ -309,7 +314,7 @@
     const panel = doc.createElement('div'); panel.className = 'sr-snippet';
     if (action.label) { const label = doc.createElement('p'); label.className = 'sr-snippet-label'; label.textContent = action.label; panel.appendChild(label); }
     const code = doc.createElement('pre'); code.className = 'sr-snippet-code'; code.textContent = String(action.code ?? ''); panel.appendChild(code);
-    doc.body.appendChild(panel);
+    overlayParent(doc).appendChild(panel);
     const rect = el.getBoundingClientRect(); const size = panel.getBoundingClientRect(); const margin = SNIPPET_MARGIN_PX;
     const roomLeft = rect.left - margin * 2, roomRight = win.innerWidth - rect.right - margin * 2;
     const side = action.side === 'left' || action.side === 'right' ? action.side
@@ -349,7 +354,7 @@
         button.addEventListener('click', () => finish({ ok: true, jumpTo: option.scene }));
         cards.appendChild(button); return { button, option };
       });
-      doc.body.appendChild(overlay);
+      overlayParent(doc).appendChild(overlay);
       const raf = ctx.window?.requestAnimationFrame;
       raf ? raf(() => overlay.classList.add('show')) : overlay.classList.add('show');
       ctx.signal?.addEventListener('abort', onAbort, { once: true });
@@ -369,16 +374,16 @@
     const overlay = doc.createElement('div'); overlay.className = 'sr-countdown-overlay';
     const num = doc.createElement('div'); num.className = 'sr-count-num';
     const cap = doc.createElement('div'); cap.className = 'sr-count-cap'; cap.textContent = action.caption || 'Your demo is about to play';
-    overlay.appendChild(num); overlay.appendChild(cap); doc.body.appendChild(overlay);
+    overlay.appendChild(num); overlay.appendChild(cap); overlayParent(doc).appendChild(overlay);
     const labels = []; for (let n = from; n >= 1; n--) labels.push(String(n)); labels.push(action.goText || 'Go');
     for (const label of labels) { if (ctx.signal?.aborted) break; num.textContent = label; num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop'); await sleep(Number(action.stepMs) || DEFAULTS.countdown.stepMs, ctx.signal); }
     overlay.remove();
   }
   function dispatchValue(el, value) { const EventCtor = el.ownerDocument.defaultView.Event; el.value = value; el.dispatchEvent(new EventCtor('input', { bubbles: true })); el.dispatchEvent(new EventCtor('change', { bubbles: true })); }
-  function ripple(doc, el) { ensureStyles(doc); const rect = el.getBoundingClientRect(); const dot = doc.createElement('div'); dot.className = 'sr-click-ripple'; dot.style.left = `${rect.left + rect.width / 2}px`; dot.style.top = `${rect.top + rect.height / 2}px`; doc.body.appendChild(dot); setTimeout(() => dot.remove(), RIPPLE_REMOVE_MS); }
+  function ripple(doc, el) { ensureStyles(doc); const rect = el.getBoundingClientRect(); const dot = doc.createElement('div'); dot.className = 'sr-click-ripple'; dot.style.left = `${rect.left + rect.width / 2}px`; dot.style.top = `${rect.top + rect.height / 2}px`; overlayParent(doc).appendChild(dot); setTimeout(() => dot.remove(), RIPPLE_REMOVE_MS); }
   async function runGlow(action, ctx) {
     const elements = queryAll(ctx.document, action.selector).slice(0, Number(action.count) || GLOW_FALLBACK_COUNT); if (!elements.length) return false;
-    ensureStyles(ctx.document); const box = ctx.document.createElement('div'); box.className = 'sr-glow-box'; ctx.document.body.appendChild(box);
+    ensureStyles(ctx.document); const box = ctx.document.createElement('div'); box.className = 'sr-glow-box'; overlayParent(ctx.document).appendChild(box);
     // The glow box cannot carry the dim shadow itself: its ring mask would clip the shadow away.
     const level = dimLevel(action, ctx); let backdrop = null; let current = null;
     const place = (el) => { current = el; placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
@@ -465,7 +470,7 @@
          a spread shadow on the ring box sat above the pill and darkened the presenter's controls.
          Spotlight exists to dim, so it ignores the host's highlight `dim` default. */
       ensureStyles(doc); const backdrop = createDimBackdrop(doc, el, Number(action.dim) || DEFAULTS.spotlight.dim);
-      const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); doc.body.appendChild(box);
+      const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); overlayParent(doc).appendChild(box);
       const stopFollowing = followTarget(win, () => { placeBox(box, el); placeBox(backdrop, el); });
       await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); settleOverlays(action, ctx, [box, backdrop], stopFollowing);
     }
@@ -573,5 +578,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

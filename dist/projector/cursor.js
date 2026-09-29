@@ -90,7 +90,7 @@
     node.setAttribute('aria-hidden', 'true');
     node.dataset.glyph = glyph;
     node.innerHTML = GLYPHS[glyph] || GLYPHS.dot;
-    doc.body.appendChild(node);
+    (root.ScreenReelCore?.overlayParent(doc) || doc.body).appendChild(node);
     paint();
     return node;
   }
@@ -109,7 +109,7 @@
     ring.style.setProperty('--sr-ring-life', `${life}ms`);
     ring.style.left = `${x}px`;
     ring.style.top = `${y + bobOffset}px`;
-    doc.body.appendChild(ring);
+    (root.ScreenReelCore?.overlayParent(doc) || doc.body).appendChild(ring);
     setTimeout(() => ring.remove(), life + RING_REMOVE_SLACK_MS);
   }
 
