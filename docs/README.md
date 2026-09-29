@@ -28,8 +28,8 @@ Two vocabulary notes that make the rest easier to read:
 ## See it all running
 
 ```bash
-npm run build
-npm run example:serve
+pnpm build
+pnpm example:serve
 ```
 
 Then open <http://127.0.0.1:4173/examples/action-showcase/showcase.html> and press

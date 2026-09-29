@@ -3,9 +3,7 @@
   "version": "0.3.0",
   "description": "Author and present interactive product demos, then capture the same flows as polished video.",
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.21.0",
   "bin": {
     "screenreel": "bin/screenreel.mjs"
   },

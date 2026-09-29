@@ -1,0 +1,23 @@
+packages:
+  - 'packages/*'
+
+# pnpm 10 skips dependency lifecycle scripts unless they are allowlisted. The ffmpeg/ffprobe
+# platform packages ship their binary without the executable bit and set it in
+# `postinstall: chmod u+x`, so every platform a contributor or CI runner may use is listed.
+onlyBuiltDependencies:
+  - '@ffmpeg-installer/darwin-arm64'
+  - '@ffmpeg-installer/darwin-x64'
+  - '@ffmpeg-installer/linux-arm'
+  - '@ffmpeg-installer/linux-arm64'
+  - '@ffmpeg-installer/linux-ia32'
+  - '@ffmpeg-installer/linux-x64'
+  - '@ffmpeg-installer/win32-ia32'
+  - '@ffmpeg-installer/win32-x64'
+  - '@ffprobe-installer/darwin-arm64'
+  - '@ffprobe-installer/darwin-x64'
+  - '@ffprobe-installer/linux-arm'
+  - '@ffprobe-installer/linux-arm64'
+  - '@ffprobe-installer/linux-ia32'
+  - '@ffprobe-installer/linux-x64'
+  - '@ffprobe-installer/win32-ia32'
+  - '@ffprobe-installer/win32-x64'

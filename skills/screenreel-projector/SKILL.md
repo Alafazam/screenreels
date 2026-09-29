@@ -10,7 +10,7 @@ Build against the running application and the checked-in flow source. Keep canon
 ## Workflow
 
 1. Inspect the host's build, router, content-security policy, and existing navigation button.
-2. Run `screenreel projector install --out <static-assets-dir>` after `npm run build` in ScreenReel.
+2. Run `screenreel projector install --out <static-assets-dir>` after `pnpm build` in ScreenReel.
 3. Add either `<screenreel-projector>` or `ScreenReel.mount(existingButton, options)`. Require a stable `projectId`.
 4. Supply a local/remote JSON URL or inline manifest. Use router hooks for an SPA.
 5. Run `screenreel flow inspect --base-url <url> --route <route> --json` before inventing selectors.
