@@ -20,7 +20,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 fs.rmSync(site, { recursive: true, force: true });
 fs.mkdirSync(site, { recursive: true });
-for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html', 'demo-lab.html', 'demo-lab-output.html', 'showcase.css', 'showcase.js', 'showcase.demo.json', 'styles.css', 'landing.css', 'demo-lab.css', 'app.js', 'landing-experiment.js', 'demo-lab.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'github-mark.png', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
+for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase-create.html', 'showcase-heal.html', 'showcase-voice.html', 'showcase-personalize.html', 'showcase-share.html', 'showcase-branch.html', 'demo-lab.html', 'demo-lab-output.html', 'showcase.css', 'showcase.js', 'showcase.demo.json', 'styles.css', 'landing.css', 'demo-lab.css', 'app.js', 'landing-experiment.js', 'demo-lab.js', 'tour-options.js', 'fixtures.js', 'screenreel.demo.json', 'logo.svg', 'github-mark.png', 'favicon.svg', 'apple-touch-icon.png', 'og-image.png', 'studio-shot.png', 'robots.txt', 'sitemap.xml']) {
   fs.copyFileSync(path.join(example, name), path.join(site, name));
 }
 fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), { recursive: true });
@@ -38,6 +38,7 @@ const pageKeys = {
   'fixtures.js': hashFile(path.join(site, 'fixtures.js')),
   'showcase.js': hashFile(path.join(site, 'showcase.js')),
   'demo-lab.js': hashFile(path.join(site, 'demo-lab.js')),
+  'tour-options.js': hashFile(path.join(site, 'tour-options.js')),
   'landing.css': hashFile(path.join(site, 'landing.css')),
   'demo-lab.css': hashFile(path.join(site, 'demo-lab.css')),
 };
@@ -65,6 +66,7 @@ const required = [
   'app.js',
   'landing-experiment.js',
   'demo-lab.js',
+  'tour-options.js',
   'fixtures.js',
   'showcase.html',
   'showcase.js',

@@ -15,6 +15,7 @@ function stubDocument(targetCount = 1) {
       getBoundingClientRect: () => rect,
       getClientRects: () => [rect],
       appendChild(child) { element.children.push(child); appended.push(child); return child; },
+      prepend(child) { element.children.unshift(child); return child; },
       remove() { element.removed = true; },
     };
     return element;
@@ -43,7 +44,7 @@ test('highlight dims the rest of the page by default and un-dims when it ends', 
   assert.equal(result.ok, true);
   const [backdrop] = stub.backdrops();
   assert.equal(stub.backdrops().length, 1);
-  assert.match(backdrop.style.boxShadow, /rgba\(9,9,11,0\.45\)/);
+  assert.equal(backdrop.style.boxShadow, '0 0 0 9999px rgba(var(--sr-dim-rgb, 9, 9, 11), 0.45)');
   assert.equal(backdrop.style.left, '5px', 'the cut-out is placed on the target, not the corner');
   assert.equal(backdrop.removed, true);
 });
@@ -108,7 +109,7 @@ test('spotlight dims through the shared backdrop, so the presenter pill stays li
 
 test('the dim backdrop is layered below the projector shell', async () => {
   const stub = stubDocument(); let css = '';
-  stub.doc.head.appendChild = (node) => { css = node.textContent; return node; };
+  stub.doc.head.prepend = (node) => { css = node.textContent; return node; };
   await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
   const backdropZ = Number(/\.sr-dim-backdrop\{[^}]*z-index:(\d+)/.exec(css)[1]);
   const shellCss = (await import('node:fs')).readFileSync(new URL('../packages/projector/screenreel.css', import.meta.url), 'utf8');

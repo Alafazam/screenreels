@@ -27,12 +27,7 @@
   document.querySelector('[data-demo-id="download-video"]')?.addEventListener('click', () => showToast('Render download is ready in the demo fixture.'));
   const demoButton = document.getElementById('demo-button');
   if (demoButton && window.ScreenReel && !isStudioPreview) {
-    window.ScreenReel.mount(demoButton, {
-      projectId: 'action-showcase',
-      flow: { src: 'screenreel.demo.json' },
-      loop: false,
-      pages: ['./', 'demo-lab.html', 'demo-lab-output.html', 'showcase-heal.html'],
-    }).catch((error) => {
+    window.ScreenReel.mount(demoButton, window.SCREENREEL_LANDING_TOUR).catch((error) => {
       console.error('[screenreel] Demo Lab failed to initialize', error);
       demoButton.disabled = true;
     });

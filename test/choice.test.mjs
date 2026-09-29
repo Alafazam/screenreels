@@ -13,6 +13,7 @@ function stubDocument() {
       children: [], style: {}, listeners: {},
       classList: { classes: new Set(), add(name) { this.classes.add(name); }, remove(name) { this.classes.delete(name); }, contains(name) { return this.classes.has(name); } },
       appendChild(child) { this.children.push(child); return child; },
+      prepend(child) { this.children.unshift(child); return child; },
       addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
       removeEventListener() {},
       remove() { element.removed = true; },

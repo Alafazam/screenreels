@@ -51,27 +51,19 @@ const demoButton = activePanel?.querySelector('.landing-demo-button');
 if (demoButton && !IS_STUDIO_PREVIEW) {
   demoButton.id = 'demo-button';
   (async () => {
-    const projector = await window.ScreenReel.mount(demoButton, {
-      projectId: 'action-showcase',
-      flow: { src: 'screenreel.demo.json' },
-      loop: false,
-      pages: ['./', 'demo-lab.html', 'demo-lab-output.html', 'showcase-heal.html'],
-    });
+    const projector = await window.ScreenReel.mount(demoButton, window.SCREENREEL_LANDING_TOUR);
     let launching = false;
     demoButton.addEventListener('click', async (event) => {
       event.stopImmediatePropagation();
       if (projector.store.enabled()) {
-        projector.disable();
+        projector.disable('user');
         return;
       }
       if (launching) return;
       launching = true;
       try {
         analytics.emit('live_demo_start', { variant });
-        projector.store.setActive('guided-tour');
-        projector.enable();
-        projector.store.setPosition(0);
-        await projector.play();
+        await projector.start('guided-tour');
       } finally {
         launching = false;
       }

@@ -23,12 +23,13 @@ await projector.start('getting-started', { mode: 'guided' }); // skips it
 
 ## How guided mode plays
 
-- **Every callout is a step.** It stays on screen with a ring and a dim around its target until the
-  viewer presses Next. Then the scene carries on, so a `click → callout → click` scene can undo
-  its own change after the viewer has seen it.
-- **A scene with no callout step waits at its end.** Its final highlight, spotlight, or callout
-  stays up until Next. A scene that already had a step moves on after its `dwellMs`, so the viewer
-  never presses Next twice for one scene.
+- **Every callout is a step, and only callouts are.** A callout ignores its `holdMs` and stays on
+  screen, with a ring and a dim around its target, until the viewer presses Next. Then the scene
+  carries on, so a `click → callout → click` scene can undo its own change after the viewer has
+  seen it, and a `choice` after a callout still shows. Everything else plays through, and a scene
+  with no callout (a countdown intro, say) moves on after its `dwellMs`.
+- **Next on the last scene of a `loop: false` flow completes the tour**, whether it comes from the
+  card, the keyboard, or the pill.
 - **Controls sit where the viewer is looking.** The card shows the step count (callouts across the
   tour), Skip, Back (from step two), and Next. Next reads Finish on the last step.
 - **Keys:** → or Enter for Next, ← for Back, Esc to exit. Keys typed into the host's own inputs
@@ -62,6 +63,9 @@ glow, spotlight, or callout keeps it up until the scene is left.
 `cleanup` runs whenever the scene is left, for any reason: next, back, exit, pause, a choice jump,
 or navigation. It runs once, to completion. Put undo steps here, not at the end of `actions`, and
 an interrupted tour can never leave the app changed.
+
+The card is white by default. Restyle it, and the rings, countdown, and choice cards, with
+`--sr-*` properties: see [Theming](theming.md).
 
 ## The click shield
 

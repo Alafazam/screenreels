@@ -138,13 +138,16 @@
     setPlaying(value) { value ? this.session.setItem(this.sessionKey('playing'), '1') : this.session.removeItem(this.sessionKey('playing')); }
     /* Share mode (?demo=play): viewer-facing minimal chrome. Session-scoped so it survives the
        flow's own cross-page navigations, exactly like playback state. */
+    /* The viewer's Guided/Autoplay pick, kept for the run so it survives a tour's page navigations. */
+    advanceChoice() { return this.session.getItem(this.sessionKey('advance-choice')) || null; }
+    setAdvanceChoice(value) { value ? this.session.setItem(this.sessionKey('advance-choice'), value) : this.session.removeItem(this.sessionKey('advance-choice')); }
     share() { return this.session.getItem(this.sessionKey('share')) === '1'; }
     setShare(value) { value ? this.session.setItem(this.sessionKey('share'), '1') : this.session.removeItem(this.sessionKey('share')); }
     /* URL-supplied demo variables persist for the run (session-scoped, like position/playing) so a
        personalized share link survives hard navigations mid-flow. */
     variables() { try { return JSON.parse(this.session.getItem(this.sessionKey('variables'))) || {}; } catch { return {}; } }
     setVariables(values) { const entries = Object.entries(values || {}); entries.length ? this.session.setItem(this.sessionKey('variables'), JSON.stringify(Object.fromEntries(entries))) : this.session.removeItem(this.sessionKey('variables')); }
-    clearRun() { ['position', 'playing', 'navigation', 'variables', 'share'].forEach((key) => this.session.removeItem(this.sessionKey(key))); }
+    clearRun() { ['position', 'playing', 'navigation', 'variables', 'share', 'advance-choice'].forEach((key) => this.session.removeItem(this.sessionKey(key))); }
     clearAll() {
       const keys = []; for (let index = 0; index < this.storage.length; index++) { const key = this.storage.key(index); if (key?.startsWith(this.prefix)) keys.push(key); } keys.forEach((key) => this.storage.removeItem(key));
       const sessionKeys = []; for (let index = 0; index < this.session.length; index++) { const key = this.session.key(index); if (key?.startsWith(this.prefix)) sessionKeys.push(key); } sessionKeys.forEach((key) => this.session.removeItem(key));

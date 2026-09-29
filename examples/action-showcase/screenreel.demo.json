@@ -7,6 +7,7 @@
         { "id": "open-source-hook", "enabled": true, "route": "./", "title": "Open-source product demos", "talkingPoints": "Lead with the product category, ownership model, and zero-backend boundary.", "narration": "ScreenReel is an open-source demo recorder that ships with your product. No account, backend, or hosted workspace.", "actions": [
           { "type": "highlight", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"open-source-badge\"]", "holdMs": 2600, "note": "Free and open source" },
           { "type": "spotlight", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"hero-statement\"]", "holdMs": 4300, "dim": 0.38, "note": "A demo recorder that ships with your product" },
+          { "id": "open-source-hook-callout", "type": "callout", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"hero-statement\"]", "title": "Open-source product demos", "text": "Record once, keep the flow in your repo, and play it inside your product.", "placement": "bottom", "highlight": true, "holdMs": 2800 },
           { "type": "pointer", "selector": "[data-demo-id=\"demo-lab-link\"]", "afterMs": 650, "note": "Open the deterministic Demo Lab" },
           { "type": "goto", "url": "demo-lab.html", "note": "Move to a new scene before navigation" }
         ]},
@@ -14,26 +15,31 @@
           { "type": "type", "selector": "#dl-demo-name", "text": "ScreenReel in 90 seconds", "clearFirst": true, "charMs": 35, "afterMs": 300, "note": "Name the story" },
           { "type": "set", "selector": "#dl-audience", "value": "engineering-leaders", "afterMs": 350, "note": "Choose engineering leaders" },
           { "type": "toggle", "selector": "#dl-presenter-notes", "checked": true, "afterMs": 350, "note": "Keep presenter notes beside the flow" },
-          { "type": "lever", "selector": "#dl-pacing", "to": 3, "durMs": 900, "afterMs": 700, "note": "Set measured pacing" }
+          { "type": "lever", "selector": "#dl-pacing", "to": 3, "durMs": 900, "afterMs": 700, "note": "Set measured pacing" },
+          { "id": "author-the-story-callout", "type": "callout", "selector": "#dl-pacing", "title": "Record by using the app", "text": "Typing, selects, toggles, and sliders you perform become editable actions.", "placement": "bottom", "highlight": true, "holdMs": 2800 }
         ]},
         { "id": "emphasise-real-elements", "enabled": true, "route": "demo-lab.html", "title": "Emphasise the real interface", "talkingPoints": "Reorder a scene, then capture highlight and spotlight actions on stable real targets.", "narration": "When a moment needs emphasis, point at the real element and capture a highlight or spotlight. Your demo remains a readable flow in the repository.", "actions": [
           { "type": "drag", "selector": "[data-demo-id=\"scene-03\"]", "toSelector": "[data-demo-id=\"scene-02\"]", "durMs": 850, "afterMs": 350, "note": "Reorder the closing scene" },
           { "type": "highlight", "selector": "[data-demo-id=\"scene-01\"]", "holdMs": 1900, "note": "Highlight a real scene" },
           { "type": "spotlight", "selector": "[data-demo-id=\"result-preview\"]", "holdMs": 2500, "dim": 0.42, "note": "Spotlight the live result" },
+          { "id": "emphasise-real-elements-callout", "type": "callout", "selector": "[data-demo-id=\"result-preview\"]", "title": "Emphasise the real interface", "text": "Point at a real element to capture a highlight or a spotlight.", "placement": "left", "highlight": true, "holdMs": 2800 },
           { "type": "pointer", "selector": "[data-demo-id=\"generate-outputs\"]", "afterMs": 550, "note": "Generate the three outputs" },
           { "type": "goto", "url": "demo-lab-output.html", "note": "Move to a new scene before navigation" }
         ]},
         { "id": "one-flow-three-outputs", "enabled": true, "route": "demo-lab-output.html", "title": "One flow, three outputs", "talkingPoints": "Show live playback, self-playing link, rendered video, and the repository source together.", "narration": "That one flow now plays live inside the product, opens as a self-playing link, and renders to video. Projector, Studio, and Capture share the same source.", "actions": [
           { "type": "glow", "selector": ".dl-output-card", "sequence": true, "count": 3, "stepMs": 1100, "afterMs": 350, "note": "Live, link, and video" },
+          { "id": "one-flow-three-outputs-callout", "type": "callout", "selector": "[data-demo-id=\"live-output\"]", "title": "One flow, three outputs", "text": "Live inside the product, a self-playing link, or a rendered video.", "placement": "bottom", "highlight": true, "holdMs": 2800 },
           { "type": "highlight", "selector": "[data-demo-id=\"readable-flow\"]", "holdMs": 3300, "note": "One readable source in the repository" }
         ]},
         { "id": "repair-before-it-breaks", "enabled": true, "route": "demo-lab-output.html", "title": "Repair before customers see a break", "talkingPoints": "Validation catches missing targets and Flow Doctor repairs fingerprinted selectors.", "narration": "When the product changes, validation catches broken targets, and flow doctor can repair fingerprinted selectors before a customer sees the break.", "actions": [
           { "type": "scrollIntoView", "selector": "[data-demo-id=\"maintenance\"]", "block": "center", "note": "Maintenance is part of the workflow" },
           { "type": "spotlight", "selector": "[data-demo-id=\"doctor-output\"]", "holdMs": 4200, "dim": 0.35, "note": "Genuine repair output" },
+          { "id": "repair-before-it-breaks-callout", "type": "callout", "selector": "[data-demo-id=\"doctor-output\"]", "title": "Repair before it breaks", "text": "Validation catches broken targets; flow doctor repairs them.", "placement": "top", "highlight": true, "holdMs": 2800 },
           { "type": "goto", "url": "./", "note": "Return to the landing page for the close" }
         ]},
         { "id": "own-the-stack", "enabled": true, "route": "./", "title": "Watch it, inspect it, own it", "talkingPoints": "Close on the two highest-intent actions: the live demo and the repository.", "narration": "Everything stays in your stack. Watch the live demo, inspect every line on GitHub, and use ScreenReel in your own product.", "actions": [
           { "type": "highlight", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"hero-actions\"]", "holdMs": 2900, "note": "Run the live demo or inspect the repository" },
+          { "id": "own-the-stack-callout", "type": "callout", "selector": "[data-variant-panel]:not([hidden]) [data-demo-id=\"hero-actions\"]", "title": "Watch it, inspect it, own it", "text": "Run the live demo, or read every line on GitHub.", "placement": "bottom", "highlight": true, "holdMs": 2800 },
           { "type": "pointer", "selector": "[data-demo-id=\"github-star\"]", "afterMs": 1600, "note": "Star ScreenReel on GitHub" }
         ]}
       ]

@@ -52,6 +52,10 @@ try {
     document.querySelector('#demo-button').click();
   }));
   await visiblePill(page);
+  // Nothing plays until the viewer picks a mode; playing then routes to the first scene.
+  await page.locator('[data-choose="auto"]').click();
+  await page.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true' && !location.search.includes('variant'));
+  await visiblePill(page);
   const productValidation = await page.evaluate(() => window.ScreenReel.validateScene());
   assert.equal(productValidation.ok, true); assert.equal(productValidation.sceneId, 'open-source-hook');
   assert.deepEqual(productConversion, { event: 'live_demo_start', variant: 'product-in-product' });
@@ -76,13 +80,15 @@ try {
   await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
   // Both forced variants launch the same canonical six-scene dogfooding demo.
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
+  // The landing asks Guided or Autoplay first; this pass checks Autoplay end to end.
+  await page.locator('[data-choose="auto"]').click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
   const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'open-source-hook');
   assert.equal(await page.locator('.sr-count').innerText(), '1/6');
   await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 9000 });
   // The agent cursor must be live during playback: the Projector supplies moveCursor to the
   // executor, so a missing node means the cursor call sites have gone back to being no-ops.
-  await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 9000 });
+  await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 15000 }); // first appears at scene 1's pointer, after its callout
   // Narration is on by default, so the pill must offer a speaker and report itself unmuted. A
   // missing button means narrator.js did not load and the tour has silently gone quiet.
   assert.equal(await page.locator('.sr-pill [data-cmd="capture"]').count(), 0);
@@ -248,7 +254,8 @@ try {
   await page.getByRole('button', { name: 'Play flow', exact: true }).click();
   await page.locator('.sr-studio').waitFor({ state: 'detached' });
   await page.locator('.sr-action-box,.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
-  assert.equal(await page.locator('.sr-flow').evaluate((node) => node.selectedOptions[0].textContent), 'All actions showcase copy');
+  // The landing's trimmed bar has no flow picker, so read the active flow from the projector.
+  assert.equal(await page.evaluate(() => [...window.ScreenReel.instances][0].store.activeFlow().name), 'All actions showcase copy');
   await page.locator('button[title="Pause"]').click();
   const spaPage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await spaPage.goto(new URL('../spa-router/', baseUrl).href, { waitUntil: 'domcontentloaded' });
   const spaTrigger = spaPage.locator('#demo-button'); await spaTrigger.waitFor(); await spaPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await spaTrigger.click(); await visiblePill(spaPage);
@@ -270,7 +277,7 @@ try {
   const guided = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'guided-demo'; document.body.appendChild(target);
     const spot = document.createElement('div'); spot.id = 'guided-spot'; spot.textContent = 'Guided target'; document.body.appendChild(spot);
-    const projector = await window.ScreenReel.mount(target, { projectId: 'guided-example', advance: 'guided', loop: false, narration: false, cursor: false, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [{ id: 'guided', name: 'Guided', defaults: { dwellMs: 50 }, scenes: [{ id: 'one', route: '/', actions: [{ type: 'highlight', selector: '#guided-spot', holdMs: 300 }] }, { id: 'two', route: '/', actions: [{ type: 'highlight', selector: '#guided-spot', holdMs: 300 }] }] }] } } });
+    const projector = await window.ScreenReel.mount(target, { projectId: 'guided-example', advance: 'guided', loop: false, narration: false, cursor: false, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [{ id: 'guided', name: 'Guided', defaults: { dwellMs: 50 }, scenes: [{ id: 'one', route: '/', actions: [{ type: 'callout', selector: '#guided-spot', text: 'One', holdMs: 300 }] }, { id: 'two', route: '/', actions: [{ type: 'callout', selector: '#guided-spot', text: 'Two', holdMs: 300 }] }] }] } } });
     const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
     let dimmed = false; const observer = new MutationObserver(() => { if (document.querySelector('.sr-dim-backdrop')) dimmed = true; }); observer.observe(document.body, { childList: true });
     projector.enable(); const firstWait = once('awaitingnext'); projector.play(); const first = await firstWait;
@@ -418,6 +425,39 @@ try {
   const viewerDrag = await inlinePage.evaluate(() => { const started = window.__shieldSeen.dragStarted; window.__shielded.destroy(); ['shield-input', 'shield-card', 'shield-drop', 'shield-button', 'shield-demo'].forEach((id) => document.getElementById(id).remove()); return started; });
   assert.deepEqual(tourActions, { typed: 'hi', hovered: true, dragStarted: 1, dragMoves: true, clicked: true, shield: true });
   assert.equal(viewerDrag, 0, 'a real viewer drag must land on the shield');
+  // ms-ui's regressions against 055b16d: every guided callout waits (and is counted), a scene with no
+  // callout plays through instead of stalling behind a hidden pill, a choice after a callout still
+  // shows, and Next on the last scene of a non-looping flow completes rather than wrapping.
+  const msui = await inlinePage.evaluate(async () => {
+    const spot = document.createElement('div'); spot.id = 'msui-spot'; spot.textContent = 'ms-ui target'; document.body.appendChild(spot);
+    const target = document.createElement('button'); target.id = 'msui-demo'; document.body.appendChild(target);
+    const callout = (text) => ({ type: 'callout', selector: '#msui-spot', text, holdMs: 5000 });
+    const flow = { id: 'msui', name: 'ms-ui', defaults: { dwellMs: 50 }, scenes: [
+      { id: 'welcome', route: '/', actions: [{ type: 'countdown', from: 1, stepMs: 200 }] },
+      { id: 'pair', route: '/', actions: [callout('first'), callout('second')] },
+      { id: 'branch', route: '/', actions: [callout('pick'), { type: 'choice', prompt: 'Where next?', options: [{ label: 'Finish', scene: 'last' }], timeoutMs: 0 }] },
+      { id: 'skipped', route: '/', actions: [callout('never shown')] },
+      { id: 'last', route: '/', actions: [callout('done')] },
+    ] };
+    const events = []; for (const name of ['awaitingnext', 'choice', 'complete', 'exit']) addEventListener(`screenreel:${name}`, (event) => events.push(`${name}:${event.detail.sceneId}${name === 'exit' ? ':' + event.detail.reason : ''}`));
+    const until = (predicate) => new Promise((resolve) => { const check = () => (predicate() ? resolve() : setTimeout(check, 25)); check(); });
+    const steps = () => events.filter((item) => item.startsWith('awaitingnext')).length;
+    const projector = await window.ScreenReel.mount(target, { projectId: 'msui-example', loop: false, narration: false, cursor: false, disableOnComplete: true, controls: { guided: [] }, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [flow] } } });
+    await projector.start('msui', { mode: 'guided' });
+    await until(() => steps() === 1); const counters = [document.querySelector('.sr-callout-step').textContent];
+    document.querySelector('.sr-callout-next').click(); await until(() => steps() === 2); counters.push(document.querySelector('.sr-callout-step').textContent);
+    document.querySelector('.sr-callout-next').click(); await until(() => steps() === 3);
+    document.querySelector('.sr-callout-next').click(); await until(() => document.querySelector('.sr-choice-card'));
+    document.querySelector('.sr-choice-card').click(); await until(() => steps() === 4);
+    document.querySelector('.sr-callout-next').click(); await until(() => events.some((item) => item.startsWith('exit')));
+    const result = { counters, events, shield: !!document.querySelector('.sr-click-shield'), enabled: projector.store.enabled() };
+    projector.destroy(); spot.remove(); target.remove(); return result;
+  });
+  assert.deepEqual(msui, {
+    counters: ['1 of 5', '2 of 5'],
+    events: ['awaitingnext:pair', 'awaitingnext:pair', 'awaitingnext:branch', 'choice:branch', 'awaitingnext:last', 'complete:last', 'exit:last:complete'],
+    shield: false, enabled: false,
+  });
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);
@@ -436,7 +476,7 @@ try {
   await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
   await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
   await inlinePage.close();
-  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="auto"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
   // stable session id. Fresh context so presenter-mode session state can't leak in.
   const shareContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
