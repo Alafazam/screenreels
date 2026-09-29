@@ -55,7 +55,8 @@ try {
   const productValidation = await page.evaluate(() => window.ScreenReel.validateScene());
   assert.equal(productValidation.ok, true); assert.equal(productValidation.sceneId, 'open-source-hook');
   assert.deepEqual(productConversion, { event: 'live_demo_start', variant: 'product-in-product' });
-  await page.locator('#demo-button').click();
+  // Mid-tour the click shield covers the page; a real click on the trigger is forwarded to it.
+  await page.locator('#demo-button').click({ force: true });
   await page.waitForFunction(() => document.querySelector('#demo-button')?.getAttribute('aria-pressed') === 'false');
   await page.goto(`${baseUrl}?variant=product-in-product`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
@@ -321,13 +322,102 @@ try {
     return result;
   });
   assert.deepEqual(onboarding, {
-    heldOnScreen: { callout: true, ring: true, dim: true, title: 'Title one', buttons: ['Next'] },
+    heldOnScreen: { callout: true, ring: true, dim: true, title: 'Title one', buttons: ['Skip tour', 'Next'] },
     appChangedDuringScene: true, replayRefused: true,
-    nextFromCallout: 'two', cleanupRanOnNext: true, backOffered: ['Back', 'Next'],
+    nextFromCallout: 'two', cleanupRanOnNext: true, backOffered: ['Skip tour', 'Back', 'Next'],
     arrowRight: 'three', lastLabel: 'Finish', arrowLeftPlays: 'two',
     finish: { reason: 'complete', sceneId: 'three', enabledAfter: false, overlaysLeft: 0 },
     escape: 'user', cleanupRanOnExit: true, unknownFlow: 'ScreenReel start(): unknown flow "missing"',
   });
+  // Guide surface (ms-ui's player, folded into the Projector): chooser, mid-scene callout steps with
+  // "N of M" and Skip, a hidden pill in guided mode, a click shield that stops real viewer clicks,
+  // callouts that follow a moving target, a minimal centred autoplay bar, and strict `functions`.
+  await inlinePage.evaluate(async () => {
+    const toggle = document.createElement('button'); toggle.id = 'guide-toggle'; toggle.textContent = 'Theme'; toggle.style.cssText = 'position:fixed;left:40px;top:320px;width:120px;height:40px';
+    toggle.onclick = () => document.body.classList.toggle('guide-dark'); document.body.appendChild(toggle);
+    const target = document.createElement('button'); target.id = 'guide-demo'; document.body.appendChild(target);
+    window.__guideGlobal = () => { window.__guideGlobalCalled = true; };
+    const flow = { id: 'guide', name: 'Getting started', defaults: { dwellMs: 50 }, scenes: [
+      { id: 'theme', route: '/', actions: [{ type: 'click', selector: '#guide-toggle' }, { type: 'callout', selector: '#guide-toggle', title: 'Theme', text: 'Switch it here', placement: 'right', holdMs: 150 }, { type: 'click', selector: '#guide-toggle' }] },
+      { id: 'globals', route: '/', actions: [{ type: 'call', fn: '__guideGlobal', args: [] }, { type: 'callout', selector: '#guide-toggle', text: 'Last step', holdMs: 150 }] },
+    ] };
+    window.__guideEvents = []; for (const name of ['awaitingnext', 'exit']) addEventListener(`screenreel:${name}`, (event) => window.__guideEvents.push([name, event.detail.sceneId, event.detail.actionIndex ?? event.detail.reason]));
+    window.__guide = await window.ScreenReel.mount(target, { projectId: 'guide-example', loop: false, narration: false, cursor: false, chooser: true, studio: false, position: 'center', controls: { guided: [], auto: ['prev', 'play', 'next', 'exit'] }, functions: {}, labels: { stepOf: (step, total) => `Step ${step} of ${total}` }, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [flow] } } });
+    window.__guideStart = window.__guide.start('guide');
+  });
+  const guideShadow = (selector) => inlinePage.locator(`#screenreel-projector-guide-example ${selector}`);
+  await guideShadow('.sr-chooser').waitFor();
+  const chooserText = await guideShadow('.sr-chooser').innerText();
+  await guideShadow('[data-choose="guided"]').click();
+  await inlinePage.waitForFunction(() => window.__guideEvents.some(([name]) => name === 'awaitingnext'));
+  const stepState = await inlinePage.evaluate(() => ({
+    toggled: document.body.classList.contains('guide-dark'),
+    step: document.querySelector('.sr-callout-step')?.textContent,
+    buttons: [...document.querySelectorAll('.sr-callout-actions button')].map((button) => button.textContent),
+    pillHidden: document.querySelector('#screenreel-projector-guide-example').shadowRoot.querySelector('.sr-pill').hidden,
+    shield: !!document.querySelector('.sr-click-shield'), side: document.querySelector('.sr-action-callout').dataset.side,
+  }));
+  // A real viewer click on the app mid-tour lands on the shield, not on the toggle.
+  const toggleBox = await inlinePage.locator('#guide-toggle').boundingBox();
+  await inlinePage.mouse.click(toggleBox.x + toggleBox.width / 2, toggleBox.y + toggleBox.height / 2);
+  const afterStrayClick = await inlinePage.evaluate(() => document.body.classList.contains('guide-dark'));
+  // The callout follows its target when the page moves it.
+  const followed = await inlinePage.evaluate(async () => {
+    const before = parseFloat(document.querySelector('.sr-action-callout').style.top);
+    document.querySelector('#guide-toggle').style.top = '420px';
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return parseFloat(document.querySelector('.sr-action-callout').style.top) - before;
+  });
+  const secondStep = await inlinePage.evaluate(async () => {
+    const waiting = new Promise((resolve) => addEventListener('screenreel:awaitingnext', (event) => resolve(event.detail), { once: true }));
+    document.querySelector('.sr-callout-next').click(); const detail = await waiting;
+    return { sceneId: detail.sceneId, undone: !document.body.classList.contains('guide-dark'), globalBlocked: !window.__guideGlobalCalled, nextLabel: document.querySelector('.sr-callout-next').textContent, step: document.querySelector('.sr-callout-step').textContent };
+  });
+  const skipped = await inlinePage.evaluate(async () => {
+    const exit = new Promise((resolve) => addEventListener('screenreel:exit', (event) => resolve(event.detail), { once: true }));
+    document.querySelector('.sr-callout-skip').click(); const detail = await exit;
+    return { reason: detail.reason, shieldGone: !document.querySelector('.sr-click-shield'), overlays: document.querySelectorAll('.sr-action-callout,.sr-glow-box,.sr-dim-backdrop').length };
+  });
+  // Autoplay with a mode skips the chooser and shows only the minimal, centred bar.
+  const autoplay = await inlinePage.evaluate(async () => {
+    await window.__guide.start('guide', { mode: 'auto' });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const root = document.querySelector('#screenreel-projector-guide-example').shadowRoot;
+    const result = { chooser: !root.querySelector('.sr-chooser-layer').hidden, controls: [...root.querySelectorAll('.sr-pill [data-cmd]')].map((button) => button.dataset.cmd), centred: root.querySelector('.sr-pill').classList.contains('sr-pill--center') };
+    window.__guide.destroy(); document.querySelector('#guide-toggle').remove(); document.querySelector('#guide-demo').remove(); delete window.__guideGlobal;
+    return result;
+  });
+  assert.match(chooserText, /Getting started[\s\S]*Guided[\s\S]*Autoplay/);
+  assert.deepEqual(stepState, { toggled: true, step: 'Step 1 of 2', buttons: ['Skip tour', 'Next'], pillHidden: true, shield: true, side: 'right' });
+  assert.equal(afterStrayClick, true, 'the click shield must stop a real viewer click from toggling the app');
+  assert.equal(followed, 100, 'the callout follows its target');
+  assert.deepEqual(secondStep, { sceneId: 'globals', undone: true, globalBlocked: true, nextLabel: 'Finish', step: 'Step 2 of 2' });
+  assert.deepEqual(skipped, { reason: 'user', shieldGone: true, overlays: 0 });
+  assert.deepEqual(autoplay, { chooser: false, controls: ['prev', 'play', 'next', 'exit'], centred: true });
+  // The shield sits under the player controls and only stops the viewer: the tour's own type, hover,
+  // drag, and click dispatch straight to their targets while it is up; a real viewer drag does not.
+  await inlinePage.evaluate(async () => {
+    const make = (tag, id, css) => { const node = document.createElement(tag); node.id = id; node.style.cssText = css; document.body.appendChild(node); return node; };
+    const seen = window.__shieldSeen = { typed: '', hovered: false, dragStarted: 0, dragMoves: 0, clicked: false };
+    make('input', 'shield-input', 'position:fixed;left:40px;top:120px;width:160px').addEventListener('input', (event) => { seen.typed = event.target.value; });
+    const card = make('div', 'shield-card', 'position:fixed;left:40px;top:180px;width:120px;height:60px;background:#eee');
+    card.addEventListener('mouseover', () => { seen.hovered = true; }); card.addEventListener('pointerdown', () => { seen.dragStarted += 1; });
+    addEventListener('pointermove', () => { if (seen.dragStarted) seen.dragMoves += 1; });
+    make('div', 'shield-drop', 'position:fixed;left:400px;top:180px;width:120px;height:60px;background:#ddd');
+    make('button', 'shield-button', 'position:fixed;left:40px;top:260px').addEventListener('click', () => { seen.clicked = true; });
+    const trigger = make('button', 'shield-demo', '');
+    const flow = { id: 'shielded', name: 'Shielded', scenes: [{ id: 'act', route: '/', dwellMs: 60000, actions: [{ type: 'type', selector: '#shield-input', text: 'hi', charMs: 10 }, { type: 'hover', selector: '#shield-card', holdMs: 50 }, { type: 'drag', selector: '#shield-card', toSelector: '#shield-drop', durMs: 150 }, { type: 'click', selector: '#shield-button' }] }] };
+    window.__shielded = await window.ScreenReel.mount(trigger, { projectId: 'shield-example', loop: false, narration: false, cursor: false, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [flow] } } });
+    await window.__shielded.start('shielded');
+  });
+  await inlinePage.waitForFunction(() => window.__shieldSeen.clicked, null, { timeout: 10000 });
+  const tourActions = await inlinePage.evaluate(() => ({ ...window.__shieldSeen, dragMoves: window.__shieldSeen.dragMoves > 0, shield: !!document.querySelector('.sr-click-shield') }));
+  await inlinePage.evaluate(() => { window.__shieldSeen.dragStarted = 0; window.__shieldSeen.dragMoves = 0; });
+  const cardBox = await inlinePage.locator('#shield-card').boundingBox();
+  await inlinePage.mouse.move(cardBox.x + 20, cardBox.y + 20); await inlinePage.mouse.down(); await inlinePage.mouse.move(cardBox.x + 300, cardBox.y + 20); await inlinePage.mouse.up();
+  const viewerDrag = await inlinePage.evaluate(() => { const started = window.__shieldSeen.dragStarted; window.__shielded.destroy(); ['shield-input', 'shield-card', 'shield-drop', 'shield-button', 'shield-demo'].forEach((id) => document.getElementById(id).remove()); return started; });
+  assert.deepEqual(tourActions, { typed: 'hi', hovered: true, dragStarted: 1, dragMoves: true, clicked: true, shield: true });
+  assert.equal(viewerDrag, 0, 'a real viewer drag must land on the shield');
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);

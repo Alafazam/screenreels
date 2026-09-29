@@ -75,7 +75,7 @@ Projector and Capture share one pointer implementation, so a live tour and a rec
 
 `timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and internal constants (countdown steps, flash pulses, reveal fades) that manifest rewriting cannot reach. Timeouts and scroll-settle limits are excluded: those are limits, not pacing. Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, `settleMs` to `flow.defaults.settleMs`.
 
-`advance: 'guided'` turns the tour into a click-through: each finished scene waits for Next instead of its `dwellMs`. Flows can default it with `defaults.advance`; the mount option wins. The `<screenreel-projector>` element accepts `advance="guided"`.
+`advance: 'guided'` turns the tour into a click-through (see [Guided tours and onboarding](docs/guided-tours.md)): each finished scene waits for Next instead of its `dwellMs`. Flows can default it with `defaults.advance`; the mount option wins. The `<screenreel-projector>` element accepts `advance="guided"`.
 
 See [Pacing and the cursor](docs/pacing-and-cursor.md).
 

@@ -12,6 +12,7 @@ are the "how do I actually do this" walkthroughs, in the order you'd meet them.
 | **[Sharing and analytics](sharing-and-analytics.md)** | How do I hand a demo to someone and see what they did? |
 | **[Branching with choices](branching.md)** | How do I let the viewer pick what they see? |
 | **[Pacing and the cursor](pacing-and-cursor.md)** | The demo feels rushed / I want to change the pointer. |
+| **[Guided tours and onboarding](guided-tours.md)** | How do I let the viewer click Next through a tour, and keep them from breaking the app mid-flow? |
 
 ## Before you start
 

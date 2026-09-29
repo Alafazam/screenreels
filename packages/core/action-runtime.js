@@ -123,7 +123,7 @@
   function ensureStyles(doc) {
     if (doc.getElementById('__screenreelActionStyles')) return;
     const style = doc.createElement('style'); style.id = '__screenreelActionStyles';
-    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-action-callout.sr-callout--interactive{pointer-events:auto}.sr-callout-title{margin:0 0 3px;font-weight:700;font-size:13px}.sr-callout-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:9px}.sr-callout-actions button{padding:4px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-callout-actions .sr-callout-next{border-color:#7c3aed;background:#7c3aed}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(9,9,11,.52);pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#18181b;font:700 15px/1.35 system-ui,sans-serif;cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid #7c3aed}';
+    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-action-callout.sr-callout--interactive{pointer-events:auto}.sr-callout-title{margin:0 0 3px;font-weight:700;font-size:13px}.sr-callout-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:9px}.sr-callout-actions button{padding:4px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-callout-actions .sr-callout-next{border-color:#7c3aed;background:#7c3aed}.sr-callout-step{margin-right:auto;align-self:center;opacity:.72;font-weight:500}.sr-callout-actions .sr-callout-skip{border-color:transparent}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(9,9,11,.52);pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#18181b;font:700 15px/1.35 system-ui,sans-serif;cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid #7c3aed}';
     doc.head.appendChild(style);
   }
   function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
@@ -180,8 +180,18 @@
      up instead, handed to the host through ctx.retain(release), when the action asks to outlive
      itself (`keep: 'untilSceneEnd'`) or the host asks it to persist (a guided tour holding its
      final emphasis until Next). An interrupted action always cleans up at once. */
-  function settleOverlays(action, ctx, nodes) {
-    const release = () => nodes.forEach((node) => node?.remove());
+  /* Panels and late layout push targets around while an overlay is up, so overlays re-place
+     themselves every frame until released. Returns stop(). A window without rAF (a test stub)
+     simply does not follow. */
+  function followTarget(win, place) {
+    if (!win.requestAnimationFrame) return () => {};
+    let frame = null; let stopped = false;
+    const tick = () => { if (stopped) return; place(); frame = win.requestAnimationFrame(tick); };
+    frame = win.requestAnimationFrame(tick);
+    return () => { stopped = true; win.cancelAnimationFrame?.(frame); };
+  }
+  function settleOverlays(action, ctx, nodes, stopFollowing) {
+    const release = () => { stopFollowing?.(); nodes.forEach((node) => node?.remove()); };
     const outlive = action.keep === 'untilSceneEnd' || ctx.persist === true;
     if (outlive && ctx.retain && !ctx.signal?.aborted) ctx.retain(release); else release();
   }
@@ -193,7 +203,8 @@
     if (controls) {
       tip.classList.add('sr-callout--interactive');
       const bar = doc.createElement('div'); bar.className = 'sr-callout-actions';
-      for (const [key, handler] of [['back', controls.onBack], ['next', controls.onNext]]) {
+      if (controls.step) { const step = doc.createElement('span'); step.className = 'sr-callout-step'; step.textContent = controls.step; bar.appendChild(step); }
+      for (const [key, handler] of [['skip', controls.onSkip], ['back', controls.onBack], ['next', controls.onNext]]) {
         if (!handler) continue;
         const button = doc.createElement('button'); button.type = 'button'; button.className = `sr-callout-${key}`; button.textContent = controls.labels[key];
         button.addEventListener('click', handler); bar.appendChild(button);
@@ -206,12 +217,18 @@
     const doc = ctx.document; const win = ctx.window; ensureStyles(doc);
     const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null;
     const ring = action.highlight ? createRing(doc, el) : null;
-    const tip = buildCallout(doc, action, ctx.persist ? ctx.calloutControls : null); doc.body.appendChild(tip);
-    const measured = tip.getBoundingClientRect();
-    const { left, top, side } = placeCallout(el.getBoundingClientRect(), { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
-    Object.assign(tip.style, { left: `${left}px`, top: `${top}px` }); tip.dataset.side = side;
+    const controls = ctx.persist ? ctx.calloutControls : null;
+    const tip = buildCallout(doc, action, controls); doc.body.appendChild(tip);
+    const place = () => {
+      if (backdrop) placeBox(backdrop, el); if (ring) placeBox(ring, el);
+      const measured = tip.getBoundingClientRect();
+      const { left, top, side } = placeCallout(el.getBoundingClientRect(), { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
+      Object.assign(tip.style, { left: `${left}px`, top: `${top}px` }); tip.dataset.side = side;
+    };
+    place(); const stopFollowing = followTarget(win, place);
+    if (controls?.focusNext) tip.querySelector?.('.sr-callout-next')?.focus?.({ preventScroll: true });
     await sleep(action.holdMs || DEFAULTS.callout.holdMs, ctx.signal);
-    settleOverlays(action, ctx, [tip, ring, backdrop]);
+    settleOverlays(action, ctx, [tip, ring, backdrop], stopFollowing);
   }
   const SCROLL_SETTLE_FRAMES = 3, SCROLL_SETTLE_MAX_MS = 1200, SCROLL_SETTLE_TICK_MS = 32;
   const FLASH_ON_MS = 190, FLASH_OFF_MS = 150;
@@ -362,13 +379,14 @@
     const elements = queryAll(ctx.document, action.selector).slice(0, Number(action.count) || GLOW_FALLBACK_COUNT); if (!elements.length) return false;
     ensureStyles(ctx.document); const box = ctx.document.createElement('div'); box.className = 'sr-glow-box'; ctx.document.body.appendChild(box);
     // The glow box cannot carry the dim shadow itself: its ring mask would clip the shadow away.
-    const level = dimLevel(action, ctx); let backdrop = null;
-    const place = (el) => { placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
+    const level = dimLevel(action, ctx); let backdrop = null; let current = null;
+    const place = (el) => { current = el; placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
+    const stopFollowing = followTarget(ctx.window, () => { if (current) place(current); });
     if (action.sequence) for (const el of elements) { await ensureInView(el, ctx); place(el); await sleep(action.stepMs || GLOW_FALLBACK_STEP_MS, ctx.signal); }
     else { await ensureInView(elements[0], ctx); place(elements[0]); await sleep(action.holdMs || DEFAULTS.highlight.holdMs, ctx.signal); }
-    if (action.keep === 'untilSceneEnd' || ctx.persist === true) { settleOverlays(action, ctx, [box, backdrop]); return true; }
+    if (action.keep === 'untilSceneEnd' || ctx.persist === true) { settleOverlays(action, ctx, [box, backdrop], stopFollowing); return true; }
     // A timed `keep` lingers the ring only; the page is un-dimmed as soon as the action ends.
-    backdrop?.remove();
+    stopFollowing(); backdrop?.remove();
     if (action.keep) setTimeout(() => box.remove(), action.keepMs || KEEP_FALLBACK_MS); else box.remove(); return true;
   }
   const easeInOutQuad = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
@@ -438,7 +456,7 @@
     if (action.type === 'waitFor') { const found = await waitFor(doc, action.selector, action.condition || 'visible', action.timeoutMs || DEFAULTS['wait-for'].timeoutMs, ctx.signal); if (!found) return { ok: false, error: 'timeout' }; if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'highlight' || action.type === 'glow') { const ok = await runGlow(action, ctx); if (!ok) ctx.warn(`Selector not found: ${action.selector}`); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok }; }
     if (action.type === 'goto') { await ctx.navigate?.(action.url); return { ok: true, navigated: true }; }
-    if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || win[action.fn]; if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
+    if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || (context.strictFunctions ? undefined : win[action.fn]); if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
     if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
     if (action.type === 'spotlight') {
@@ -447,7 +465,8 @@
          Spotlight exists to dim, so it ignores the host's highlight `dim` default. */
       ensureStyles(doc); const backdrop = createDimBackdrop(doc, el, Number(action.dim) || DEFAULTS.spotlight.dim);
       const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); doc.body.appendChild(box);
-      await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); settleOverlays(action, ctx, [box, backdrop]);
+      const stopFollowing = followTarget(win, () => { placeBox(box, el); placeBox(backdrop, el); });
+      await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); settleOverlays(action, ctx, [box, backdrop], stopFollowing);
     }
     else if (action.type === 'callout') await runCallout(action, ctx, el);
     else if (action.type === 'flash') await runFlash(action, ctx, el);

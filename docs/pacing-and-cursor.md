@@ -55,8 +55,9 @@ A flow can set its own mode with `"defaults": { "advance": "guided" }`; the moun
 the same flow can run guided inside the product and automatic on a share link. In guided mode the
 Next button pulses while the tour is waiting, share links get a Next button too, and Next on the
 last scene of a `loop: false` flow completes the tour (`screenreel:complete`). Each wait also
-dispatches `screenreel:awaitingnext` with `{ projectId, flowId, sceneId }`. The step is a scene:
-the actions inside a scene still run back to back.
+dispatches `screenreel:awaitingnext` with `{ projectId, flowId, sceneId }`. In guided mode each
+callout is also a step that waits for Next. See [Guided tours and onboarding](guided-tours.md) for
+the step card, the chooser, `cleanup`, and the click shield.
 
 ## Dimming behind highlights
 
