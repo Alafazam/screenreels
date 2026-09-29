@@ -367,7 +367,14 @@
     if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || win[action.fn]; if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
     if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
-    if (action.type === 'spotlight') { ensureStyles(doc); const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); box.style.boxShadow = `0 0 0 2px rgba(255,255,255,.85),0 0 0 9999px rgba(9,9,11,${Number(action.dim) || DEFAULTS.spotlight.dim})`; doc.body.appendChild(box); await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); box.remove(); }
+    if (action.type === 'spotlight') {
+      /* The dim lives on the shared backdrop (layered under the presenter pill), not on the ring:
+         a spread shadow on the ring box sat above the pill and darkened the presenter's controls.
+         Spotlight exists to dim, so it ignores the host's highlight `dim` default. */
+      ensureStyles(doc); const backdrop = createDimBackdrop(doc, el, Number(action.dim) || DEFAULTS.spotlight.dim);
+      const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); doc.body.appendChild(box);
+      await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); box.remove(); backdrop.remove();
+    }
     else if (action.type === 'callout') { ensureStyles(doc); const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null; const tip = doc.createElement('div'); tip.className = 'sr-action-callout'; tip.textContent = action.text || 'Callout'; doc.body.appendChild(tip); const rect = el.getBoundingClientRect(); const left = action.placement === 'right' ? rect.right + 8 : action.placement === 'left' ? Math.max(8, rect.left - 288) : Math.max(8, Math.min(rect.left, win.innerWidth - 288)); const top = action.placement === 'top' ? rect.top - 48 : rect.bottom + 8; Object.assign(tip.style, { left: `${left}px`, top: `${Math.max(8, top)}px` }); await sleep(action.holdMs || DEFAULTS.callout.holdMs, ctx.signal); tip.remove(); backdrop?.remove(); }
     else if (action.type === 'flash') await runFlash(action, ctx, el);
     else if (action.type === 'reel') await runReel(action, ctx, el);

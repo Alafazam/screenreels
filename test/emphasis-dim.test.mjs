@@ -93,3 +93,24 @@ test('an invalid dim warns and falls back to the default', async () => {
   assert.deepEqual(warnings, ['Invalid dim value: dark']);
   assert.match(stub.backdrops()[0].style.boxShadow, /0\.45\)/);
 });
+
+test('spotlight dims through the shared backdrop, so the presenter pill stays lit', async () => {
+  const stub = stubDocument(); const appendedBoxes = [];
+  const createElement = stub.doc.createElement; stub.doc.createElement = () => { const node = createElement(); appendedBoxes.push(node); return node; };
+  await run({ type: 'spotlight', selector: '.kpi', holdMs: 100 }, stub, { dim: false });
+  const [backdrop] = stub.backdrops();
+  assert.match(backdrop.style.boxShadow, /0\.62\)/, 'spotlight keeps its stronger default and ignores the host highlight dim');
+  const ring = appendedBoxes.find((node) => node.className === 'sr-action-box');
+  assert.equal(ring.style.boxShadow, undefined, 'the ring carries no spread shadow of its own');
+  assert.equal(backdrop.removed && ring.removed, true);
+});
+
+test('the dim backdrop is layered below the projector shell', async () => {
+  const stub = stubDocument(); let css = '';
+  stub.doc.head.appendChild = (node) => { css = node.textContent; return node; };
+  await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
+  const backdropZ = Number(/\.sr-dim-backdrop\{[^}]*z-index:(\d+)/.exec(css)[1]);
+  const shellCss = (await import('node:fs')).readFileSync(new URL('../packages/projector/screenreel.css', import.meta.url), 'utf8');
+  const shellZ = Number(/\.sr-shell\{[^}]*z-index:(\d+)/.exec(shellCss)[1]);
+  assert.ok(backdropZ < shellZ, `backdrop z ${backdropZ} must sit under the shell z ${shellZ}`);
+});
