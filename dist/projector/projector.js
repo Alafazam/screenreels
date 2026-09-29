@@ -12,6 +12,12 @@ const TRIGGER_ICON_PX = 18;
    viewer presses Next. */
 const ADVANCE_MODES = ['auto', 'guided'];
 const DEFAULT_ADVANCE_MODE = 'auto';
+/* In a guided scene, a final action of one of these types stays on screen until the viewer moves on. */
+const PERSISTABLE_TYPES = new Set(['highlight', 'glow', 'spotlight', 'callout']);
+const CALLOUT_LABELS = { back: 'Back', next: 'Next', finish: 'Finish' };
+/* Guided-tour keys, the ones a slide deck uses. */
+const GUIDED_KEYS = { ArrowRight: 'next', Enter: 'next', ArrowLeft: 'prev', Escape: 'exit' };
+const HOST_CONTROL_SELECTOR = 'input, textarea, select, button, a, [contenteditable]';
 let publicApi;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const event = (name, detail) => window.dispatchEvent(new CustomEvent(`screenreel:${name}`, { detail }));
@@ -28,12 +34,15 @@ class Projector {
   constructor(target, options, assetBase, assetVersion) {
     this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, timeScale: 1, cursor: 'dot', narration: true, ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
+    this.retained = []; this.runningScene = null; this.leaving = Promise.resolve();
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
   }
-  /* Mount option wins over the flow's `defaults.advance`, so one flow can run guided inside the
-     product and auto on a share link. An unknown value warns and falls back to auto. */
-  advanceMode() {
-    const mode = this.options.advance ?? this.store.activeFlow()?.defaults?.advance ?? DEFAULT_ADVANCE_MODE;
+  /* Precedence: the scene's own `advance`, then the mount option, then the flow's
+     `defaults.advance`. The mount option beats the flow so one flow can run guided inside the
+     product and auto on a share link; a scene can still opt out either way. An unknown value warns
+     and falls back to auto. */
+  advanceMode(scene = this.current().scene) {
+    const mode = scene?.advance ?? this.options.advance ?? this.store.activeFlow()?.defaults?.advance ?? DEFAULT_ADVANCE_MODE;
     if (ADVANCE_MODES.includes(mode)) return mode;
     console.warn(`[screenreel] Unknown advance mode "${mode}"; expected ${ADVANCE_MODES.join(' or ')}`);
     return DEFAULT_ADVANCE_MODE;
@@ -80,7 +89,7 @@ class Projector {
     if (this.store.enabled() && !new URLSearchParams(location.search).has('screenreelPreview')) { this.enable(false); if (this.store.playing()) queueMicrotask(() => this.play()); } instances.add(this); event('ready', { projectId: this.store.projectId }); return this;
   }
   bindTarget() {
-    this.clickHandler = () => this.store.enabled() ? this.disable() : this.enable(); this.target.addEventListener('click', this.clickHandler); this.target.setAttribute('aria-pressed', String(this.store.enabled()));
+    this.clickHandler = () => this.store.enabled() ? this.disable('user') : this.enable(); this.target.addEventListener('click', this.clickHandler); this.target.setAttribute('aria-pressed', String(this.store.enabled()));
   }
   parseActivation() {
     const params = new URLSearchParams(location.search);
@@ -119,13 +128,14 @@ class Projector {
     // Narration control rides in both chromes: a viewer on a share link needs it most, and a
     // presenter talking over the demo needs to silence it fast. Hidden when there is no engine.
     const nextButton = `<button data-cmd="next" class="${this.awaitingNext ? 'sr-await-next' : ''}" title="Next scene">${icon('right')}</button>`;
+    const prevButton = `<button data-cmd="prev" title="Previous scene">${icon('left')}</button>`;
     const muted = this.store.muted();
     const soundButton = this.options.narration === false || !window.__screenreelNarrator?.available()
       ? ''
       : `<button data-cmd="sound" class="${muted ? '' : 'active'}${this.narrationBlocked ? ' sr-needs-sound' : ''}" title="${muted ? 'Turn on narration' : 'Mute narration'}" aria-pressed="${String(!muted)}">${icon(muted ? 'mute' : 'sound')}</button>`;
     this.pill.innerHTML = share
-      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${playButton}${this.advanceMode() === 'guided' ? nextButton : ''}${soundButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
-      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span><button data-cmd="prev" title="Previous scene">${icon('left')}</button>${playButton}${nextButton}${soundButton}<button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><span class="sr-pill-separator" aria-hidden="true"></span><button data-cmd="studio" class="sr-pill-studio" title="Open Studio" aria-label="Open Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
+      ? `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${this.advanceMode() === 'guided' ? prevButton : ''}${playButton}${this.advanceMode() === 'guided' ? nextButton : ''}${soundButton}<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`
+      : `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select><span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>${prevButton}${playButton}${nextButton}${soundButton}<button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button><span class="sr-pill-separator" aria-hidden="true"></span><button data-cmd="studio" class="sr-pill-studio" title="Open Studio" aria-label="Open Studio">${icon('studio')}</button><button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`;
     const flowSelect = this.pill.querySelector('.sr-flow'); if (flowSelect) flowSelect.onchange = (e) => { this.pause(); this.store.setActive(e.target.value); this.store.setPosition(0); this.render(); };
     this.pill.querySelectorAll('[data-cmd]').forEach((button) => { button.onclick = () => this.command(button.dataset.cmd); });
     this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(share ? null : scene);
@@ -156,13 +166,69 @@ class Projector {
        button read as "record a video", which is what the CLI does — and captureCurrent() opens
        Studio anyway, so Studio is the honest single entry point. The command stays because a host
        calling command('capture') or captureCurrent() directly still works. */
-    else if (command === 'capture') this.captureCurrent(); else if (command === 'studio') this.openStudio(); else if (command === 'exit') this.disable();
+    else if (command === 'capture') this.captureCurrent(); else if (command === 'studio') this.openStudio(); else if (command === 'exit') this.disable('user');
   }
   /* Notes ride the same time scale as the actions they describe, so a note never outlives
      the emphasis it is narrating (the main reason the tour read as rushed). */
   toast(message) { if (!this.toastNode) return; this.toastNode.textContent = message; this.toastNode.hidden = false; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => { this.toastNode.hidden = true; }, TOAST_MS * (Number(this.options.timeScale) || 1)); }
-  enable(emit = true) { this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); this.cursor()?.show(); if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this; }
-  disable() { this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false }); return this; }
+  enable(emit = true) {
+    this.store.setEnabled(true); this.target.setAttribute('aria-pressed', 'true'); this.mountUi(); this.cursor()?.show();
+    if (!this.keyHandler) { this.keyHandler = (keyEvent) => this.handleKey(keyEvent); document.addEventListener('keydown', this.keyHandler); }
+    if (emit) event('modechange', { projectId: this.store.projectId, enabled: true }); return this;
+  }
+  /* `reason` tells a host a skip from a finish: 'user' (pill, trigger, Esc), 'complete'
+     (disableOnComplete), or 'api' (a host call, destroy()). */
+  disable(reason = 'api') {
+    const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id;
+    document.removeEventListener('keydown', this.keyHandler); this.keyHandler = null;
+    this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
+    if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason });
+    return this;
+  }
+  /* Guided tours are paced by the viewer. Keys typed into the host's own controls — or the
+     projector's buttons, found through the shadow boundary — are left alone. */
+  handleKey(keyEvent) {
+    if (!this.store.playing() || this.advanceMode() !== 'guided') return;
+    if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
+    const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
+    if (origin?.closest?.(HOST_CONTROL_SELECTOR)) return;
+    const command = GUIDED_KEYS[keyEvent.key]; if (!command) return;
+    keyEvent.preventDefault(); this.command(command);
+  }
+  /* Overlays a scene handed over (see settleOverlays in the runtime) go when the scene is left. */
+  releaseOverlays() { const releases = this.retained; this.retained = []; releases.forEach((release) => release()); }
+  /* Everything a scene leaves behind is undone here, whatever ended it: next, back, exit, pause,
+     a choice jump, or navigation. `scene.cleanup` runs once per started scene and to completion —
+     it never gets the abort signal, because a half-undone app is the state it exists to prevent. */
+  async leaveScene(reason) {
+    this.releaseOverlays();
+    const scene = this.runningScene; this.runningScene = null;
+    for (const action of scene?.cleanup || []) {
+      const result = await window.ScreenReelCore.runAction(action, { document, window, resolveFunction: (name) => functions.get(name), variables: this.variablesFor(), warn: (message) => console.warn('[screenreel]', message) });
+      if (!result.ok) console.warn(`[screenreel] cleanup ${action.type} failed leaving scene ${scene.id} (${reason})`);
+    }
+  }
+  /* Back/Next inside a guided scene's final callout. Back is offered from the second scene on. */
+  calloutControls(sceneIndex, sceneCount) {
+    const finishing = sceneIndex >= sceneCount - 1 && this.options.loop === false;
+    return {
+      labels: { back: CALLOUT_LABELS.back, next: finishing ? CALLOUT_LABELS.finish : CALLOUT_LABELS.next },
+      onBack: sceneIndex > 0 ? () => this.command('prev') : null,
+      onNext: () => this.command('next'),
+    };
+  }
+  /* Start a flow at a scene: the entry point for hosts that launch tours themselves (onboarding,
+     a help menu). Throws on an unknown flow or an out-of-range position rather than guessing. */
+  async start(flowId, { position = 0 } = {}) {
+    const flow = this.store.getFlow(flowId); if (!flow) throw new Error(`ScreenReel start(): unknown flow "${flowId}"`);
+    const sceneCount = this.store.enabledScenes(flow).length;
+    if (!Number.isInteger(position) || position < 0 || position >= sceneCount) throw new Error(`ScreenReel start(): position ${position} is outside the ${sceneCount} enabled scenes of "${flowId}"`);
+    this.pause(); await this.leaving;
+    this.store.setActive(flow.id); this.store.setPosition(position);
+    if (this.store.enabled()) this.render(); else this.enable();
+    this.playScene(); // not awaited: it resolves only when the first scene finishes
+    return this;
+  }
   current() { const scenes = this.store.enabledScenes(); return { scenes, position: Math.min(this.store.position(), Math.max(0, scenes.length - 1)), scene: scenes[Math.min(this.store.position(), Math.max(0, scenes.length - 1))] }; }
   routeMatches(scene) {
     const currentRoute = this.router.getRoute();
@@ -181,7 +247,9 @@ class Projector {
     const next = (position + 1) % scenes.length; this.store.setPosition(next); this.render(); return scenes[next];
   }
   complete() {
-    this.pause(); const { scene, position, scenes } = this.current(); this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene?.id, position, sceneCount: scenes.length }); return this;
+    this.pause(); const { scene, position, scenes } = this.current(); this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene?.id, position, sceneCount: scenes.length });
+    if (this.options.disableOnComplete) this.disable('complete');
+    return this;
   }
   validateScene(sceneId) {
     const flow = this.store.activeFlow(); const scene = sceneId ? flow.scenes.find((item) => item.id === sceneId) : this.current().scene;
@@ -200,13 +268,21 @@ class Projector {
     const report = { ok: false, flowId: this.store.activeFlow().id, sceneId: scene.id, route: scene.route, sceneErrors: [], actions: [{ actionIndex, actionId: action.id, type: action.type, selector: action.selector, errors: [result.error || 'Action failed'] }] };
     event('validation', { projectId: this.store.projectId, report }); this.toast(actionIndex < 0 ? 'Scene readiness failed' : `Scene stopped at action ${actionIndex + 1}`); this.pause(); return report;
   }
-  async play() {
+  /* Public entry. A second play() while a scene is already running would start a parallel run —
+     two narrators, every click doubled — so it is refused loudly instead. */
+  play() {
+    if (this.store.playing() && this.runningScene) { console.warn('[screenreel] play() ignored: a scene is already playing'); return Promise.resolve(); }
+    return this.playScene();
+  }
+  async playScene() {
+    await this.leaving; // a previous scene's cleanup must finish before this one touches the app
     const { scene } = this.current(); if (!scene) return; const generation = ++this.playGeneration; clearTimeout(this.timer); this.timer = null; this.awaitingNext = false; this.store.setPlaying(true); this.render();
     if (!this.routeMatches(scene)) {
       const sameDocument = await this.navigate(scene.route);
-      if (sameDocument && generation === this.playGeneration && this.store.playing() && this.routeMatches(scene)) return this.play();
+      if (sameDocument && generation === this.playGeneration && this.store.playing() && this.routeMatches(scene)) return this.playScene();
       return;
     }
+    this.runningScene = scene;
     if (!this.analytics.viewStarted()) { this.analytics.markViewStarted(); this.analytics.emit('view_start'); }
     this.analytics.emit('scene_enter');
     this.dropOffSent = false;
@@ -227,11 +303,13 @@ class Projector {
     // Narration starts with the scene's actions and runs alongside them, not before: the viewer
     // should hear the description of the thing while watching it happen. Deliberately not awaited.
     this.narrate(scene);
+    const guided = this.advanceMode(scene) === 'guided'; const lastIndex = (scene.actions || []).length - 1;
     for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
       const action = scene.actions[actionIndex];
       if (generation !== this.playGeneration || !this.store.playing()) break;
       event('step', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, sceneIndex, sceneTitle: scene.title, actionIndex, total: (scene.actions || []).length, action });
       let navigationSameDocument = false; let priorPosition = null;
+      const persist = guided && actionIndex === lastIndex && PERSISTABLE_TYPES.has(window.ScreenReelCore.actionType(action));
       const result = await window.ScreenReelCore.runAction(action, {
         document, window, signal: this.controller.signal, resolveFunction: (name) => functions.get(name),
         variables: this.variablesFor(),
@@ -247,11 +325,14 @@ class Projector {
         narrateAction: (text) => { this.narrator()?.speak(text); },
         navigate: async (route) => {
           // Navigation actions are terminal: persist the next scene before a hard navigation can unload this document.
+          await this.leaveScene('navigate');
           const { scenes, position } = this.current(); priorPosition = position;
           if (position >= scenes.length - 1 && this.options.loop === false) this.complete(); else this.advancePosition();
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
         dim: this.options.dim,
+        persist, retain: (release) => this.retained.push(release),
+        calloutControls: persist ? this.calloutControls(sceneIndex, this.current().scenes.length) : undefined,
         announce: (message) => this.toast(message),
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
@@ -262,12 +343,13 @@ class Projector {
         if (targetIndex === -1) { this.toast(`Unknown choice target: ${result.jumpTo}`); continue; }
         event('choice', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, targetSceneId: result.jumpTo, actionIndex });
         this.analytics.emit('choice', { targetSceneId: result.jumpTo });
+        await this.leaveScene('choice');
         this.store.setPosition(targetIndex); this.render();
-        return this.play();
+        return this.playScene();
       }
       if (result.navigated) {
         const nextScene = this.current().scene;
-        if (navigationSameDocument && generation === this.playGeneration && this.store.playing() && nextScene && this.routeMatches(nextScene)) return this.play();
+        if (navigationSameDocument && generation === this.playGeneration && this.store.playing() && nextScene && this.routeMatches(nextScene)) return this.playScene();
         return;
       }
       if (!result.ok && this.options.strict) return this.actionFailed(scene, action, actionIndex, result);
@@ -295,18 +377,31 @@ class Projector {
     // Held by reference: disable() (or opening Studio) during the beat drops this.pill to null.
     pill.dataset.intro = 'done';
   }
-  pause() { this.playGeneration++; this.awaitingNext = false; this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
+  pause() { this.playGeneration++; this.awaitingNext = false; this.leaving = this.leaveScene('pause').catch((error) => console.warn('[screenreel] scene cleanup failed', error)); this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
     const current = this.current(); if (autoPlay && this.options.loop === false && current.position >= current.scenes.length - 1) return this.complete();
-    const shouldPlay = autoPlay || this.store.playing(); const scene = this.advancePosition(); if (!scene) return;
+    const shouldPlay = autoPlay || this.store.playing();
     const generation = ++this.playGeneration; this.awaitingNext = false; this.controller?.abort(); clearTimeout(this.timer); this.timer = null;
+    this.leaving = this.leaveScene('next'); await this.leaving;
+    if (generation !== this.playGeneration) return; // another command arrived during cleanup
+    const scene = this.advancePosition(); if (!scene) return;
     if (!this.routeMatches(scene)) {
       const sameDocument = await this.navigate(scene.route);
-      if (sameDocument && generation === this.playGeneration && shouldPlay && this.store.playing() && this.routeMatches(scene)) return this.play();
-    } else if (shouldPlay && this.store.playing()) return this.play();
+      if (sameDocument && generation === this.playGeneration && shouldPlay && this.store.playing() && this.routeMatches(scene)) return this.playScene();
+    } else if (shouldPlay && this.store.playing()) return this.playScene();
   }
-  async previous() { const { scenes, position } = this.current(); if (!scenes.length) return; this.pause(); const next = (position - 1 + scenes.length) % scenes.length; this.store.setPosition(next); this.render(); if (!this.routeMatches(scenes[next])) await this.router.navigate(scenes[next].route); }
+  /* Presenter Back pauses on the previous scene. Guided Back plays it, the way a viewer expects,
+     and does nothing on the first scene rather than wrapping to the end of the tour. */
+  async previous() {
+    const { scenes, position } = this.current(); if (!scenes.length) return;
+    const guided = this.advanceMode() === 'guided' && this.store.playing();
+    if (guided && position === 0) return;
+    this.pause();
+    const target = (position - 1 + scenes.length) % scenes.length; this.store.setPosition(target); this.render();
+    if (guided) { this.store.setPlaying(true); return this.playScene(); }
+    if (!this.routeMatches(scenes[target])) await this.router.navigate(scenes[target].route);
+  }
   captureCurrent() {
     let flow = this.store.activeFlow(); if (flow.readonly) flow = this.store.createCopy(flow, `My ${flow.name}`);
     const route = window.ScreenReelCore.normalizeRoute(this.router.getRoute(), location.href) || '/'; const scene = { id: window.ScreenReelStore.makeId('scene'), enabled: true, route, title: document.title || 'Captured scene', talkingPoints: '', dwellMs: window.ScreenReelStore.NEW_FLOW_DEFAULTS.dwellMs, actions: [] };

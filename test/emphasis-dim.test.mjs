@@ -9,11 +9,12 @@ const { runAction, setTimeScale } = globalThis.ScreenReelCore;
 function stubDocument(targetCount = 1) {
   const makeElement = (rect = { left: 10, top: 10, right: 110, bottom: 60, width: 100, height: 50 }) => {
     const element = {
-      style: {}, removed: false,
-      classList: { add() {}, remove() {} },
+      style: {}, dataset: {}, removed: false, children: [], listeners: {},
+      classList: { names: new Set(), add(name) { this.names.add(name); }, remove(name) { this.names.delete(name); }, contains(name) { return this.names.has(name); } },
+      addEventListener(type, handler) { (element.listeners[type] ??= []).push(handler); },
       getBoundingClientRect: () => rect,
       getClientRects: () => [rect],
-      appendChild(child) { appended.push(child); return child; },
+      appendChild(child) { element.children.push(child); appended.push(child); return child; },
       remove() { element.removed = true; },
     };
     return element;
@@ -28,7 +29,7 @@ function stubDocument(targetCount = 1) {
   };
   doc.defaultView = { innerWidth: 1280, innerHeight: 720, getComputedStyle: () => ({ display: 'block', visibility: 'visible' }), document: doc };
   const backdrops = () => appended.filter((node) => node.className === 'sr-dim-backdrop');
-  return { doc, win: doc.defaultView, targets, backdrops };
+  return { doc, win: doc.defaultView, targets, backdrops, appended: () => appended };
 }
 
 const run = (action, stub, extra = {}) => runAction(action, { document: stub.doc, window: stub.win, ...extra });
@@ -113,4 +114,51 @@ test('the dim backdrop is layered below the projector shell', async () => {
   const shellCss = (await import('node:fs')).readFileSync(new URL('../packages/projector/screenreel.css', import.meta.url), 'utf8');
   const shellZ = Number(/\.sr-shell\{[^}]*z-index:(\d+)/.exec(shellCss)[1]);
   assert.ok(backdropZ < shellZ, `backdrop z ${backdropZ} must sit under the shell z ${shellZ}`);
+});
+
+const byClass = (stub, className) => stub.appended().filter((node) => node.className === className);
+
+test('callout renders an optional title as its own heading and the text as its body', async () => {
+  const stub = stubDocument();
+  await run({ type: 'callout', selector: '.kpi', title: 'Sidebar', text: 'Every page lives here', holdMs: 100 }, stub);
+  const [tip] = byClass(stub, 'sr-action-callout');
+  assert.deepEqual(tip.children.map((node) => [node.className, node.textContent]), [['sr-callout-title', 'Sidebar'], ['sr-callout-body', 'Every page lives here']]);
+  assert.equal(tip.dataset.side, 'bottom');
+});
+
+test('callout highlight: true rings the target together with the callout', async () => {
+  const stub = stubDocument();
+  await run({ type: 'callout', selector: '.kpi', text: 'Look', highlight: true, holdMs: 100 }, stub);
+  const [ring] = byClass(stub, 'sr-glow-box');
+  assert.ok(ring, 'a ring is drawn'); assert.equal(ring.removed, true);
+});
+
+test('keep: untilSceneEnd and persist hand overlays to the host instead of removing them', async () => {
+  for (const [action, extra] of [[{ type: 'highlight', keep: 'untilSceneEnd' }, {}], [{ type: 'callout', text: 'Hi' }, { persist: true }], [{ type: 'spotlight' }, { persist: true }]]) {
+    const stub = stubDocument(); const releases = [];
+    await run({ ...action, selector: '.kpi', holdMs: 100 }, stub, { ...extra, retain: (release) => releases.push(release) });
+    assert.equal(releases.length, 1, action.type);
+    assert.equal(stub.backdrops()[0].removed, false, `${action.type} stays up until released`);
+    releases[0]();
+    assert.equal(stub.backdrops()[0].removed, true, `${action.type} released`);
+  }
+});
+
+test('an interrupted persisting action cleans up at once rather than handing overlays over', async () => {
+  const stub = stubDocument(); const controller = new AbortController(); const releases = [];
+  const pending = run({ type: 'callout', selector: '.kpi', text: 'Hi', holdMs: 100000 }, stub, { persist: true, retain: (release) => releases.push(release), signal: controller.signal });
+  controller.abort(); await pending;
+  assert.equal(releases.length, 0); assert.equal(stub.backdrops()[0].removed, true);
+});
+
+test('a persisting callout shows Back and Next controls wired to the host', async () => {
+  const stub = stubDocument(); const calls = [];
+  const calloutControls = { labels: { back: 'Back', next: 'Next' }, onBack: () => calls.push('back'), onNext: () => calls.push('next') };
+  await run({ type: 'callout', selector: '.kpi', text: 'Hi', holdMs: 100 }, stub, { persist: true, retain: () => {}, calloutControls });
+  const [tip] = byClass(stub, 'sr-action-callout');
+  const bar = tip.children.find((node) => node.className === 'sr-callout-actions');
+  assert.deepEqual(bar.children.map((button) => button.textContent), ['Back', 'Next']);
+  bar.children.forEach((button) => button.listeners.click[0]());
+  assert.deepEqual(calls, ['back', 'next']);
+  assert.ok(tip.classList.contains('sr-callout--interactive'));
 });

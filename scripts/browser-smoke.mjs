@@ -281,6 +281,53 @@ try {
     return { first: first.sceneId, second: second.sceneId, heldPosition, pulsing, dimmed, playingAfter: projector.store.playing() };
   });
   assert.deepEqual(guided, { first: 'one', second: 'two', heldPosition: 0, pulsing: true, dimmed: true, playingAfter: false });
+  // Guided onboarding (the ms-ui contract): the final highlight + callout stay up until Next, the
+  // callout carries Back/Next, keys drive the tour, Back plays the previous scene, scene cleanup
+  // undoes app changes whatever ends the scene, and start()/exit/disableOnComplete/play() behave.
+  const onboarding = await inlinePage.evaluate(async () => {
+    const target = document.createElement('button'); target.id = 'onboarding-demo'; document.body.appendChild(target);
+    const spot = document.createElement('div'); spot.id = 'onboarding-spot'; spot.textContent = 'Onboarding target'; document.body.appendChild(spot);
+    const scene = (id, extra = {}) => ({ id, route: '/', actions: [{ type: 'callout', selector: '#onboarding-spot', title: `Title ${id}`, text: `Body ${id}`, highlight: true, holdMs: 200 }], ...extra });
+    const flow = { id: 'onboarding', name: 'Onboarding', defaults: { dwellMs: 50, advance: 'guided' }, scenes: [
+      scene('one', { actions: [{ type: 'call', fn: 'onboardingDark', args: [] }, { type: 'callout', selector: '#onboarding-spot', title: 'Title one', text: 'Body one', highlight: true, holdMs: 200 }], cleanup: [{ type: 'call', fn: 'onboardingLight', args: [] }] }),
+      scene('two'), scene('three'),
+    ] };
+    const unregister = [window.ScreenReel.registerFn('onboardingDark', () => document.body.classList.add('onboarding-dark')), window.ScreenReel.registerFn('onboardingLight', () => document.body.classList.remove('onboarding-dark'))];
+    const warnings = []; const warn = console.warn; console.warn = (...args) => { warnings.push(args.join(' ')); warn(...args); };
+    const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+    const projector = await window.ScreenReel.mount(target, { projectId: 'onboarding-example', loop: false, narration: false, cursor: false, disableOnComplete: true, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows: [flow] } } });
+    const result = {};
+    let waiting = once('awaitingnext'); await projector.start('onboarding'); await waiting;
+    const callout = () => document.querySelector('.sr-action-callout');
+    result.heldOnScreen = { callout: !!callout(), ring: !!document.querySelector('.sr-glow-box'), dim: !!document.querySelector('.sr-dim-backdrop'), title: callout()?.querySelector('.sr-callout-title')?.textContent, buttons: [...(callout()?.querySelectorAll('button') || [])].map((button) => button.textContent) };
+    result.appChangedDuringScene = document.body.classList.contains('onboarding-dark');
+    const before = projector.store.playing(); await projector.play(); result.replayRefused = before && warnings.some((line) => line.includes('play() ignored'));
+    waiting = once('awaitingnext'); callout().querySelector('.sr-callout-next').click(); const second = await waiting;
+    result.nextFromCallout = second.sceneId; result.cleanupRanOnNext = !document.body.classList.contains('onboarding-dark');
+    result.backOffered = [...callout().querySelectorAll('button')].map((button) => button.textContent);
+    waiting = once('awaitingnext'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); result.arrowRight = (await waiting).sceneId;
+    result.lastLabel = callout().querySelector('.sr-callout-next').textContent;
+    waiting = once('awaitingnext'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); result.arrowLeftPlays = (await waiting).sceneId;
+    const exit = once('exit'); waiting = once('awaitingnext'); callout().querySelector('.sr-callout-next').click(); await waiting;
+    callout().querySelector('.sr-callout-next').click(); const exitDetail = await exit; await settle();
+    result.finish = { reason: exitDetail.reason, sceneId: exitDetail.sceneId, enabledAfter: projector.store.enabled(), overlaysLeft: document.querySelectorAll('.sr-action-callout,.sr-glow-box,.sr-dim-backdrop').length };
+    // Exit mid-scene still runs cleanup and reports a user skip.
+    waiting = once('awaitingnext'); await projector.start('onboarding', { position: 0 }); await waiting;
+    const skip = once('exit'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); result.escape = (await skip).reason; await settle();
+    result.cleanupRanOnExit = !document.body.classList.contains('onboarding-dark');
+    try { await projector.start('missing'); result.unknownFlow = 'no error'; } catch (error) { result.unknownFlow = error.message; }
+    console.warn = warn; unregister.forEach((fn) => fn()); projector.destroy(); target.remove(); spot.remove();
+    return result;
+  });
+  assert.deepEqual(onboarding, {
+    heldOnScreen: { callout: true, ring: true, dim: true, title: 'Title one', buttons: ['Next'] },
+    appChangedDuringScene: true, replayRefused: true,
+    nextFromCallout: 'two', cleanupRanOnNext: true, backOffered: ['Back', 'Next'],
+    arrowRight: 'three', lastLabel: 'Finish', arrowLeftPlays: 'two',
+    finish: { reason: 'complete', sceneId: 'three', enabledAfter: false, overlaysLeft: 0 },
+    escape: 'user', cleanupRanOnExit: true, unknownFlow: 'ScreenReel start(): unknown flow "missing"',
+  });
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);

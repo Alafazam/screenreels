@@ -7,7 +7,7 @@
     { id: 'highlight', type: 'highlight', category: 'Emphasis', label: 'Highlight target', picker: 'visual', defaults: { holdMs: 1600 }, fields: [field('holdMs', 'Highlight time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'highlight-sequence', type: 'glow', category: 'Emphasis', label: 'Highlight target sequence', picker: 'collection', defaults: { sequence: true, count: 6, stepMs: 1050, afterMs: 400 }, fields: [field('count', 'Maximum targets', 'number', { min: 1, max: 30 }), field('stepMs', 'Time per target (ms)', 'number', { min: 100, max: 10000 })] },
     { id: 'spotlight', type: 'spotlight', category: 'Emphasis', label: 'Spotlight target', picker: 'visual', defaults: { holdMs: 1800, dim: 0.62 }, fields: [field('holdMs', 'Spotlight time (ms)', 'number', { min: 100, max: 30000 }), field('dim', 'Background dimming', 'number', { min: 0.1, max: 0.9, step: 0.05 })] },
-    { id: 'callout', type: 'callout', category: 'Emphasis', label: 'Target callout', picker: 'visual', defaults: { text: 'Add your callout', placement: 'auto', holdMs: 2200 }, fields: [field('text', 'Callout text', 'textarea'), field('placement', 'Placement', 'select', { options: ['auto', 'top', 'right', 'bottom', 'left'] }), field('holdMs', 'Callout time (ms)', 'number', { min: 100, max: 30000 })] },
+    { id: 'callout', type: 'callout', category: 'Emphasis', label: 'Target callout', picker: 'visual', defaults: { text: 'Add your callout', placement: 'auto', holdMs: 2200 }, fields: [field('title', 'Callout title (optional)', 'text'), field('text', 'Callout text', 'textarea'), field('highlight', 'Highlight the target too', 'checkbox'), field('placement', 'Placement', 'select', { options: ['auto', 'top', 'right', 'bottom', 'left'] }), field('holdMs', 'Callout time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'flash', type: 'flash', category: 'Emphasis', label: 'Flash target', picker: 'visual', defaults: { times: 2 }, fields: [field('times', 'Flash count', 'number', { min: 1, max: 10 })] },
     { id: 'reel', type: 'reel', category: 'Emphasis', label: 'Reel text into place', picker: 'visual', defaults: { frames: 7, stepMs: 80, holdMs: 500 }, fields: [field('frames', 'Spin frames', 'number', { min: 2, max: 30 }), field('stepMs', 'Time per frame (ms)', 'number', { min: 20, max: 500 }), field('holdMs', 'Hold after landing (ms)', 'number', { min: 0, max: 10000 })] },
     { id: 'reveal', type: 'reveal', category: 'Emphasis', label: 'Reveal image over target', picker: 'visual', defaults: { holdMs: 1600 }, fields: [field('src', 'Image URL', 'text'), field('holdMs', 'Hold time (ms)', 'number', { min: 100, max: 30000 })] },
@@ -60,6 +60,11 @@
   const LEVER_INPUT_THROTTLE_MS = 90;  // input events while a slider moves, so listeners are not flooded
   const REEL_SCRAMBLE_INDEX_STRIDE = 3, REEL_SCRAMBLE_FRAME_STRIDE = 7; // deterministic glyph scramble
   const AFTER_MS_MAX = 30000;
+  const CALLOUT_GAP_PX = 8;            // space between a callout and its target
+  const CALLOUT_VIEWPORT_MARGIN_PX = 8; // a callout never comes closer than this to the viewport edge
+  /* The side a callout tries first for `placement: 'auto'`, then the rest in order. */
+  const CALLOUT_AUTO_ORDER = ['bottom', 'top', 'right', 'left'];
+  const OPPOSITE_SIDE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
   /* Selector tooling: what counts as a visual target, and how deep a generated selector may go. */
   const BROAD_TARGET_VIEWPORT_SHARE = 0.7;
   const VISUAL_MIN_WIDTH_PX = 24, VISUAL_MIN_HEIGHT_PX = 18, VISUAL_MIN_PADDING_PX = 6, VISUAL_MIN_RADIUS_PX = 4;
@@ -118,7 +123,7 @@
   function ensureStyles(doc) {
     if (doc.getElementById('__screenreelActionStyles')) return;
     const style = doc.createElement('style'); style.id = '__screenreelActionStyles';
-    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(9,9,11,.52);pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#18181b;font:700 15px/1.35 system-ui,sans-serif;cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid #7c3aed}';
+    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-action-callout.sr-callout--interactive{pointer-events:auto}.sr-callout-title{margin:0 0 3px;font-weight:700;font-size:13px}.sr-callout-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:9px}.sr-callout-actions button{padding:4px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-callout-actions .sr-callout-next{border-color:#7c3aed;background:#7c3aed}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(9,9,11,.52);pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#18181b;font:700 15px/1.35 system-ui,sans-serif;cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid #7c3aed}';
     doc.head.appendChild(style);
   }
   function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
@@ -139,6 +144,74 @@
   function createDimBackdrop(doc, el, level) {
     const node = doc.createElement('div'); node.className = 'sr-dim-backdrop';
     node.style.boxShadow = `0 0 0 9999px rgba(9,9,11,${level})`; placeBox(node, el); doc.body.appendChild(node); return node;
+  }
+  function createRing(doc, el) {
+    const ring = doc.createElement('div'); ring.className = 'sr-glow-box'; placeBox(ring, el); doc.body.appendChild(ring); return ring;
+  }
+  /* Where a callout goes. Pure geometry so it can be tested without a browser.
+     - `left`/`right` centre vertically on the target; `top`/`bottom` align to its left edge.
+     - A requested side without room flips to the opposite side; if neither fits (a full-height
+       sidebar, say), the side with the most room wins.
+     - The result is clamped inside the viewport on both axes, whatever the target does.
+     Returns { left, top, side }, where side is where the callout actually landed. */
+  function placeCallout(target, size, viewport, placement = 'auto') {
+    const room = {
+      top: target.top - CALLOUT_GAP_PX - CALLOUT_VIEWPORT_MARGIN_PX,
+      bottom: viewport.height - target.bottom - CALLOUT_GAP_PX - CALLOUT_VIEWPORT_MARGIN_PX,
+      left: target.left - CALLOUT_GAP_PX - CALLOUT_VIEWPORT_MARGIN_PX,
+      right: viewport.width - target.right - CALLOUT_GAP_PX - CALLOUT_VIEWPORT_MARGIN_PX,
+    };
+    const fits = (side) => room[side] >= (side === 'top' || side === 'bottom' ? size.height : size.width);
+    const roomiest = () => Object.keys(room).reduce((best, side) => (room[side] > room[best] ? side : best));
+    let side;
+    if (OPPOSITE_SIDE[placement]) side = fits(placement) ? placement : fits(OPPOSITE_SIDE[placement]) ? OPPOSITE_SIDE[placement] : roomiest();
+    else side = CALLOUT_AUTO_ORDER.find(fits) || roomiest();
+    const centredTop = target.top + target.height / 2 - size.height / 2;
+    const position = {
+      top: { left: target.left, top: target.top - CALLOUT_GAP_PX - size.height },
+      bottom: { left: target.left, top: target.bottom + CALLOUT_GAP_PX },
+      left: { left: target.left - CALLOUT_GAP_PX - size.width, top: centredTop },
+      right: { left: target.right + CALLOUT_GAP_PX, top: centredTop },
+    }[side];
+    const clamp = (value, extent, available) => Math.max(CALLOUT_VIEWPORT_MARGIN_PX, Math.min(value, available - CALLOUT_VIEWPORT_MARGIN_PX - extent));
+    return { left: clamp(position.left, size.width, viewport.width), top: clamp(position.top, size.height, viewport.height), side };
+  }
+  /* The end of an emphasis action. Normally its overlays go as soon as its time is up. They stay
+     up instead, handed to the host through ctx.retain(release), when the action asks to outlive
+     itself (`keep: 'untilSceneEnd'`) or the host asks it to persist (a guided tour holding its
+     final emphasis until Next). An interrupted action always cleans up at once. */
+  function settleOverlays(action, ctx, nodes) {
+    const release = () => nodes.forEach((node) => node?.remove());
+    const outlive = action.keep === 'untilSceneEnd' || ctx.persist === true;
+    if (outlive && ctx.retain && !ctx.signal?.aborted) ctx.retain(release); else release();
+  }
+  function buildCallout(doc, action, controls) {
+    const tip = doc.createElement('div'); tip.className = 'sr-action-callout';
+    if (action.title) { const heading = doc.createElement('div'); heading.className = 'sr-callout-title'; heading.textContent = action.title; tip.appendChild(heading); }
+    const body = doc.createElement('div'); body.className = 'sr-callout-body'; body.textContent = action.text || 'Callout'; tip.appendChild(body);
+    /* Guided tours put the controls where the viewer is already looking. Labels come from the host. */
+    if (controls) {
+      tip.classList.add('sr-callout--interactive');
+      const bar = doc.createElement('div'); bar.className = 'sr-callout-actions';
+      for (const [key, handler] of [['back', controls.onBack], ['next', controls.onNext]]) {
+        if (!handler) continue;
+        const button = doc.createElement('button'); button.type = 'button'; button.className = `sr-callout-${key}`; button.textContent = controls.labels[key];
+        button.addEventListener('click', handler); bar.appendChild(button);
+      }
+      tip.appendChild(bar);
+    }
+    return tip;
+  }
+  async function runCallout(action, ctx, el) {
+    const doc = ctx.document; const win = ctx.window; ensureStyles(doc);
+    const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null;
+    const ring = action.highlight ? createRing(doc, el) : null;
+    const tip = buildCallout(doc, action, ctx.persist ? ctx.calloutControls : null); doc.body.appendChild(tip);
+    const measured = tip.getBoundingClientRect();
+    const { left, top, side } = placeCallout(el.getBoundingClientRect(), { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
+    Object.assign(tip.style, { left: `${left}px`, top: `${top}px` }); tip.dataset.side = side;
+    await sleep(action.holdMs || DEFAULTS.callout.holdMs, ctx.signal);
+    settleOverlays(action, ctx, [tip, ring, backdrop]);
   }
   const SCROLL_SETTLE_FRAMES = 3, SCROLL_SETTLE_MAX_MS = 1200, SCROLL_SETTLE_TICK_MS = 32;
   const FLASH_ON_MS = 190, FLASH_OFF_MS = 150;
@@ -293,7 +366,8 @@
     const place = (el) => { placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
     if (action.sequence) for (const el of elements) { await ensureInView(el, ctx); place(el); await sleep(action.stepMs || GLOW_FALLBACK_STEP_MS, ctx.signal); }
     else { await ensureInView(elements[0], ctx); place(elements[0]); await sleep(action.holdMs || DEFAULTS.highlight.holdMs, ctx.signal); }
-    // `keep` lingers the ring only; the page is un-dimmed as soon as the action ends.
+    if (action.keep === 'untilSceneEnd' || ctx.persist === true) { settleOverlays(action, ctx, [box, backdrop]); return true; }
+    // A timed `keep` lingers the ring only; the page is un-dimmed as soon as the action ends.
     backdrop?.remove();
     if (action.keep) setTimeout(() => box.remove(), action.keepMs || KEEP_FALLBACK_MS); else box.remove(); return true;
   }
@@ -316,7 +390,7 @@
      break validation guarantees while a URL-controlled goto is an open redirect (the projector's
      default router assigns location.href without re-normalizing at play time). Single pass, no
      recursive expansion; unknown names stay literal so flows without variables are byte-identical. */
-  const INTERPOLATED_FIELDS = ['text', 'note', 'value', 'label', 'code', 'caption', 'goText', 'narration'];
+  const INTERPOLATED_FIELDS = ['title', 'text', 'note', 'value', 'label', 'code', 'caption', 'goText', 'narration'];
   const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_]\w*)\s*\}\}/g;
   function interpolate(value, variables) {
     const missing = [];
@@ -373,9 +447,9 @@
          Spotlight exists to dim, so it ignores the host's highlight `dim` default. */
       ensureStyles(doc); const backdrop = createDimBackdrop(doc, el, Number(action.dim) || DEFAULTS.spotlight.dim);
       const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); doc.body.appendChild(box);
-      await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); box.remove(); backdrop.remove();
+      await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); settleOverlays(action, ctx, [box, backdrop]);
     }
-    else if (action.type === 'callout') { ensureStyles(doc); const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null; const tip = doc.createElement('div'); tip.className = 'sr-action-callout'; tip.textContent = action.text || 'Callout'; doc.body.appendChild(tip); const rect = el.getBoundingClientRect(); const left = action.placement === 'right' ? rect.right + 8 : action.placement === 'left' ? Math.max(8, rect.left - 288) : Math.max(8, Math.min(rect.left, win.innerWidth - 288)); const top = action.placement === 'top' ? rect.top - 48 : rect.bottom + 8; Object.assign(tip.style, { left: `${left}px`, top: `${Math.max(8, top)}px` }); await sleep(action.holdMs || DEFAULTS.callout.holdMs, ctx.signal); tip.remove(); backdrop?.remove(); }
+    else if (action.type === 'callout') await runCallout(action, ctx, el);
     else if (action.type === 'flash') await runFlash(action, ctx, el);
     else if (action.type === 'reel') await runReel(action, ctx, el);
     else if (action.type === 'reveal') await runReveal(action, ctx, el);
@@ -479,5 +553,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);
