@@ -41,6 +41,29 @@
   ];
 
   const byId = new Map(definitions.map((item) => [item.id, item]));
+  /* The definitions table is the one home for an action's defaults; the executor falls back to it
+     rather than repeating the numbers. Keyed by definition id: DEFAULTS.spotlight.holdMs. */
+  const DEFAULTS = Object.fromEntries(definitions.map((item) => [item.id, item.defaults]));
+  /* Executor fallbacks that deliberately differ from the definitions table. Studio seeds new
+     actions from the table; these apply only to hand-written manifests that omit the field, and
+     changing them would change how existing flows play. */
+  const GLOW_FALLBACK_COUNT = 12, GLOW_FALLBACK_STEP_MS = 1100;
+  const WAIT_FALLBACK_MS = 500;
+  const KEEP_FALLBACK_MS = 4000;       // how long a `keep` highlight ring lingers after its action
+  /* Element readiness. */
+  const ELEMENT_WAIT_TIMEOUT_MS = 8000, CURSOR_TARGET_WAIT_MS = 6000, WAIT_POLL_MS = 120;
+  /* Geometry. */
+  const BOX_PADDING_PX = 5;            // highlight ring and dim cut-out sit this far outside the target
+  const REVEAL_MARGIN_PX = 24, REVEAL_MIN_WIDTH_PX = 640, REVEAL_ASPECT = 10 / 16;
+  const DRAG_GRAB_MAX_OFFSET_Y_PX = 18; // grab near the top of a tall card, where its handle usually is
+  const RIPPLE_REMOVE_MS = 700;        // outlives the .65s sr-ripple animation
+  const LEVER_INPUT_THROTTLE_MS = 90;  // input events while a slider moves, so listeners are not flooded
+  const REEL_SCRAMBLE_INDEX_STRIDE = 3, REEL_SCRAMBLE_FRAME_STRIDE = 7; // deterministic glyph scramble
+  const AFTER_MS_MAX = 30000;
+  /* Selector tooling: what counts as a visual target, and how deep a generated selector may go. */
+  const BROAD_TARGET_VIEWPORT_SHARE = 0.7;
+  const VISUAL_MIN_WIDTH_PX = 24, VISUAL_MIN_HEIGHT_PX = 18, VISUAL_MIN_PADDING_PX = 6, VISUAL_MIN_RADIUS_PX = 4;
+  const SELECTOR_MAX_DEPTH = 5, SELECTOR_MAX_CLASSES = 2;
   const aliases = { fill: 'type' };
   const supportedTypes = new Set(definitions.map((item) => item.type).concat(['fill', 'glow']));
   /* One authoritative pacing multiplier. Every deliberate delay in the runtime goes through
@@ -82,13 +105,13 @@
   }
   function queryAll(doc, selector) { try { return selector ? [...doc.querySelectorAll(selector)] : []; } catch { return []; } }
   function resolveElement(doc, action, selector = action.selector) { return queryAll(doc, selector)[Number(action.index) || 0] || null; }
-  async function waitFor(doc, selector, condition = 'appear', timeoutMs = 8000, signal) {
+  async function waitFor(doc, selector, condition = 'appear', timeoutMs = ELEMENT_WAIT_TIMEOUT_MS, signal) {
     const started = Date.now();
     while (!signal?.aborted && Date.now() - started <= timeoutMs) {
       const el = selector ? resolveElement(doc, { selector }) : doc.body; const style = el ? doc.defaultView.getComputedStyle(el) : null;
       const visible = !!el && style.display !== 'none' && style.visibility !== 'hidden' && el.getClientRects().length > 0;
       const met = condition === 'disappear' ? !el : condition === 'visible' ? visible : condition === 'enabled' ? visible && !el.disabled : condition === 'selected' ? !!el && (el.checked || el.selected || el.getAttribute('aria-selected') === 'true') : !!el;
-      if (met) return el || true; await sleep(120, signal);
+      if (met) return el || true; await sleep(WAIT_POLL_MS, signal);
     }
     return null;
   }
@@ -98,7 +121,7 @@
     style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:14px;border:3px solid #7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48);transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483001;max-width:280px;padding:9px 11px;border-radius:8px;background:#18181b;color:#fff;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3);pointer-events:none}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#7c3aed;pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:transparent}.sr-count-num{font:800 220px/1 system-ui,sans-serif;letter-spacing:-.04em;color:rgba(63,63,70,.24);text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 system-ui,sans-serif;color:rgba(63,63,70,.5)}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(9,9,11,.52);pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:#fff;color:#18181b;font:700 15px/1.35 system-ui,sans-serif;cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid #7c3aed}';
     doc.head.appendChild(style);
   }
-  function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - 5}px`, top: `${rect.top - 5}px`, width: `${rect.width + 10}px`, height: `${rect.height + 10}px` }); }
+  function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
   /* Highlight, highlight sequence, and callout dim the rest of the page so the eye lands on the
      target. Precedence: the action's own `dim`, then the host's context default (Projector's
      `dim` mount option), then DEFAULT_EMPHASIS_DIM. `0` or `false` turns it off. Lighter than
@@ -169,24 +192,24 @@
     for (let i = 0; i < times; i++) { if (ctx.signal?.aborted) break; el.classList.add('sr-flash-on'); await sleep(action.onMs ?? FLASH_ON_MS, ctx.signal); el.classList.remove('sr-flash-on'); await sleep(action.offMs ?? FLASH_OFF_MS, ctx.signal); }
   }
   async function runReel(action, ctx, el) {
-    const original = el.textContent; const frames = Math.max(2, Number(action.frames) || 7); const stepMs = Number(action.stepMs) || 80;
+    const original = el.textContent; const frames = Math.max(2, Number(action.frames) || DEFAULTS.reel.frames); const stepMs = Number(action.stepMs) || DEFAULTS.reel.stepMs;
     el.classList.add('sr-reel');
-    for (let f = 0; f < frames - 1; f++) { if (ctx.signal?.aborted) break; el.textContent = [...original].map((ch, idx) => ch === ' ' ? ' ' : REEL_GLYPHS[(idx * 3 + f * 7 + ch.charCodeAt(0)) % REEL_GLYPHS.length]).join(''); await sleep(stepMs, ctx.signal); }
+    for (let f = 0; f < frames - 1; f++) { if (ctx.signal?.aborted) break; el.textContent = [...original].map((ch, idx) => ch === ' ' ? ' ' : REEL_GLYPHS[(idx * REEL_SCRAMBLE_INDEX_STRIDE + f * REEL_SCRAMBLE_FRAME_STRIDE + ch.charCodeAt(0)) % REEL_GLYPHS.length]).join(''); await sleep(stepMs, ctx.signal); }
     el.textContent = original; el.classList.remove('sr-reel'); el.classList.add('sr-reel-landed');
     await sleep(action.holdMs ?? REEL_LANDED_MS, ctx.signal); el.classList.remove('sr-reel-landed');
   }
   async function runReveal(action, ctx, el) {
     if (!action.src) { ctx.warn('reveal requires an image src'); return; }
-    ensureStyles(ctx.document); const doc = ctx.document; const win = ctx.window; const rect = el.getBoundingClientRect(); const margin = 24;
-    const width = Math.min(win.innerWidth - margin * 2, Math.max(rect.width, 640));
-    const height = Math.min(win.innerHeight - margin * 2, Math.round(width * 10 / 16));
+    ensureStyles(ctx.document); const doc = ctx.document; const win = ctx.window; const rect = el.getBoundingClientRect(); const margin = REVEAL_MARGIN_PX;
+    const width = Math.min(win.innerWidth - margin * 2, Math.max(rect.width, REVEAL_MIN_WIDTH_PX));
+    const height = Math.min(win.innerHeight - margin * 2, Math.round(width * REVEAL_ASPECT));
     const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, win.innerWidth - margin - width));
     const top = Math.max(margin, Math.min(rect.top + rect.height / 2 - height / 2, win.innerHeight - margin - height));
     const img = doc.createElement('img'); img.className = 'sr-reveal';
     try { img.src = new URL(action.src, win.location.href).href; } catch { img.src = action.src; }
     Object.assign(img.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` });
     doc.body.appendChild(img); await sleep(REVEAL_FADE_IN_MS, ctx.signal); img.classList.add('show');
-    await sleep(action.holdMs || 1600, ctx.signal); img.classList.remove('show'); await sleep(REVEAL_FADE_OUT_MS, ctx.signal); img.remove();
+    await sleep(action.holdMs || DEFAULTS.reveal.holdMs, ctx.signal); img.classList.remove('show'); await sleep(REVEAL_FADE_OUT_MS, ctx.signal); img.remove();
   }
   /* Side panel holding the code a developer would write for the target being shown.
      Sits on whichever side of the target has more room, so it never covers the subject. */
@@ -210,7 +233,7 @@
     await sleep(REVEAL_FADE_IN_MS, ctx.signal); panel.classList.add('show');
     /* keep: leave the panel up while later actions run, so code and emphasis are on screen together. */
     if (action.keep) { setTimeout(() => panel.remove(), scaled(action.keepMs || SNIPPET_KEEP_MS)); return; }
-    await sleep(action.holdMs || 2600, ctx.signal); panel.classList.remove('show'); await sleep(REVEAL_FADE_OUT_MS, ctx.signal); panel.remove();
+    await sleep(action.holdMs || DEFAULTS.snippet.holdMs, ctx.signal); panel.classList.remove('show'); await sleep(REVEAL_FADE_OUT_MS, ctx.signal); panel.remove();
   }
   /* Viewer-facing choice cards. Unlike every other overlay these accept pointer events —
      the viewer clicks a card and playback jumps to its scene (via the jumpTo result channel).
@@ -251,39 +274,40 @@
     });
   }
   async function runCountdown(action, ctx) {
-    ensureStyles(ctx.document); const doc = ctx.document; const from = Math.max(1, Number(action.from) || 3);
+    ensureStyles(ctx.document); const doc = ctx.document; const from = Math.max(1, Number(action.from) || DEFAULTS.countdown.from);
     const overlay = doc.createElement('div'); overlay.className = 'sr-countdown-overlay';
     const num = doc.createElement('div'); num.className = 'sr-count-num';
     const cap = doc.createElement('div'); cap.className = 'sr-count-cap'; cap.textContent = action.caption || 'Your demo is about to play';
     overlay.appendChild(num); overlay.appendChild(cap); doc.body.appendChild(overlay);
     const labels = []; for (let n = from; n >= 1; n--) labels.push(String(n)); labels.push(action.goText || 'Go');
-    for (const label of labels) { if (ctx.signal?.aborted) break; num.textContent = label; num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop'); await sleep(Number(action.stepMs) || 720, ctx.signal); }
+    for (const label of labels) { if (ctx.signal?.aborted) break; num.textContent = label; num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop'); await sleep(Number(action.stepMs) || DEFAULTS.countdown.stepMs, ctx.signal); }
     overlay.remove();
   }
   function dispatchValue(el, value) { const EventCtor = el.ownerDocument.defaultView.Event; el.value = value; el.dispatchEvent(new EventCtor('input', { bubbles: true })); el.dispatchEvent(new EventCtor('change', { bubbles: true })); }
-  function ripple(doc, el) { ensureStyles(doc); const rect = el.getBoundingClientRect(); const dot = doc.createElement('div'); dot.className = 'sr-click-ripple'; dot.style.left = `${rect.left + rect.width / 2}px`; dot.style.top = `${rect.top + rect.height / 2}px`; doc.body.appendChild(dot); setTimeout(() => dot.remove(), 700); }
+  function ripple(doc, el) { ensureStyles(doc); const rect = el.getBoundingClientRect(); const dot = doc.createElement('div'); dot.className = 'sr-click-ripple'; dot.style.left = `${rect.left + rect.width / 2}px`; dot.style.top = `${rect.top + rect.height / 2}px`; doc.body.appendChild(dot); setTimeout(() => dot.remove(), RIPPLE_REMOVE_MS); }
   async function runGlow(action, ctx) {
-    const elements = queryAll(ctx.document, action.selector).slice(0, Number(action.count) || 12); if (!elements.length) return false;
+    const elements = queryAll(ctx.document, action.selector).slice(0, Number(action.count) || GLOW_FALLBACK_COUNT); if (!elements.length) return false;
     ensureStyles(ctx.document); const box = ctx.document.createElement('div'); box.className = 'sr-glow-box'; ctx.document.body.appendChild(box);
     // The glow box cannot carry the dim shadow itself: its ring mask would clip the shadow away.
     const level = dimLevel(action, ctx); let backdrop = null;
     const place = (el) => { placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
-    if (action.sequence) for (const el of elements) { await ensureInView(el, ctx); place(el); await sleep(action.stepMs || 1100, ctx.signal); }
-    else { await ensureInView(elements[0], ctx); place(elements[0]); await sleep(action.holdMs || 1600, ctx.signal); }
+    if (action.sequence) for (const el of elements) { await ensureInView(el, ctx); place(el); await sleep(action.stepMs || GLOW_FALLBACK_STEP_MS, ctx.signal); }
+    else { await ensureInView(elements[0], ctx); place(elements[0]); await sleep(action.holdMs || DEFAULTS.highlight.holdMs, ctx.signal); }
     // `keep` lingers the ring only; the page is un-dimmed as soon as the action ends.
     backdrop?.remove();
-    if (action.keep) setTimeout(() => box.remove(), action.keepMs || 4000); else box.remove(); return true;
+    if (action.keep) setTimeout(() => box.remove(), action.keepMs || KEEP_FALLBACK_MS); else box.remove(); return true;
   }
+  const easeInOutQuad = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
   async function animateLever(el, target, durMs, ctx) {
     const from = Number(el.value) || 0; const min = Number(el.min) || 0; const max = Number(el.max) || 100; const to = target === 'max' ? max : target === 'min' ? min : Number(target);
     if (!Number.isFinite(to)) return; const started = performance.now(); let lastDispatch = 0; await ctx.moveCursor?.(el);
-    await new Promise((resolve) => { const frame = (now) => { if (ctx.signal?.aborted) return resolve(); const p = Math.min(1, (now - started) / (Number(durMs) || 1200)); const eased = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; el.value = from + (to - from) * eased; if (p >= 1 || now - lastDispatch > 90) { el.dispatchEvent(new ctx.window.Event('input', { bubbles: true })); lastDispatch = now; } if (p < 1) ctx.window.requestAnimationFrame(frame); else { el.dispatchEvent(new ctx.window.Event('change', { bubbles: true })); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
+    await new Promise((resolve) => { const frame = (now) => { if (ctx.signal?.aborted) return resolve(); const p = Math.min(1, (now - started) / (Number(durMs) || DEFAULTS.lever.durMs)); const eased = easeInOutQuad(p); el.value = from + (to - from) * eased; if (p >= 1 || now - lastDispatch > LEVER_INPUT_THROTTLE_MS) { el.dispatchEvent(new ctx.window.Event('input', { bubbles: true })); lastDispatch = now; } if (p < 1) ctx.window.requestAnimationFrame(frame); else { el.dispatchEvent(new ctx.window.Event('change', { bubbles: true })); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
   }
   async function runDrag(action, ctx, el) {
     const destination = resolveElement(ctx.document, action, action.toSelector); const sourceRect = el.getBoundingClientRect(); const targetRect = destination?.getBoundingClientRect();
-    const sx = sourceRect.left + (action.offsetX ?? sourceRect.width / 2); const sy = sourceRect.top + (action.offsetY ?? Math.min(18, sourceRect.height / 2)); const dx = targetRect ? targetRect.left + targetRect.width / 2 - sx : Number(action.dx) || 0; const dy = targetRect ? targetRect.top + targetRect.height / 2 - sy : Number(action.dy) || 0;
+    const sx = sourceRect.left + (action.offsetX ?? sourceRect.width / 2); const sy = sourceRect.top + (action.offsetY ?? Math.min(DRAG_GRAB_MAX_OFFSET_Y_PX, sourceRect.height / 2)); const dx = targetRect ? targetRect.left + targetRect.width / 2 - sx : Number(action.dx) || 0; const dy = targetRect ? targetRect.top + targetRect.height / 2 - sy : Number(action.dy) || 0;
     const Pointer = ctx.window.PointerEvent || ctx.window.MouseEvent; const Mouse = ctx.window.MouseEvent; const event = (type, Ctor, x, y, pressed) => new Ctor(type, { bubbles: true, cancelable: true, composed: true, view: ctx.window, clientX: x, clientY: y, button: 0, buttons: pressed ? 1 : 0, pointerId: 1, isPrimary: true, pointerType: 'mouse' });
-    await ctx.moveCursor?.(el); el.dispatchEvent(event('pointerdown', Pointer, sx, sy, true)); el.dispatchEvent(event('mousedown', Mouse, sx, sy, true)); const started = performance.now(); const duration = Number(action.durMs) || 900;
+    await ctx.moveCursor?.(el); el.dispatchEvent(event('pointerdown', Pointer, sx, sy, true)); el.dispatchEvent(event('mousedown', Mouse, sx, sy, true)); const started = performance.now(); const duration = Number(action.durMs) || DEFAULTS.drag.durMs;
     await new Promise((resolve) => { const frame = (now) => { const p = Math.min(1, (now - started) / duration); const x = sx + dx * p; const y = sy + dy * p; ctx.window.dispatchEvent(event('pointermove', Pointer, x, y, true)); ctx.window.dispatchEvent(event('mousemove', Mouse, x, y, true)); ctx.window.__screenreelCursor?.moveToPoint?.(x, y, 1); if (!ctx.signal?.aborted && p < 1) ctx.window.requestAnimationFrame(frame); else { ctx.window.dispatchEvent(event('pointerup', Pointer, x, y, false)); ctx.window.dispatchEvent(event('mouseup', Mouse, x, y, false)); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
   }
   /* Flow variables. {{name}} placeholders resolve against ctx.variables in DISPLAY/VALUE fields
@@ -334,25 +358,25 @@
        runs alongside the visual it describes, and a queued line would drift behind the picture. */
     const narration = actionNarration(action);
     if (narration && ctx.narrateAction) ctx.narrateAction(narration);
-    if (action.type === 'wait') { await sleep(action.ms || 500, ctx.signal); return { ok: true }; }
+    if (action.type === 'wait') { await sleep(action.ms || WAIT_FALLBACK_MS, ctx.signal); return { ok: true }; }
     if (action.type === 'countdown') { await runCountdown(action, ctx); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'choice') { const result = await runChoice(action, ctx); if (result.ok && action.afterMs) await sleep(action.afterMs, ctx.signal); return result; }
-    if (action.type === 'waitFor') { const found = await waitFor(doc, action.selector, action.condition || 'visible', action.timeoutMs || 8000, ctx.signal); if (!found) return { ok: false, error: 'timeout' }; if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
+    if (action.type === 'waitFor') { const found = await waitFor(doc, action.selector, action.condition || 'visible', action.timeoutMs || DEFAULTS['wait-for'].timeoutMs, ctx.signal); if (!found) return { ok: false, error: 'timeout' }; if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'highlight' || action.type === 'glow') { const ok = await runGlow(action, ctx); if (!ok) ctx.warn(`Selector not found: ${action.selector}`); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok }; }
     if (action.type === 'goto') { await ctx.navigate?.(action.url); return { ok: true, navigated: true }; }
-    if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', 6000, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || win[action.fn]; if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
-    let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || 8000, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
+    if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || win[action.fn]; if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
+    let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
     if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
-    if (action.type === 'spotlight') { ensureStyles(doc); const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); box.style.boxShadow = `0 0 0 2px rgba(255,255,255,.85),0 0 0 9999px rgba(9,9,11,${Number(action.dim) || .62})`; doc.body.appendChild(box); await sleep(action.holdMs || 1800, ctx.signal); box.remove(); }
-    else if (action.type === 'callout') { ensureStyles(doc); const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null; const tip = doc.createElement('div'); tip.className = 'sr-action-callout'; tip.textContent = action.text || 'Callout'; doc.body.appendChild(tip); const rect = el.getBoundingClientRect(); const left = action.placement === 'right' ? rect.right + 8 : action.placement === 'left' ? Math.max(8, rect.left - 288) : Math.max(8, Math.min(rect.left, win.innerWidth - 288)); const top = action.placement === 'top' ? rect.top - 48 : rect.bottom + 8; Object.assign(tip.style, { left: `${left}px`, top: `${Math.max(8, top)}px` }); await sleep(action.holdMs || 2200, ctx.signal); tip.remove(); backdrop?.remove(); }
+    if (action.type === 'spotlight') { ensureStyles(doc); const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); box.style.boxShadow = `0 0 0 2px rgba(255,255,255,.85),0 0 0 9999px rgba(9,9,11,${Number(action.dim) || DEFAULTS.spotlight.dim})`; doc.body.appendChild(box); await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); box.remove(); }
+    else if (action.type === 'callout') { ensureStyles(doc); const level = dimLevel(action, ctx); const backdrop = level ? createDimBackdrop(doc, el, level) : null; const tip = doc.createElement('div'); tip.className = 'sr-action-callout'; tip.textContent = action.text || 'Callout'; doc.body.appendChild(tip); const rect = el.getBoundingClientRect(); const left = action.placement === 'right' ? rect.right + 8 : action.placement === 'left' ? Math.max(8, rect.left - 288) : Math.max(8, Math.min(rect.left, win.innerWidth - 288)); const top = action.placement === 'top' ? rect.top - 48 : rect.bottom + 8; Object.assign(tip.style, { left: `${left}px`, top: `${Math.max(8, top)}px` }); await sleep(action.holdMs || DEFAULTS.callout.holdMs, ctx.signal); tip.remove(); backdrop?.remove(); }
     else if (action.type === 'flash') await runFlash(action, ctx, el);
     else if (action.type === 'reel') await runReel(action, ctx, el);
     else if (action.type === 'reveal') await runReveal(action, ctx, el);
     else if (action.type === 'snippet') await runSnippet(action, ctx, el);
     else if (action.type === 'click') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); ripple(doc, el); el.click(); }
-    else if (action.type === 'hover') { await ctx.moveCursor?.(el); ['pointerover', 'mouseover', 'mouseenter'].forEach((type) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== 'mouseenter', view: win }))); await sleep(action.holdMs || 800, ctx.signal); }
+    else if (action.type === 'hover') { await ctx.moveCursor?.(el); ['pointerover', 'mouseover', 'mouseenter'].forEach((type) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== 'mouseenter', view: win }))); await sleep(action.holdMs || DEFAULTS.hover.holdMs, ctx.signal); }
     else if (action.type === 'focus') { await ctx.moveCursor?.(el); el.focus({ preventScroll: false }); }
-    else if (action.type === 'type') { await ctx.moveCursor?.(el); el.focus(); if (action.clearFirst !== false) dispatchValue(el, ''); let value = action.clearFirst === false ? String(el.value || '') : ''; for (const char of String(action.text ?? action.value ?? '')) { value += char; el.value = value; el.dispatchEvent(new win.Event('input', { bubbles: true })); await sleep(action.charMs ?? 45, ctx.signal); } el.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    else if (action.type === 'type') { await ctx.moveCursor?.(el); el.focus(); if (action.clearFirst !== false) dispatchValue(el, ''); let value = action.clearFirst === false ? String(el.value || '') : ''; for (const char of String(action.text ?? action.value ?? '')) { value += char; el.value = value; el.dispatchEvent(new win.Event('input', { bubbles: true })); await sleep(action.charMs ?? DEFAULTS.type.charMs, ctx.signal); } el.dispatchEvent(new win.Event('change', { bubbles: true })); }
     else if (action.type === 'set') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); dispatchValue(el, action.value ?? ''); }
     else if (action.type === 'toggle') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); if (!!el.checked !== !!action.checked) el.click(); }
     else if (action.type === 'lever') await animateLever(el, action.to, action.durMs, ctx);
@@ -376,7 +400,7 @@
     }
     if (actionType(action) === 'call' && !/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) errors.push('Use a valid function name');
     for (const key of ['selector', 'toSelector', 'cursorTo']) { if (!action[key] || !doc) continue; const count = queryAll(doc, action[key]).length; const collection = key === 'selector' && definition.picker === 'collection'; if (!count) errors.push(`${key} has no matches`); else if (!collection && count > 1 && action.index == null) errors.push(`${key} matches multiple elements`); }
-    for (const spec of [...(definition.fields || []), { key: 'afterMs', min: 0, max: 30000 }]) if (spec.type === 'number' && action[spec.key] != null && action[spec.key] !== '') { const value = Number(action[spec.key]); if (!Number.isFinite(value) || (spec.min != null && value < spec.min) || (spec.max != null && value > spec.max)) errors.push(`${spec.label || spec.key} is outside the allowed range`); }
+    for (const spec of [...(definition.fields || []), { key: 'afterMs', min: 0, max: AFTER_MS_MAX }]) if (spec.type === 'number' && action[spec.key] != null && action[spec.key] !== '') { const value = Number(action[spec.key]); if (!Number.isFinite(value) || (spec.min != null && value < spec.min) || (spec.max != null && value > spec.max)) errors.push(`${spec.label || spec.key} is outside the allowed range`); }
     return errors;
   }
   /* Flow-level graph validation: every choice target must be a real, ENABLED scene. A target
@@ -400,8 +424,8 @@
   }
   const INSPECT_TEXT_LIMIT = 120, INSPECT_LIMIT = 500; // fingerprint/inspection bounds
   const interactiveSelector = 'button,a[href],input,select,textarea,[role="button"],[role="switch"],[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
-  function isBroad(el, doc) { if (!el || ['BODY', 'HTML', 'MAIN'].includes(el.tagName) || el.getAttribute('role') === 'tabpanel' || el.hasAttribute('data-panel')) return true; const rect = el.getBoundingClientRect(); return rect.width * rect.height > doc.defaultView.innerWidth * doc.defaultView.innerHeight * .7; }
-  function visualCandidate(el, doc) { if (!el || isBroad(el, doc)) return false; const rect = el.getBoundingClientRect(); if (rect.width < 24 || rect.height < 18) return false; const style = doc.defaultView.getComputedStyle(el); const padded = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].some((key) => parseFloat(style[key]) >= 6); return style.borderStyle !== 'none' || style.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(style.borderRadius) >= 4 || padded; }
+  function isBroad(el, doc) { if (!el || ['BODY', 'HTML', 'MAIN'].includes(el.tagName) || el.getAttribute('role') === 'tabpanel' || el.hasAttribute('data-panel')) return true; const rect = el.getBoundingClientRect(); return rect.width * rect.height > doc.defaultView.innerWidth * doc.defaultView.innerHeight * BROAD_TARGET_VIEWPORT_SHARE; }
+  function visualCandidate(el, doc) { if (!el || isBroad(el, doc)) return false; const rect = el.getBoundingClientRect(); if (rect.width < VISUAL_MIN_WIDTH_PX || rect.height < VISUAL_MIN_HEIGHT_PX) return false; const style = doc.defaultView.getComputedStyle(el); const padded = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].some((key) => parseFloat(style[key]) >= VISUAL_MIN_PADDING_PX); return style.borderStyle !== 'none' || style.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(style.borderRadius) >= VISUAL_MIN_RADIUS_PX || padded; }
   function resolvePickerTarget(exact, policy, doc = exact?.ownerDocument) { if (!exact || !doc) return null; if (policy === 'interactive') return exact.closest(interactiveSelector) || exact; if (policy === 'visual' || policy === 'collection') for (let el = exact; el && el !== doc.body; el = el.parentElement) if (visualCandidate(el, doc)) return el; return isBroad(exact, doc) ? null : exact; }
   const escapeCss = (value) => root.CSS?.escape ? root.CSS.escape(value) : String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
   function selectorFor(el) {
@@ -409,7 +433,7 @@
     const demoId = el.getAttribute('data-demo-id'); if (demoId) return `[data-demo-id="${String(demoId).replace(/"/g, '\\"')}"]`;
     if (el.id && unique(`#${escapeCss(el.id)}`)) return `#${escapeCss(el.id)}`;
     for (const attr of [...el.attributes].filter((item) => item.name.startsWith('data-') && !item.name.startsWith('data-screenreel'))) { const selector = `[${attr.name}="${String(attr.value).replace(/"/g, '\\"')}"]`; if (attr.value && unique(selector)) return selector; }
-    const parts = []; let node = el; while (node && node !== doc.body && parts.length < 5) { let part = node.tagName.toLowerCase(); const classes = [...node.classList].filter((name) => !name.startsWith('sr-') && !name.startsWith('screenreel-')).slice(0, 2); if (classes.length) part += classes.map((name) => `.${escapeCss(name)}`).join(''); const siblings = node.parentElement ? [...node.parentElement.children].filter((item) => item.tagName === node.tagName) : []; if (siblings.length > 1) part += `:nth-of-type(${siblings.indexOf(node) + 1})`; parts.unshift(part); const selector = parts.join(' > '); if (unique(selector)) return selector; node = node.parentElement; } return parts.join(' > ') || null;
+    const parts = []; let node = el; while (node && node !== doc.body && parts.length < SELECTOR_MAX_DEPTH) { let part = node.tagName.toLowerCase(); const classes = [...node.classList].filter((name) => !name.startsWith('sr-') && !name.startsWith('screenreel-')).slice(0, SELECTOR_MAX_CLASSES); if (classes.length) part += classes.map((name) => `.${escapeCss(name)}`).join(''); const siblings = node.parentElement ? [...node.parentElement.children].filter((item) => item.tagName === node.tagName) : []; if (siblings.length > 1) part += `:nth-of-type(${siblings.indexOf(node) + 1})`; parts.unshift(part); const selector = parts.join(' > '); if (unique(selector)) return selector; node = node.parentElement; } return parts.join(' > ') || null;
   }
   function selectorForCollection(el) {
     const doc = el?.ownerDocument; if (!doc || !el) return null;
@@ -448,5 +472,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

@@ -6,6 +6,8 @@ const functions = new Map();
 const TOAST_MS = 2600;
 const PILL_INTRO_MS = 1100;
 const VARIABLE_PARAM_PREFIX = 'srv_';
+const DEFAULT_DWELL_MS = 3000;         // rest after a scene when neither it nor its flow sets dwellMs
+const TRIGGER_ICON_PX = 18;
 /* 'auto' advances after each scene's dwell; 'guided' holds on the finished scene until the
    viewer presses Next. */
 const ADVANCE_MODES = ['auto', 'guided'];
@@ -210,7 +212,7 @@ class Projector {
     this.dropOffSent = false;
     this.controller?.abort(); this.controller = new AbortController();
     if (scene.waitFor) {
-      const ready = await window.ScreenReelCore.waitFor(document, scene.waitFor, 'visible', Number(scene.timeoutMs) || 8000, this.controller.signal);
+      const ready = await window.ScreenReelCore.waitFor(document, scene.waitFor, 'visible', Number(scene.timeoutMs) || window.ScreenReelCore.ELEMENT_WAIT_TIMEOUT_MS, this.controller.signal);
       if (!ready) {
         const result = { ok: false, error: `Scene readiness timed out: ${scene.waitFor}` };
         console.warn('[screenreel]', result.error); if (this.options.strict) return this.actionFailed(scene, { id: null, type: 'waitFor', selector: scene.waitFor }, -1, result);
@@ -279,7 +281,7 @@ class Projector {
     if (generation !== this.playGeneration || !this.store.playing()) return;
     this.analytics.emit('scene_complete');
     if (this.advanceMode() === 'guided') { this.awaitingNext = true; this.render(); event('awaitingnext', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id }); return; }
-    const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? 3000); this.timer = setTimeout(() => this.next(true, generation), delay);
+    const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? DEFAULT_DWELL_MS); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
   /* Introduce the control pill before the first action runs, so the viewer sees which flow is
      about to play and where the controls are. Resolves when the beat is over. */
@@ -307,7 +309,7 @@ class Projector {
   async previous() { const { scenes, position } = this.current(); if (!scenes.length) return; this.pause(); const next = (position - 1 + scenes.length) % scenes.length; this.store.setPosition(next); this.render(); if (!this.routeMatches(scenes[next])) await this.router.navigate(scenes[next].route); }
   captureCurrent() {
     let flow = this.store.activeFlow(); if (flow.readonly) flow = this.store.createCopy(flow, `My ${flow.name}`);
-    const route = window.ScreenReelCore.normalizeRoute(this.router.getRoute(), location.href) || '/'; const scene = { id: window.ScreenReelStore.makeId('scene'), enabled: true, route, title: document.title || 'Captured scene', talkingPoints: '', dwellMs: 6000, actions: [] };
+    const route = window.ScreenReelCore.normalizeRoute(this.router.getRoute(), location.href) || '/'; const scene = { id: window.ScreenReelStore.makeId('scene'), enabled: true, route, title: document.title || 'Captured scene', talkingPoints: '', dwellMs: window.ScreenReelStore.NEW_FLOW_DEFAULTS.dwellMs, actions: [] };
     flow.scenes.push(scene); flow = this.store.save(flow); this.toast('Scene captured locally'); this.openStudio({ flowId: flow.id, sceneId: scene.id });
   }
   async openStudio(selection = {}) { const module = await import(this.assetUrl('studio.js')); return module.openStudio({ projector: this, store: this.store, assetBase: this.assetBase, assetVersion: this.assetVersion, ...selection }); }
@@ -328,7 +330,7 @@ export function createPublicApi(assetBase, assetVersion = '') {
   class ScreenReelElement extends HTMLElement {
     async connectedCallback() {
       if (this.instance) return; const shadow = this.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; const styleUrl = new URL('screenreel.css', assetBase); if (assetVersion) styleUrl.search = assetVersion; link.href = styleUrl.href; shadow.appendChild(link);
-      const button = document.createElement('button'); button.className = 'sr-trigger'; button.title = 'Toggle ScreenReel demo'; button.setAttribute('aria-label', 'Toggle ScreenReel demo'); button.innerHTML = icon('presentation', 18); shadow.appendChild(button);
+      const button = document.createElement('button'); button.className = 'sr-trigger'; button.title = 'Toggle ScreenReel demo'; button.setAttribute('aria-label', 'Toggle ScreenReel demo'); button.innerHTML = icon('presentation', TRIGGER_ICON_PX); shadow.appendChild(button);
       let data; const inlineId = this.getAttribute('flow-data'); if (inlineId) { const node = document.getElementById(inlineId); if (node) data = JSON.parse(node.textContent); }
       this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict'), ...(this.hasAttribute('advance') ? { advance: this.getAttribute('advance') } : {}) });
     }

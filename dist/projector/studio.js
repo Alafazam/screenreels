@@ -27,6 +27,9 @@ const SCENE_TIMING_FIELDS = [
   { key: 'settleMs', label: 'Then pause before acting (ms)', type: 'number', min: 0, max: 30000 },
   { key: 'dwellMs', label: 'Hold after the last action (ms)', type: 'number', min: 100, max: 120000 },
 ];
+/* Save-time checks read their bounds from the field specs above, so the form and validation cannot disagree. */
+const SCENE_TIMING_ERRORS = [['dwellMs', 'invalid scene time'], ['timeoutMs', 'invalid ready timeout'], ['settleMs', 'invalid settle time']];
+const BLOB_URL_REVOKE_MS = 500;      // give the download a beat to start before the object URL goes
 const ACTION_ICONS = { choice: 'right', highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
 const flowCounts = (flow) => ({ scenes: flow.scenes.length, enabled: flow.scenes.filter((scene) => scene.enabled !== false).length, actions: flow.scenes.reduce((total, scene) => total + scene.actions.length, 0) });
 function formatUpdated(flow) { if (flow.readonly) return 'Standard'; try { return new Date(flow.updatedAt).toLocaleDateString('en-GB'); } catch { return '—'; } }
@@ -144,7 +147,7 @@ class Studio {
      space belongs to the product being demoed. Route gets a picker plus the URL it actually
      resolves to, because a wrong route is the one scene mistake that silently plays nothing. */
   openSceneSettings({ creating = false } = {}) {
-    const scene = creating ? { id: window.ScreenReelStore.makeId('scene'), enabled: true, route: window.ScreenReelCore.normalizeRoute(this.projector.router.getRoute(), location.href) || '/', title: '', talkingPoints: '', dwellMs: 6000, actions: [] } : this.scene(); if (!scene) return;
+    const scene = creating ? { id: window.ScreenReelStore.makeId('scene'), enabled: true, route: window.ScreenReelCore.normalizeRoute(this.projector.router.getRoute(), location.href) || '/', title: '', talkingPoints: '', dwellMs: window.ScreenReelStore.NEW_FLOW_DEFAULTS.dwellMs, actions: [] } : this.scene(); if (!scene) return;
     const routeOptions = this.routeCandidates().map((route) => `<option value="${esc(route)}">${esc(route)}</option>`).join('');
     const talkingPoints = creating ? `<label class="sr-field wide"><span>Talking points <small>Optional</small></span><textarea data-key="talkingPoints" placeholder="What should the presenter say during this scene?"></textarea></label>` : '';
     const modal = this.modal(`<h2>${creating ? 'Create scene' : 'Scene settings'}</h2>${creating ? '<p class="sr-modal-lead">Name the moment and, if useful, add the line you want to say. You can record the actions next.</p>' : ''}<div class="sr-fields sr-scene-basics">${SCENE_FIELDS.map((spec) => this.fieldHtml(spec, scene[spec.key])).join('')}${talkingPoints}<div class="sr-field wide"><label>Page</label><div class="sr-route-row"><input data-key="route" value="${esc(scene.route)}" placeholder="/dashboard"><select data-route-pick aria-label="Known pages"><option value="">Pages…</option>${routeOptions}</select></div><small class="sr-route-resolved"></small></div></div><details class="sr-advanced"><summary>Advanced timing</summary><p>Control page readiness and the pause after the last action. Blank values inherit the flow defaults.</p><div class="sr-fields">${SCENE_TIMING_FIELDS.map((spec) => this.fieldHtml(spec, scene[spec.key])).join('')}</div></details><div class="sr-modal-actions"><button data-cancel>Cancel</button><button data-apply class="sr-primary">${creating ? 'Create scene' : 'Apply'}</button></div>`);
@@ -435,7 +438,7 @@ class Studio {
   cancelPicker() {}
   editAction(index) {
     const action = this.scene().actions[index]; if (action.locked) return this.toast('Unknown imported actions are preserved but locked'); const definition = window.ScreenReelCore.definitionForAction(action); if (!definition) return;
-    const specs = [...(definition.picker !== 'none' ? [{ key: 'selector', label: 'Target selector', type: 'text' }] : []), ...(definition.fields || []), { key: 'afterMs', label: 'Delay after action (ms)', type: 'number', min: 0, max: 30000 }];
+    const specs = [...(definition.picker !== 'none' ? [{ key: 'selector', label: 'Target selector', type: 'text' }] : []), ...(definition.fields || []), { key: 'afterMs', label: 'Delay after action (ms)', type: 'number', min: 0, max: window.ScreenReelCore.AFTER_MS_MAX }];
     /* Narration is deliberately NOT a field here. Two editors for one string means this modal's
        Apply silently clobbers a line just written in the Voiceover modal, and the delete-if-blank
        plus the pace refit would have to exist in both. Discovery is the row's speaker button. */
@@ -525,7 +528,7 @@ class Studio {
     if (!doc) return this.toast('Preview is unavailable');
     const controller = new AbortController(); this.failedAction = -1; this.scenePlayback = { controller, index: -1, phase: 'preparing', remainingMs: 0, total: scene.actions.length }; this.updateScenePlayback();
     if (scene.waitFor) {
-      const ready = await window.ScreenReelCore.waitFor(doc, scene.waitFor, 'visible', scene.timeoutMs ?? 8000, controller.signal);
+      const ready = await window.ScreenReelCore.waitFor(doc, scene.waitFor, 'visible', scene.timeoutMs ?? window.ScreenReelCore.ELEMENT_WAIT_TIMEOUT_MS, controller.signal);
       if (!ready && !controller.signal.aborted) { this.stopScenePlayback(); return this.toast(`Ready selector timed out: ${scene.waitFor}`); }
     }
     if (scene.settleMs) await window.ScreenReelCore.sleep(scene.settleMs, controller.signal);
@@ -558,16 +561,19 @@ class Studio {
     const errors = [];
     for (const scene of this.draft.scenes) {
       if (!window.ScreenReelCore.normalizeRoute(scene.route, location.href)) errors.push(`${scene.title}: invalid local route`);
-      if (scene.dwellMs != null && (!Number.isFinite(Number(scene.dwellMs)) || Number(scene.dwellMs) < 100 || Number(scene.dwellMs) > 120000)) errors.push(`${scene.title}: invalid scene time`);
-      if (scene.timeoutMs != null && (!Number.isFinite(Number(scene.timeoutMs)) || Number(scene.timeoutMs) < 100 || Number(scene.timeoutMs) > 120000)) errors.push(`${scene.title}: invalid ready timeout`);
-      if (scene.settleMs != null && (!Number.isFinite(Number(scene.settleMs)) || Number(scene.settleMs) < 0 || Number(scene.settleMs) > 30000)) errors.push(`${scene.title}: invalid settle time`);
+      for (const [key, message] of SCENE_TIMING_ERRORS) {
+        if (scene[key] == null) continue;
+        const { min, max } = SCENE_TIMING_FIELDS.find((spec) => spec.key === key);
+        const value = Number(scene[key]);
+        if (!Number.isFinite(value) || value < min || value > max) errors.push(`${scene.title}: ${message}`);
+      }
       if (scene.id === this.sceneId) for (const action of scene.actions) if (!action.locked) errors.push(...window.ScreenReelCore.validate(action, this.frame?.contentDocument, location.href).map((message) => `${scene.title}: ${message}`));
     }
     errors.push(...window.ScreenReelCore.validateFlowGraph(this.draft));
     if (errors.length) { this.toast(errors[0]); return false; }
     clearTimeout(this.autosaveTimer); this.autosaveTimer = null; this.draft = this.store.save(this.draft); this.flowId = this.draft.id; this.dirty = false; this.autosaveError = null; this.setSaveStatus('Draft saved locally', 'saved'); this.toast('Scene finished and saved locally'); if (renderAfter) this.render(); return true;
   }
-  exportFlow() { const blob = new Blob([JSON.stringify(this.store.export(this.draft), null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${this.draft.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.screenreel.json`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 500); }
+  exportFlow() { const blob = new Blob([JSON.stringify(this.store.export(this.draft), null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${this.draft.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.screenreel.json`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), BLOB_URL_REVOKE_MS); }
   importFile() { const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json'; input.onchange = async () => { try { const flow = this.store.import(JSON.parse(await input.files[0].text())); this.flowId = flow.id; this.view = 'scenes'; this.loadDraft(); this.render(); } catch (error) { this.toast(error.message); } }; input.click(); }
   async copyAiContext() { const scene = this.scene(); let targets = []; try { targets = this.frame?.contentDocument ? window.ScreenReelCore.inspectDocument(this.frame.contentDocument) : []; } catch {} const payload = { schemaVersion: 1, projectId: this.store.projectId, flow: this.draft ? { id: this.draft.id, name: this.draft.name } : null, scene: scene || null, stableTargets: targets, validation: scene ? scene.actions.map((action, index) => ({ index, actionId: action.id, errors: action.locked ? [] : window.ScreenReelCore.validate(action, this.frame?.contentDocument, location.href) })) : [] }; const text = JSON.stringify(payload, null, 2); try { await navigator.clipboard.writeText(text); } catch { const area = document.createElement('textarea'); area.value = text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); } this.toast('AI context copied'); }
   backToFlows() { if (!this.flushAutosave() && !confirm('The local draft could not be saved. Leave anyway?')) return; this.view = 'flows'; this.flowId = null; this.sceneId = null; this.draft = null; this.dirty = false; this.editorPhase = null; this.render(); }

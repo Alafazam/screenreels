@@ -15,6 +15,10 @@ export const PACE_MAX_MS = 30000;  // the ceiling the action editor's own number
 export const PACE_FIELDS = ['holdMs', 'ms'];                           // an action's own on-screen duration
 export const PACE_SKIP_TYPES = new Set(['goto', 'choice', 'waitFor']); // length decided at play time
 const NARRATION_SETTLE_FALLBACK_MS = 6000; // narrator.settleCapMs, for a host whose narrator is absent
+const MS_PER_SECOND = 1000;
+/* Last-resort estimates for when the action registry is not loaded (a bare Node import): the
+   registry's own defaults resolve first in actionSelfMs, and these mirror them. */
+const ESTIMATE_FALLBACKS = { glowStepMs: 1050, glowCount: 6, countdownStepMs: 720, countdownFrom: 3, typeCharMs: 45 };
 
 /* Browser-only lookups, guarded so a Node import stays clean. The narrator is the authority on how
    long a line takes to say; without one, pacing simply does nothing. */
@@ -29,11 +33,11 @@ const definitionOf = (action) => (typeof window === 'undefined' ? null : window.
    holdMs of its own estimates its registry 1600 rather than 0. */
 export function actionSelfMs(action, definition) {
   const num = (key, fallback) => Number(action[key] ?? definition?.defaults?.[key] ?? fallback) || 0;
-  if (action.type === 'glow' && action.sequence) return num('stepMs', 1050) * num('count', 6);
+  if (action.type === 'glow' && action.sequence) return num('stepMs', ESTIMATE_FALLBACKS.glowStepMs) * num('count', ESTIMATE_FALLBACKS.glowCount);
   // runCountdown plays `from…1` and then "Go", so a 3-count is four beats rather than one stepMs.
-  if (action.type === 'countdown') return num('stepMs', 720) * (Math.max(1, num('from', 3)) + 1);
+  if (action.type === 'countdown') return num('stepMs', ESTIMATE_FALLBACKS.countdownStepMs) * (Math.max(1, num('from', ESTIMATE_FALLBACKS.countdownFrom)) + 1);
   let ms = num('holdMs', 0) || num('durMs', 0) || num('ms', 0) || num('stepMs', 0);
-  if (action.type === 'type') ms += num('charMs', 45) * String(action.text ?? definition?.defaults?.text ?? '').length;
+  if (action.type === 'type') ms += num('charMs', ESTIMATE_FALLBACKS.typeCharMs) * String(action.text ?? definition?.defaults?.text ?? '').length;
   if (action.type === 'choice') ms += num('timeoutMs', 0) || CHOICE_ESTIMATE_MS;
   return ms;
 }
@@ -79,5 +83,5 @@ export function estimateSceneSeconds(scene, defaults, speechMs = estimateSpeechM
     ms += windowMs;
   }
   ms += Math.min(Number(scene.narrationCapMs) || narrationSettleCapMs(), pending);
-  return Math.max(1, Math.round(ms / 1000));
+  return Math.max(1, Math.round(ms / MS_PER_SECOND));
 }

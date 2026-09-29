@@ -22,6 +22,12 @@
   const ARC_MIN_DISTANCE_PX = 48;     // below this, a curve reads as jitter rather than motion
   const OVERSHOOT_MAX_PX = 10;        // how far a long move can sail past its target
   const OVERSHOOT_RETURN_MS = 90;     // beat spent correcting back onto the target
+  const OVERSHOOT_MIN_DISTANCE_PX = 200; // only long moves overshoot; short ones would look jittery
+  const OVERSHOOT_DISTANCE_RATIO = 0.03;  // overshoot grows with distance, up to OVERSHOOT_MAX_PX
+  const RING_REMOVE_SLACK_MS = 80;    // keep a ring node a beat past its animation so it never pops
+  const BOB_FRAME_MS = 16;            // bob repaint interval (~60fps)
+  /* Arc jitter: a deterministic 0.75–1.25 multiplier hashed from the endpoints (see tween). */
+  const JITTER_MIN = 0.75, JITTER_RANGE = 0.5, JITTER_HASH_STRIDES = [7, 13, 31], JITTER_BUCKETS = 100;
   const STYLE_ID = '__screenreelCursorStyles';
   const NODE_ID = '__screenreelCursor';
 
@@ -104,7 +110,7 @@
     ring.style.left = `${x}px`;
     ring.style.top = `${y + bobOffset}px`;
     doc.body.appendChild(ring);
-    setTimeout(() => ring.remove(), life + 80);
+    setTimeout(() => ring.remove(), life + RING_REMOVE_SLACK_MS);
   }
 
   /* Concentric arrival rings: the "you are here" cue. */
@@ -138,7 +144,9 @@
       // Deterministic "jitter" derived from the endpoint coordinates rather than Math.random():
       // the same start/end points always produce the same curve, so a captured video is
       // reproducible frame-for-frame across runs.
-      const jitter = 0.75 + ((Math.abs(Math.round(fromX + fromY * 7 + targetX * 13 + targetY * 31)) % 100) / 100) * 0.5;
+      const [strideA, strideB, strideC] = JITTER_HASH_STRIDES;
+      const hash = Math.abs(Math.round(fromX + fromY * strideA + targetX * strideB + targetY * strideC));
+      const jitter = JITTER_MIN + ((hash % JITTER_BUCKETS) / JITTER_BUCKETS) * JITTER_RANGE;
       const offset = Math.min(ARC_MAX_PX, distance * ARC_RATIO) * jitter * arcSide;
       controlX = midX + perpX * offset;
       controlY = midY + perpY * offset;
@@ -147,7 +155,7 @@
       const start = performance.now();
       const frame = (now) => {
         const t = Math.min(1, (now - start) / ms);
-        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const eased = easeInOutQuad(t);
         if (arced) {
           const inv = 1 - eased;
           x = inv * inv * fromX + 2 * inv * eased * controlX + eased * eased * targetX;
@@ -171,10 +179,11 @@
   /* Travels to a point, overshooting slightly past it on long arced moves and correcting back —
      the settle reads as a deliberate arrival rather than a robotic snap onto the target. Short
      moves, straight-line motion, and reduced-motion all skip straight to a plain tween. */
+  const easeInOutQuad = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
   async function tweenWithOvershoot(toX, toY, ms) {
     const distance = Math.hypot(toX - x, toY - y);
-    if (motion === 'arc' && distance > 200 && !reducedMotion()) {
-      const overshootPx = Math.min(OVERSHOOT_MAX_PX, distance * 0.03);
+    if (motion === 'arc' && distance > OVERSHOOT_MIN_DISTANCE_PX && !reducedMotion()) {
+      const overshootPx = Math.min(OVERSHOOT_MAX_PX, distance * OVERSHOOT_DISTANCE_RATIO);
       const dirX = (toX - x) / distance;
       const dirY = (toY - y) / distance;
       await tween(toX + dirX * overshootPx, toY + dirY * overshootPx, ms);
@@ -248,7 +257,7 @@
         const phase = ((performance.now() - start) % BOB_PERIOD_MS) / BOB_PERIOD_MS;
         bobOffset = Math.sin(phase * Math.PI * 2) * BOB_AMPLITUDE_PX * sign;
         paint();
-      }, 16);
+      }, BOB_FRAME_MS);
       return this;
     },
     stopBob() {

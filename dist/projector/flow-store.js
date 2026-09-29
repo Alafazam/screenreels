@@ -2,6 +2,9 @@
 (function initScreenReelStore(root) {
   if (root.ScreenReelStore) return;
   const clone = (value) => JSON.parse(JSON.stringify(value));
+  /* Pacing a flow gets when it declares none, and that a new or captured scene starts with. */
+  const NEW_FLOW_DEFAULTS = Object.freeze({ dwellMs: 6000, settleMs: 900 });
+  const PROJECT_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,79}$/i; // 2-80 chars, matching the error below
   const now = () => new Date().toISOString();
   const makeId = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 0xffffff).toString(36)}`;
 
@@ -25,7 +28,7 @@
     return {
       ...clone(flow), id: String(flow.id || `standard_${index + 1}`), name: String(flow.name || `Demo flow ${index + 1}`),
       readonly, createdAt: flow.createdAt || now(), updatedAt: flow.updatedAt || now(),
-      defaults: clone(flow.defaults || { dwellMs: 6000, settleMs: 900 }), scenes: flow.scenes.map((scene, sceneIndex) => normalizeScene(scene, sceneIndex, baseHref)),
+      defaults: clone(flow.defaults || NEW_FLOW_DEFAULTS), scenes: flow.scenes.map((scene, sceneIndex) => normalizeScene(scene, sceneIndex, baseHref)),
     };
   }
   function normalizeManifest(document, baseHref) {
@@ -43,7 +46,7 @@
   class Store {
     constructor(options) {
       this.projectId = String(options.projectId || '').trim();
-      if (!/^[a-z0-9][a-z0-9._-]{1,79}$/i.test(this.projectId)) throw new Error('projectId must be 2-80 letters, numbers, dots, underscores, or dashes');
+      if (!PROJECT_ID_PATTERN.test(this.projectId)) throw new Error('projectId must be 2-80 letters, numbers, dots, underscores, or dashes');
       this.flowSource = options.flow; this.baseHref = options.baseHref || root.location?.href || 'http://screenreel.local/'; this.legacyStorage = options.legacyStorage;
       this.storage = options.storage || root.localStorage; this.session = options.sessionStorage || root.sessionStorage;
       this.prefix = `screenreel:${this.projectId}:`; this.standardFlows = []; this.recoveryNotice = '';
@@ -102,7 +105,7 @@
       }) }));
       return flow;
     }
-    createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: { dwellMs: 6000, settleMs: 900 }, scenes: [] }; }
+    createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: clone(NEW_FLOW_DEFAULTS), scenes: [] }; }
     save(flow) {
       if (flow.readonly || this.standardFlows.some((item) => item.id === flow.id)) throw new Error('Standard flows cannot be overwritten');
       const normalized = normalizeFlow(flow, 0, this.baseHref, false); normalized.updatedAt = now(); const flows = this.readLocal(); const index = flows.findIndex((item) => item.id === normalized.id);
@@ -149,5 +152,5 @@
     consumeRecoveryNotice() { const notice = this.recoveryNotice; this.recoveryNotice = ''; return notice; }
   }
 
-  root.ScreenReelStore = { Store, normalizeManifest, normalizeFlow, normalizeScene, normalizeAction, clone, makeId };
+  root.ScreenReelStore = { NEW_FLOW_DEFAULTS, Store, normalizeManifest, normalizeFlow, normalizeScene, normalizeAction, clone, makeId };
 })(globalThis);
