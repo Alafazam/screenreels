@@ -106,7 +106,7 @@ class Projector {
     if (spoke) this.narrationBlocked = false;
   }
   async init() {
-    await this.store.ready(); window.ScreenReelCore.setTimeScale(this.options.timeScale); this.analytics = createAnalytics({ store: this.store, options: this.options.analytics || {} }); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
+    await this.store.ready(); this.applyPendingRestore(); window.ScreenReelCore.setTimeScale(this.options.timeScale); this.analytics = createAnalytics({ store: this.store, options: this.options.analytics || {} }); this.parseActivation(); this.bindTarget(); this.unsubscribe = this.router.subscribe?.(() => this.render());
     // drop_off means "left the page while playing" — pagehide covers navigation/close, the
     // visibility change covers tab switches; only the first per session fires unless playback resumes.
     this.dropOffHandler = () => { if (this.store.playing() && !this.dropOffSent) { this.dropOffSent = true; this.analytics.emit('drop_off'); } };
@@ -262,12 +262,31 @@ class Projector {
   /* `reason` tells a host a skip from a finish: 'user' (pill, trigger, Esc), 'complete'
      (disableOnComplete), or 'api' (a host call, destroy()). */
   disable(reason = 'api') {
-    const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id;
+    const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id; const origin = this.store.origin();
     document.removeEventListener('keydown', this.keyHandler); this.keyHandler = null;
     this.resolveChooser?.(null);
     this.pause(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
     if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason });
+    if (wasEnabled && origin && this.options.restoreOnExit && (reason === 'user' || reason === 'complete')) this.restoreOrigin(origin);
     return this;
+  }
+  /* restoreOnExit: closing or finishing a tour takes the viewer back to where they started it —
+     the same route and scroll position. A different route means a navigation (often a full page
+     load), so the scroll rides along in the session and init() applies it on arrival. */
+  restoreOrigin(origin) {
+    if (this.routeMatches({ route: origin.route })) { scrollTo(origin.scrollX, origin.scrollY); return; }
+    this.store.setPendingRestore({ scrollX: origin.scrollX, scrollY: origin.scrollY });
+    // A hard navigation still reports the old URL until unload, so apply only once the route truly
+    // matches (an SPA route change); otherwise the arriving page's init() applies it.
+    this.navigate(origin.route).then(() => { if (this.routeMatches({ route: origin.route })) this.applyPendingRestore(); })
+      .catch((error) => console.warn('[screenreel] could not return to where the tour started', error));
+  }
+  applyPendingRestore() {
+    const pending = this.store.pendingRestore(); if (!pending) return;
+    this.store.setPendingRestore(null);
+    // Before `load` the page may not be tall enough yet, and the browser would clamp the scroll.
+    const restore = () => scrollTo(pending.scrollX, pending.scrollY);
+    if (document.readyState === 'complete') restore(); else addEventListener('load', restore, { once: true });
   }
   /* Guided tours are paced by the viewer. Keys typed into the host's own controls — or the
      projector's buttons, found through the shadow boundary — are left alone. */
@@ -275,9 +294,12 @@ class Projector {
     if (keyEvent.key === 'Escape' && this.resolveChooser) { keyEvent.preventDefault(); this.resolveChooser(null); return; }
     if (!this.store.playing() || this.advanceMode() !== 'guided') return;
     if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
-    const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
-    if (origin?.closest?.(HOST_CONTROL_SELECTOR)) return;
     const command = GUIDED_KEYS[keyEvent.key]; if (!command) return;
+    const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
+    // Esc always closes the tour. From the tour's own card, arrows work too, but Enter is left to
+    // the focused button's native click so it cannot fire twice.
+    const inCard = !!origin?.closest?.('.sr-action-callout');
+    if (command !== 'exit' && (inCard ? keyEvent.key === 'Enter' : origin?.closest?.(HOST_CONTROL_SELECTOR))) return;
     keyEvent.preventDefault(); this.command(command);
   }
   /* Overlays a scene handed over (see settleOverlays in the runtime) go when the scene is left. */
@@ -329,6 +351,7 @@ class Projector {
     if (!Number.isInteger(position) || position < 0 || position >= sceneCount) throw new Error(`ScreenReel start(): position ${position} is outside the ${sceneCount} enabled scenes of "${flowId}"`);
     this.pause(); await this.leaving;
     this.store.setActive(flow.id); this.store.setPosition(position); this.store.setAdvanceChoice(null);
+    this.store.setOrigin({ route: this.router.getRoute(), scrollX, scrollY });
     if (this.store.enabled()) this.render(); else this.enable();
     // `mode` skips the chooser; so does a projector mounted without `chooser: true`.
     const chosen = mode ?? (this.options.chooser ? await this.chooseMode(flow) : null);

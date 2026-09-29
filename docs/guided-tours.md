@@ -87,5 +87,9 @@ it off with `shield: false`.
 
 A second `play()` while a scene is running warns and does nothing. Use `start()` to restart.
 
+`restoreOnExit: true` takes the viewer back to where they started the tour when they close it (✕,
+Skip, Esc, the trigger) or finish it: the same route and scroll position, across a full page load
+if the tour navigated away. `start()` records the starting point.
+
 `functions`: when a map is passed, `call` actions resolve only through it and `registerFn`, never
 through `window`. Without it, the window fallback remains for existing hosts.

@@ -13,4 +13,8 @@ window.SCREENREEL_LANDING_TOUR = Object.freeze({
   chooser: true,
   controls: { guided: [], auto: ['count', 'prev', 'play', 'next', 'sound', 'studio', 'exit'] },
   position: 'center',
+  // Closing or finishing the tour returns the visitor to where they started it.
+  restoreOnExit: true,
+  // Muted until narration uses a better voice than the browser's built-in speech.
+  narration: false,
 });

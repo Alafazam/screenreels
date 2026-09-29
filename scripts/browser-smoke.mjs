@@ -89,11 +89,10 @@ try {
   // The agent cursor must be live during playback: the Projector supplies moveCursor to the
   // executor, so a missing node means the cursor call sites have gone back to being no-ops.
   await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 15000 }); // first appears at scene 1's pointer, after its callout
-  // Narration is on by default, so the pill must offer a speaker and report itself unmuted. A
-  // missing button means narrator.js did not load and the tour has silently gone quiet.
+  // The landing tour mounts with narration: false until it has a better voice, so the pill offers
+  // no speaker there. narrator.js still loads: other hosts keep narration on by default.
   assert.equal(await page.locator('.sr-pill [data-cmd="capture"]').count(), 0);
-  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').count(), 1);
-  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').count(), 0);
   assert.equal(await page.evaluate(() => Boolean(window.__screenreelNarrator?.available())), true);
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
   await page.waitForURL(/demo-lab\.html$/, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -257,6 +256,20 @@ try {
   // The landing's trimmed bar has no flow picker, so read the active flow from the projector.
   assert.equal(await page.evaluate(() => [...window.ScreenReel.instances][0].store.activeFlow().name), 'All actions showcase copy');
   await page.locator('button[title="Pause"]').click();
+  // restoreOnExit: closing the landing tour mid-way — here from Demo Lab, a full navigation away —
+  // returns the visitor to the landing, at the scroll position they started from.
+  const returnPage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await silenceSpeech(returnPage);
+  await returnPage.goto(`${baseUrl}?variant=repo-native`, { waitUntil: 'domcontentloaded' });
+  await returnPage.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true');
+  await returnPage.evaluate(() => scrollTo(0, 120)); await returnPage.waitForFunction(() => scrollY === 120);
+  await returnPage.getByRole('button', { name: 'Run the live demo' }).click(); await returnPage.locator('[data-choose="guided"]').click();
+  await returnPage.locator('.sr-callout-next').click();
+  await returnPage.waitForURL(/demo-lab\.html$/, { waitUntil: 'domcontentloaded' }); await returnPage.locator('.sr-callout-next').waitFor();
+  await returnPage.keyboard.press('Escape');
+  await returnPage.waitForURL(/\/action-showcase\/\?variant=repo-native$/, { waitUntil: 'load' });
+  await returnPage.waitForFunction(() => scrollY === 120, null, { timeout: 5000 });
+  assert.equal(await returnPage.evaluate(() => !!document.querySelector('.sr-pill, .sr-click-shield, .sr-action-callout')), false, 'the tour is fully closed after returning');
+  await returnPage.close();
   const spaPage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await spaPage.goto(new URL('../spa-router/', baseUrl).href, { waitUntil: 'domcontentloaded' });
   const spaTrigger = spaPage.locator('#demo-button'); await spaTrigger.waitFor(); await spaPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await spaTrigger.click(); await visiblePill(spaPage);
   await spaPage.locator('button[title="Play"]').click(); await spaPage.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
