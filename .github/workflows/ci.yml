@@ -57,7 +57,9 @@ jobs:
             sleep 1
           done
       - name: Validate demo flows against the live DOM
-        run: node scripts/annotate-validate.mjs --flow examples/action-showcase/screenreel.demo.json --base-url http://127.0.0.1:4173/examples/action-showcase/
+        run: |
+          node scripts/annotate-validate.mjs --flow examples/action-showcase/screenreel.demo.json --base-url http://127.0.0.1:4173/examples/action-showcase/
+          node scripts/annotate-validate.mjs --flow examples/action-showcase/showcase.demo.json --base-url http://127.0.0.1:4173/examples/action-showcase/
       - run: pnpm build:pages
       - name: Browser smoke test
         run: pnpm test:browser

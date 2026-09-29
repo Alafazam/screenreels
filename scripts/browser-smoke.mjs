@@ -263,13 +263,36 @@ try {
   await returnPage.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true');
   await returnPage.evaluate(() => scrollTo(0, 120)); await returnPage.waitForFunction(() => scrollY === 120);
   await returnPage.getByRole('button', { name: 'Run the live demo' }).click(); await returnPage.locator('[data-choose="guided"]').click();
-  await returnPage.locator('.sr-callout-next').click();
+  // Scene 1 has two cards (the badge, then the statement) before it navigates to Demo Lab.
+  await returnPage.locator('.sr-callout-step', { hasText: '1 of' }).waitFor(); await returnPage.locator('.sr-callout-next').click();
+  await returnPage.locator('.sr-callout-step', { hasText: '2 of' }).waitFor(); await returnPage.locator('.sr-callout-next').click();
   await returnPage.waitForURL(/demo-lab\.html$/, { waitUntil: 'domcontentloaded' }); await returnPage.locator('.sr-callout-next').waitFor();
   await returnPage.keyboard.press('Escape');
   await returnPage.waitForURL(/\/action-showcase\/\?variant=repo-native$/, { waitUntil: 'load' });
   await returnPage.waitForFunction(() => scrollY === 120, null, { timeout: 5000 });
   assert.equal(await returnPage.evaluate(() => !!document.querySelector('.sr-pill, .sr-click-shield, .sr-action-callout')), false, 'the tour is fully closed after returning');
   await returnPage.close();
+  // Showcase journey on the new player: Guided shows a card per chapter across pages, Esc returns to
+  // the page the journey started on, and the one-chapter demos play straight away in Autoplay.
+  const showcasePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await silenceSpeech(showcasePage);
+  await showcasePage.goto(new URL('showcase.html', baseUrl).href, { waitUntil: 'domcontentloaded' });
+  await showcasePage.waitForFunction(() => document.querySelector('#sc-journey-button')?.hasAttribute('aria-pressed'));
+  await showcasePage.locator('#sc-journey-button').click(); await showcasePage.locator('[data-choose="guided"]').click();
+  await showcasePage.locator('.sr-callout-next').waitFor({ timeout: 15000 });
+  assert.equal(await showcasePage.locator('.sr-callout-title').innerText(), 'The journey of a demo');
+  assert.equal(await showcasePage.locator('.sr-callout-step').innerText(), '1 of 7');
+  assert.equal(await showcasePage.locator('.sr-toast:visible').count(), 0, 'guided tours show no note toasts');
+  await showcasePage.locator('.sr-callout-next').click();
+  await showcasePage.waitForURL(/showcase-create\.html$/); await showcasePage.locator('.sr-callout-next').waitFor({ timeout: 15000 });
+  assert.equal(await showcasePage.locator('.sr-callout-title').innerText(), 'Perform it once');
+  await showcasePage.keyboard.press('Escape');
+  await showcasePage.waitForURL(/\/showcase\.html$/, { waitUntil: 'load' });
+  await showcasePage.goto(new URL('showcase-branch.html', baseUrl).href, { waitUntil: 'domcontentloaded' });
+  await showcasePage.waitForFunction(() => document.querySelector('#sc-journey-button')?.hasAttribute('aria-pressed'));
+  await showcasePage.locator('[data-sc="branch"]').click();
+  await showcasePage.locator('.sr-choice-card, .sr-glow-box').first().waitFor({ timeout: 15000 });
+  assert.equal(await showcasePage.locator('.sr-chooser').count(), 0, 'one-chapter demos skip the chooser');
+  await showcasePage.close();
   const spaPage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); await spaPage.goto(new URL('../spa-router/', baseUrl).href, { waitUntil: 'domcontentloaded' });
   const spaTrigger = spaPage.locator('#demo-button'); await spaTrigger.waitFor(); await spaPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await spaTrigger.click(); await visiblePill(spaPage);
   await spaPage.locator('button[title="Play"]').click(); await spaPage.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });

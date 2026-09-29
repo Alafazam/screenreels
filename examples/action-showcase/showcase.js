@@ -54,37 +54,40 @@ if (!journeyButton) return;
     projectId: 'screenreel-showcase',
     flow: { src: 'showcase.demo.json' },
     loop: false,
+    // The journey asks Guided (a card per chapter, Next to continue) or Autoplay (a compact,
+    // centred bar); closing it returns the visitor to where they started.
+    chooser: true,
+    controls: { guided: [], auto: ['count', 'prev', 'play', 'next', 'exit'] },
+    position: 'center',
+    restoreOnExit: true,
+    narration: false, // muted until narration uses a better voice than the browser's built-in speech
   });
 
+  // `mode` skips the chooser: the one-chapter demos just play.
   let launching = false;
-  const launch = async (flowId, position = 0) => {
+  const launch = async (flowId, mode) => {
     if (launching) return;
     launching = true;
-    try {
-      projector.store.setActive(flowId);
-      projector.enable();
-      projector.store.setPosition(position);
-      await projector.play();
-    } finally { launching = false; }
+    try { await projector.start(flowId, { position: 0, mode }); } finally { launching = false; }
   };
 
   // Header button: force-play the journey from the top (capture phase, like the home page).
   journeyButton.addEventListener('click', (event) => {
     event.stopImmediatePropagation();
-    if (projector.store.enabled()) { projector.disable(); return; }
+    if (projector.store.enabled()) { projector.disable('user'); return; }
     sessionStorage.removeItem(COUNTER_KEY); paintCounters({ events: 0, scenes: 0, choices: 0 });
     launch('journey');
   }, true);
   document.querySelectorAll('[data-sc="journey"]').forEach((node) => node.addEventListener('click', () => journeyButton.click()));
 
-  document.querySelector('[data-sc="branch"]')?.addEventListener('click', () => launch('branching-demo'));
+  document.querySelector('[data-sc="branch"]')?.addEventListener('click', () => launch('branching-demo', 'auto'));
 
   // Personalization: the input feeds the same session store a ?srv_company= link would.
   document.querySelector('[data-sc="personalize"]')?.addEventListener('click', () => {
     const company = companyInput?.value.trim();
     projector.store.setVariables(company ? { company } : {});
     paintShareUrl();
-    launch('personalize-demo');
+    launch('personalize-demo', 'auto');
   });
 
   document.querySelector('[data-sc="share"]')?.addEventListener('click', () => {

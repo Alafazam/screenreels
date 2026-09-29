@@ -8,36 +8,39 @@
         { "id": "j-intro", "enabled": true, "route": "showcase.html", "title": "The journey of a demo", "talkingPoints": "Six chapters, six features — and this tour will walk through every page itself.", "actions": [
           { "type": "countdown", "from": 2, "stepMs": 480, "caption": "The journey of a demo", "note": "Six chapters. The tour drives every page itself." },
           { "type": "glow", "selector": ".sc-chapter-card", "sequence": true, "count": 6, "stepMs": 800, "afterMs": 300, "note": "One flow will now travel through all six chapters" },
+          { "id": "j-intro-callout", "type": "callout", "selector": ".sc-chapters", "title": "The journey of a demo", "text": "One flow travels through all six chapters, driving every page itself.", "placement": "bottom", "highlight": true, "holdMs": 2800 },
           { "type": "goto", "url": "showcase-create.html", "note": "Chapter 1: it starts with a recording" }
         ]},
         { "id": "j-create", "enabled": true, "route": "showcase-create.html", "title": "Chapter 1 — Perform it once", "talkingPoints": "You don't write a demo. You perform it once, and Studio writes it down.", "actions": [
-          { "type": "highlight", "selector": "[data-demo-id=\"rec-panel\"]", "holdMs": 1700, "note": "Press Record in Studio and just use the app" },
+          { "id": "j-create-callout", "type": "callout", "selector": "[data-demo-id=\"rec-panel\"]", "title": "Perform it once", "text": "Press Record in Studio and just use the app.", "placement": "auto", "highlight": true, "holdMs": 2800 },
           { "type": "flash", "selector": "[data-demo-id=\"rec-mapping\"]", "times": 2, "afterMs": 400, "note": "Keystrokes, toggles, scrolls — all become actions" },
           { "type": "goto", "url": "showcase-heal.html", "note": "Chapter 2: then the product changes…" }
         ]},
         { "id": "j-heal", "enabled": true, "route": "showcase-heal.html", "title": "Chapter 2 — It refuses to rot", "talkingPoints": "The product changed. The doctor re-matches the target by fingerprint and CI tells the PR that broke it.", "actions": [
-          { "type": "highlight", "selector": ".sc-terminal", "holdMs": 1700, "note": "flow doctor finds the renamed selector…" },
+          { "id": "j-heal-callout", "type": "callout", "selector": ".sc-terminal", "title": "It refuses to rot", "text": "Flow doctor finds the renamed selector and repairs it by fingerprint.", "placement": "auto", "highlight": true, "holdMs": 2800 },
           { "type": "flash", "selector": "[data-sc-fix]", "times": 3, "afterMs": 400, "note": "…and repairs it by fingerprint" },
           { "type": "goto", "url": "showcase-voice.html", "note": "Chapter 3: give it a voice" }
         ]},
         { "id": "j-voice", "enabled": true, "route": "showcase-voice.html", "title": "Chapter 3 — Give it a voice", "talkingPoints": "The talking points you already write become the narration track.", "actions": [
-          { "type": "highlight", "selector": "[data-demo-id=\"voice-panel\"]", "holdMs": 1700, "note": "assemble --voice narrates the video from these very notes" },
+          { "id": "j-voice-callout", "type": "callout", "selector": "[data-demo-id=\"voice-panel\"]", "title": "Give it a voice", "text": "assemble --voice narrates the video from these very notes.", "placement": "auto", "highlight": true, "holdMs": 2800 },
           { "type": "goto", "url": "showcase-personalize.html", "note": "Chapter 4: say their name" }
         ]},
         { "id": "j-personalize", "enabled": true, "route": "showcase-personalize.html", "title": "Chapter 4 — Say their name, {{company}}", "talkingPoints": "One flow, personalized per prospect: {{company}} resolves from the share link.", "actions": [
           { "type": "scrollIntoView", "selector": "#sc-name", "block": "center", "note": "Watch the placeholder resolve" },
           { "type": "type", "selector": "#sc-name", "text": "Hello {{company}}!", "clearFirst": true, "charMs": 45, "afterMs": 500, "note": "Typed for {{company}} — from the link, not the manifest" },
+          { "id": "j-personalize-callout", "type": "callout", "selector": "#sc-name", "title": "Say their name", "text": "Typed for {{company}}: from the link, not the manifest.", "placement": "auto", "highlight": true, "holdMs": 2800 },
           { "type": "goto", "url": "showcase-share.html", "note": "Chapter 5: send it out" }
         ]},
         { "id": "j-share", "enabled": true, "route": "showcase-share.html", "title": "Chapter 5 — Send it out", "talkingPoints": "Viewers get minimal chrome; you get the funnel. This very tour has been emitting events the whole way.", "actions": [
           { "type": "glow", "selector": ".sc-metric", "sequence": true, "count": 3, "stepMs": 800, "afterMs": 300, "note": "These metrics counted THIS tour, live" },
+          { "id": "j-share-callout", "type": "callout", "selector": ".sc-metrics", "title": "Send it out", "text": "These metrics counted this tour, live.", "placement": "auto", "highlight": true, "holdMs": 2800 },
           { "type": "goto", "url": "showcase-branch.html", "note": "Chapter 6: your turn to drive" }
         ]},
         { "id": "j-branch", "enabled": true, "route": "showcase-branch.html", "title": "Chapter 6 — Let them drive", "talkingPoints": "The tour ends by handing the wheel to the viewer.", "actions": [
           { "type": "choice", "prompt": "You drive. Where to?", "options": [ { "label": "Replay the journey", "scene": "j-intro" }, { "label": "Finish the story", "scene": "j-finale" } ], "timeoutMs": 12000, "defaultScene": "j-finale" }
         ]},
         { "id": "j-finale", "enabled": true, "route": "showcase-branch.html", "title": "The end — and the beginning", "talkingPoints": "Recorded, self-healing, narrated, personalized, shared, and branching. One runtime, no backend.", "actions": [
-          { "type": "highlight", "selector": "[data-demo-id=\"sc-cta\"]", "holdMs": 2000, "note": "That was six features in one cross-page flow. The end." }
+          { "id": "j-finale-callout", "type": "callout", "selector": "[data-demo-id=\"sc-cta\"]", "title": "The end, and the beginning", "text": "Six features in one cross-page flow. Now make your own.", "placement": "auto", "highlight": true, "holdMs": 2800 }
         ]}
       ]
     },

@@ -496,7 +496,8 @@ class Projector {
         dim: this.options.dim,
         persist: step, skipHold: step, retain: (release) => holder.push(release),
         calloutControls: step ? this.calloutControls(scene, actionIndex) : undefined,
-        announce: (message) => this.toast(message),
+        // Notes are presenter captions; a guided tour's card already carries the words.
+        announce: guided ? undefined : (message) => this.toast(message),
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
       if (result.jumpTo && generation === this.playGeneration && this.store.playing()) {
