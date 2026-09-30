@@ -7,7 +7,7 @@ const { runAction, setTimeScale } = globalThis.ScreenReelCore;
 /* Minimal document stub for emphasis actions: element creation, a queryable set of in-view
    targets, and a record of every overlay node appended to the body. */
 function stubDocument(targetCount = 1) {
-  const makeElement = (rect = { left: 10, top: 10, right: 110, bottom: 60, width: 100, height: 50 }) => {
+  const makeElement = (rect = { left: 10, top: 200, right: 110, bottom: 250, width: 100, height: 50 }) => {
     const element = {
       style: {}, dataset: {}, removed: false, children: [], listeners: {},
       classList: { names: new Set(), add(name) { this.names.add(name); }, remove(name) { this.names.delete(name); }, contains(name) { return this.names.has(name); } },
@@ -21,7 +21,7 @@ function stubDocument(targetCount = 1) {
     return element;
   };
   const appended = [];
-  const targets = Array.from({ length: targetCount }, (_, index) => makeElement({ left: 10 + index * 200, top: 10, right: 110 + index * 200, bottom: 60, width: 100, height: 50 }));
+  const targets = Array.from({ length: targetCount }, (_, index) => makeElement({ left: 10 + index * 200, top: 200, right: 110 + index * 200, bottom: 250, width: 100, height: 50 }));
   const doc = {
     body: makeElement(), head: makeElement(),
     createElement: () => makeElement(),
@@ -162,4 +162,12 @@ test('a persisting callout shows Back and Next controls wired to the host', asyn
   bar.children.forEach((button) => button.listeners.click[0]());
   assert.deepEqual(calls, ['back', 'next']);
   assert.ok(tip.classList.contains('sr-callout--interactive'));
+});
+
+test('an element hugging the bottom edge is scrolled into the comfort band before it is emphasised', async () => {
+  const stub = stubDocument(); const [target] = stub.targets; const scrolls = [];
+  target.getBoundingClientRect = () => ({ left: 10, top: 660, right: 110, bottom: 710, width: 100, height: 50 });
+  target.scrollIntoView = (options) => scrolls.push(options.block);
+  await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
+  assert.deepEqual(scrolls, ['center'], 'on screen but in the bottom 20% still scrolls');
 });

@@ -15,6 +15,7 @@ window.SCREENREEL_LANDING_TOUR = Object.freeze({
   position: 'center',
   // Closing or finishing the tour returns the visitor to where they started it.
   restoreOnExit: true,
+  disableOnComplete: true, // the player and cursor go away when the tour ends
   // Muted until narration uses a better voice than the browser's built-in speech.
   narration: false,
 });

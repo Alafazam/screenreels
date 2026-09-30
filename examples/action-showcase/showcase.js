@@ -60,6 +60,7 @@ if (!journeyButton) return;
     controls: { guided: [], auto: ['count', 'prev', 'play', 'next', 'exit'] },
     position: 'center',
     restoreOnExit: true,
+    disableOnComplete: true,
     narration: false, // muted until narration uses a better voice than the browser's built-in speech
   });
 

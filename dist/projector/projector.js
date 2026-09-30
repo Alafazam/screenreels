@@ -191,7 +191,7 @@ class Projector {
     this.pill.classList.toggle('sr-pill--center', pillPosition === 'center');
     const flowSelect = this.pill.querySelector('.sr-flow'); if (flowSelect) flowSelect.onchange = (e) => { this.pause(); this.store.setActive(e.target.value); this.store.setPosition(0); this.render(); };
     this.pill.querySelectorAll('[data-cmd]').forEach((button) => { button.onclick = () => this.command(button.dataset.cmd); });
-    this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(share ? null : scene);
+    this.target.setAttribute('aria-pressed', String(this.store.enabled())); this.renderNotes(controls.includes('notes') ? (share ? null : scene) : null); // notes only where the pill offers them
     this.syncShield();
   }
   /* The tour layer: one root for the pill, shield, cursor, and every overlay the runtime draws.
@@ -577,7 +577,8 @@ class Projector {
     const route = window.ScreenReelCore.normalizeRoute(this.router.getRoute(), location.href) || '/'; const scene = { id: window.ScreenReelStore.makeId('scene'), enabled: true, route, title: document.title || 'Captured scene', talkingPoints: '', dwellMs: window.ScreenReelStore.NEW_FLOW_DEFAULTS.dwellMs, actions: [] };
     flow.scenes.push(scene); flow = this.store.save(flow); this.toast('Scene captured locally'); this.openStudio({ flowId: flow.id, sceneId: scene.id });
   }
-  async openStudio(selection = {}) { const module = await import(this.assetUrl('studio.js')); return module.openStudio({ projector: this, store: this.store, assetBase: this.assetBase, assetVersion: this.assetVersion, ...selection }); }
+  // Authoring pauses the tour: its click shield (in the top layer) would otherwise cover Studio.
+  async openStudio(selection = {}) { if (this.store.playing()) this.pause(); const module = await import(this.assetUrl('studio.js')); return module.openStudio({ projector: this, store: this.store, assetBase: this.assetBase, assetVersion: this.assetVersion, ...selection }); }
   destroy() { this.disable(); this.target.removeEventListener('click', this.clickHandler); removeEventListener('pagehide', this.dropOffHandler); document.removeEventListener('visibilitychange', this.visibilityHandler); this.unsubscribe?.(); instances.delete(this); }
 }
 
