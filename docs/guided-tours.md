@@ -21,6 +21,12 @@ await projector.start('getting-started');                   // shows the chooser
 await projector.start('getting-started', { mode: 'guided' }); // skips it
 ```
 
+A flow can carry its own playback in `defaults.advance`:
+- `'ask'` shows the chooser. It's the default for flows created in Studio.
+- `'guided'` and `'auto'` fix the mode.
+
+A host's `chooser` or `advance` mount option overrides it. See [Recording a scene](recording.md#info-cards-one-flow-guided-and-autoplay) for authoring all of this in Studio.
+
 ## How guided mode plays
 
 - **Every callout is a step, and only callouts are.** A callout ignores its `holdMs` and stays on
@@ -52,7 +58,18 @@ full-height sidebar, the callout goes to the side with the most room. It is alwa
 the viewport. `highlight: true` rings the target as well. `keep: 'untilSceneEnd'` on a highlight,
 glow, spotlight, or callout keeps it up until the scene is left.
 
-## Undoing what a scene changed: `cleanup`
+## Undoing what a tour changed: automatic, with `cleanup` for the rest
+
+A tour puts the app back by itself. Before it changes a form control (`type`, `set`, `toggle`,
+`lever`), it records the old value. A click that the same scene repeats later on the same element,
+such as a theme toggle, is treated as a pair: the second click undoes the first.
+
+When those are undone:
+- **A scene cut short** (Next mid-scene, Back, a choice jump, pause) undoes its own changes. Back also undoes the scene it returns to, so replaying it can't apply a toggle twice.
+- **Closing or finishing the tour** undoes everything, newest first.
+- **A scene that plays through** keeps its changes, so the next scene can build on them.
+
+For anything else, add `cleanup` actions. Studio's **Add undo** does this for a click:
 
 ```json
 { "id": "dark-mode", "route": "/home",
@@ -61,8 +78,7 @@ glow, spotlight, or callout keeps it up until the scene is left.
 ```
 
 `cleanup` runs whenever the scene is left, for any reason: next, back, exit, pause, a choice jump,
-or navigation. It runs once, to completion. Put undo steps here, not at the end of `actions`, and
-an interrupted tour can never leave the app changed.
+or navigation. It runs once, to completion.
 
 The card is white by default. Restyle it, and the rings, countdown, and choice cards, with
 `--sr-*` properties: see [Theming](theming.md).

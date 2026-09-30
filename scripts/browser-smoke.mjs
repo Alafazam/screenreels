@@ -252,6 +252,8 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 }); await page.screenshot({ path: path.join(output, 'studio-1440x900.png') });
   await page.getByRole('button', { name: 'Play flow', exact: true }).click();
   await page.locator('.sr-studio').waitFor({ state: 'detached' });
+  // The author sees what a viewer sees: this host asks Guided or Autoplay first.
+  await page.locator('[data-choose="auto"]').click();
   await page.locator('.sr-action-box,.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
   // The landing's trimmed bar has no flow picker, so read the active flow from the projector.
   assert.equal(await page.evaluate(() => [...window.ScreenReel.instances][0].store.activeFlow().name), 'All actions showcase copy');
@@ -508,6 +510,45 @@ try {
   await inlinePage.locator('.sr-callout-next').click({ timeout: 3000 }); // a real click: fails if the modal covers it
   await inlinePage.waitForFunction(() => !window.__modalTour.store.playing() || !document.querySelector('.sr-callout-next'));
   await inlinePage.evaluate(() => { window.__modalTour.destroy(); document.getElementById('host-modal').close(); document.getElementById('host-modal').remove(); document.getElementById('modal-demo').remove(); });
+  // Automatic cleanup: a tour that types, toggles, and click-toggles the app puts all of it back when
+  // closed mid-scene; played through, it keeps changes scene to scene and puts them back at the end.
+  // A flow whose playback is 'ask' shows the chooser with no host option.
+  const cleanup = await inlinePage.evaluate(async () => {
+    const make = (html) => { const wrap = document.createElement('div'); wrap.innerHTML = html; document.body.appendChild(wrap); return wrap; };
+    const fixture = make('<input id="cl-name" value="Original"><input id="cl-check" type="checkbox"><button id="cl-theme">Theme</button><div id="cl-spot">spot</div>');
+    document.getElementById('cl-theme').onclick = () => document.body.classList.toggle('cl-dark');
+    const state = () => ({ name: document.getElementById('cl-name').value, checked: document.getElementById('cl-check').checked, dark: document.body.classList.contains('cl-dark') });
+    const card = (text) => ({ type: 'callout', selector: '#cl-spot', text, holdMs: 100 });
+    const flows = [
+      { id: 'interrupt', name: 'Interrupt', defaults: { dwellMs: 50 }, scenes: [{ id: 'i1', route: '/', actions: [{ type: 'type', selector: '#cl-name', text: 'Changed', charMs: 0 }, { type: 'toggle', selector: '#cl-check', checked: true }, { type: 'click', selector: '#cl-theme' }, card('Look'), { type: 'click', selector: '#cl-theme' }] }] },
+      { id: 'forward', name: 'Forward', defaults: { dwellMs: 50 }, scenes: [{ id: 'f1', route: '/', actions: [{ type: 'type', selector: '#cl-name', text: 'Kept', charMs: 0 }] }, { id: 'f2', route: '/', actions: [card('Still kept?')] }] },
+      { id: 'asks', name: 'Asks', defaults: { advance: 'ask' }, scenes: [{ id: 'a1', route: '/', actions: [card('Hi')] }] },
+    ];
+    const target = document.createElement('button'); target.id = 'cl-demo'; document.body.appendChild(target);
+    const projector = await window.ScreenReel.mount(target, { projectId: 'cleanup-example', loop: false, narration: false, cursor: false, disableOnComplete: true, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows } } });
+    const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+    const result = {};
+    let waiting = once('awaitingnext'); await projector.start('interrupt', { mode: 'guided' }); await waiting;
+    result.midScene = state();
+    const exited = once('exit'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await exited; await settle();
+    result.afterEsc = state();
+    waiting = once('awaitingnext'); await projector.start('forward', { mode: 'guided' }); await waiting;
+    result.nextScene = state();
+    const done = once('exit'); document.querySelector('.sr-callout-next').click(); await done; await settle();
+    result.afterFinish = state();
+    projector.start('asks'); await new Promise((resolve) => setTimeout(resolve, 200));
+    result.asks = !!document.querySelector('#screenreel-projector-cleanup-example')?.shadowRoot.querySelector('.sr-chooser-layer:not([hidden]) .sr-chooser');
+    projector.destroy(); fixture.remove(); target.remove(); document.body.classList.remove('cl-dark');
+    return result;
+  });
+  assert.deepEqual(cleanup, {
+    midScene: { name: 'Changed', checked: true, dark: true },
+    afterEsc: { name: 'Original', checked: false, dark: false },
+    nextScene: { name: 'Kept', checked: false, dark: false },
+    afterFinish: { name: 'Original', checked: false, dark: false },
+    asks: true,
+  });
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);
@@ -526,6 +567,41 @@ try {
   await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
   await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
   await inlinePage.close();
+  // Studio authoring of guided + autoplay tours: Flow settings ("Let viewers choose" for new flows),
+  // an Info card from the toolbar titled from its element, words edited on the row and persisted,
+  // Play scene in Guided waiting for Next in the preview, and ⇧⌘-click capturing a card.
+  const authorPage = await browser.newPage({ viewport: { width: 1440, height: 900 } }); await silenceSpeech(authorPage);
+  await authorPage.goto(`${baseUrl}?variant=repo-native`, { waitUntil: 'domcontentloaded' });
+  await authorPage.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true');
+  await authorPage.evaluate(() => window.ScreenReel.openStudio());
+  await authorPage.getByRole('button', { name: 'New flow', exact: true }).click();
+  await authorPage.locator('[data-flow-name]').fill('Card tour'); await authorPage.getByRole('button', { name: 'Create flow', exact: true }).click();
+  await authorPage.locator('[data-flow-settings]').click();
+  assert.equal(await authorPage.locator('input[name="sr-playback"]:checked').getAttribute('value'), 'ask');
+  await authorPage.locator('input[name="sr-playback"][value="guided"]').check(); await authorPage.getByRole('button', { name: 'Save', exact: true }).click();
+  assert.match(await authorPage.locator('.sr-scene-page .sr-page-title p').first().innerText(), /Guided/);
+  await authorPage.getByRole('button', { name: 'Create first scene', exact: true }).click();
+  await authorPage.locator('.sr-modal [data-key="title"]').fill('Welcome'); await authorPage.getByRole('button', { name: 'Create scene', exact: true }).click();
+  const authorFrame = authorPage.frameLocator('.sr-preview-frame');
+  const badgeTarget = authorFrame.locator('[data-variant-panel]:not([hidden]) [data-demo-id="open-source-badge"]'); await badgeTarget.waitFor();
+  await authorPage.locator('[data-add-card]').first().click(); await badgeTarget.hover(); await badgeTarget.click();
+  const cardRow = authorPage.locator('.sr-action').first(); await cardRow.waitFor();
+  assert.match(await cardRow.locator('[data-card-title]').inputValue(), /Free and open source/);
+  assert.equal(await cardRow.locator('[data-card-needs]').count(), 1, 'an empty card is flagged');
+  await cardRow.locator('[data-card-text]').fill('Apache 2.0, self-hosted, no account needed.');
+  assert.equal(await cardRow.locator('[data-card-needs]').count(), 0);
+  await authorPage.waitForFunction(() => Object.entries(localStorage).some(([key, value]) => key.endsWith(':flows:v1') && value.includes('Apache 2.0, self-hosted') && value.includes('"advance":"guided"')), null, { timeout: 5000 });
+  await authorPage.locator('[data-play-scene]').click();
+  await authorFrame.locator('.sr-callout-next').waitFor({ timeout: 10000 });
+  assert.match(await cardRow.locator('[data-action-status]').innerText(), /waiting for next/i);
+  await authorFrame.locator('.sr-callout-next').click(); await authorPage.getByText('Scene completed').waitFor({ timeout: 10000 });
+  const gestureTarget = authorFrame.locator('[data-variant-panel]:not([hidden]) .landing-lede').first();
+  const captureKey = process.platform === 'darwin' ? 'Meta' : 'Control'; // Studio's capture key: ⌘ on macOS, Ctrl elsewhere
+  await gestureTarget.hover(); await authorPage.keyboard.down(captureKey); await authorPage.keyboard.down('Shift');
+  await gestureTarget.click({ modifiers: [captureKey, 'Shift'] }); await authorPage.keyboard.up('Shift'); await authorPage.keyboard.up(captureKey);
+  await authorPage.locator('.sr-action').nth(1).waitFor();
+  assert.deepEqual(await authorPage.locator('.sr-action strong').allInnerTexts(), ['Info card', 'Info card'], '⇧⌘-click captures a second info card');
+  await authorPage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="auto"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
   // stable session id. Fresh context so presenter-mode session state can't leak in.

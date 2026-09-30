@@ -12,9 +12,9 @@ Live demo: [Chapter 1 of the showcase](../examples/action-showcase/showcase-crea
 3. Open a flow. Choose **Add scene**, give it a name and optional talking points, then choose
    **Create scene**. The current page is selected automatically; readiness and timing stay under
    **Advanced timing** when you need them. To continue an existing scene, choose **Edit** instead.
-4. Press **● Record**. The first time, a short primer lists exactly what gets captured — tick
+4. Press **Start recording**. The first time, a short primer lists exactly what gets captured — tick
    *Don't show this again* once you know. Then the banner reads
-   *"Recording — ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops"*.
+   *"Recording — ⌘/Ctrl+click highlights · ⇧⌘/⇧Ctrl+click adds an info card · Alt+click spotlights · Esc stops"*.
 5. **Use your app in the preview.** Click, type, pick from selects, scroll.
 6. Press **Stop & review** (or `Esc`).
 7. Press **Finish scene** to validate it and return to the scene list.
@@ -36,6 +36,7 @@ normal action afterwards — reorder it, edit its settings, delete it.
 | Pause between actions | `afterMs` on the previous action, so replay keeps your rhythm |
 | Click something that navigates | `goto` — including `pushState`, `replaceState`, history, hash, and full-page navigation |
 | ⌘+click (Mac) / Ctrl+click (Windows/Linux) | `highlight` on it — and the click itself never reaches your app |
+| ⇧⌘+click (Mac) / ⇧Ctrl+click (Windows/Linux) | an **info card** on it, titled from the element's text — likewise swallowed |
 | Alt+click something | `spotlight` on it — likewise swallowed |
 
 The two "one" rows matter: a 20-character name is one readable `type` action, not twenty
@@ -54,12 +55,35 @@ the selector it resolved to and how many elements that selector matches. Then
 - **click** commits it — your app never sees that click, and no `click` action is recorded,
 - **Esc**, or letting go of the key, cancels.
 
-Hold **Alt** for a `spotlight` instead of a `highlight`. If the box says more than one match, widen
+Add **Shift** to the capture key for an **info card** instead, or hold **Alt** for a `spotlight`. If the box says more than one match, widen
 or narrow until it says one: an ambiguous selector is a scene that will not save.
 
 **This works whenever the preview is loaded, not just while recording.** Mid-take the annotation
 joins the same coalesced sequence as everything else. On macOS Chrome, prefer ⌘; Ctrl+click is a
 right-click there.
+
+## Info cards: one flow, Guided and Autoplay
+
+An info card is a titled note beside an element, and it is what makes one flow work two ways:
+
+- **Guided:** each card waits until the viewer presses Next.
+- **Autoplay:** each card stays up for its autoplay time, and never less than it takes to read.
+
+Add one with **⇧⌘/⇧Ctrl+click** while recording, or with **Info card** in the editor toolbar and a
+click on the element. Its title starts as the element's own text. Type the card's words straight
+into its row in the timeline. The card sits on its element in the preview while you edit, and the
+row shows its step number and autoplay time. A card with no text shows **Needs text** and won't save.
+
+**Preview as Guided / Autoplay** beside **Play scene** plays the scene the way that viewer gets it:
+Guided waits for **Next** on each card in the preview.
+
+**Flow settings** (on the scene list) sets **How viewers play it**:
+- **Let viewers choose:** the default for new flows. Viewers pick Guided or Autoplay when the tour starts.
+- **Guided** or **Autoplay** fixes one of them.
+
+You never set up the rest:
+- **The click shield:** while a tour plays, stray viewer clicks can't change the app.
+- **Cleanup:** anything the tour changed is put back when it's closed or cut short. The timeline shows it: typed fields and toggles read **↺ Put back automatically**, and a click undone by a later click on the same element reads **↺ Undone by action N**. A click with nothing to undo it reads **May stay changed after the tour**, with an **Add undo** button.
 
 ## Things worth knowing
 

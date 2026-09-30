@@ -7,7 +7,7 @@
    only thing that can apply, which is why the boxes below carry no CSS rules at all. */
 
 const SELECTOR_LABEL_LIMIT = 60;      // a selector longer than this tells the author nothing more
-const MODE_LABELS = { preview: 'Target preview', highlight: 'Highlight', spotlight: 'Spotlight', target: 'Target', destination: 'Destination', collection: 'Collection' };
+const MODE_LABELS = { preview: 'Target preview', highlight: 'Highlight', spotlight: 'Spotlight', callout: 'Info card', target: 'Target', destination: 'Destination', collection: 'Collection' };
 const KEY_HINT = '↑ wider · ↓ narrower · click to capture';
 /* Literally true: validate() reports "selector matches multiple elements" and Studio.save() aborts
    on the first error, so an ambiguous target is a scene that cannot be saved. */
@@ -24,6 +24,7 @@ const LABEL_BELOW_GAP_PX = 10;
 const ACCENTS = {
   highlight: { border: '#8b5cf6', shadow: 'rgba(124,58,237,.55)', chip: '#6d28d9' },
   spotlight: { border: '#f59e0b', shadow: 'rgba(180,83,9,.45)', chip: '#b45309' },
+  callout: { border: '#2563eb', shadow: 'rgba(37,99,235,.45)', chip: '#1d4ed8' },
 };
 const MULTI_CHIP = '#b91c1c';
 
@@ -145,8 +146,10 @@ export class GestureHighlighter {
       if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && this.state === 'previewing') { event.preventDefault(); this.elevate(event.key === 'ArrowUp'); return; }
     }
     // On macOS Ctrl is a non-committing target preview; Cmd commits a highlight. Windows/Linux
-    // keep Ctrl+click as the capture gesture because they have no Cmd key.
-    const next = event.metaKey ? 'highlight' : (event.ctrlKey ? (this.isMac ? 'preview' : 'highlight') : event.altKey ? 'spotlight' : null);
+    // keep Ctrl+click as the capture gesture because they have no Cmd key. Adding Shift to the
+    // capture key captures an info card instead.
+    const capture = this.isMac ? event.metaKey : event.ctrlKey;
+    const next = capture && event.shiftKey ? 'callout' : event.metaKey ? 'highlight' : (event.ctrlKey ? (this.isMac ? 'preview' : 'highlight') : event.altKey ? 'spotlight' : null);
     // Nothing else is preventDefault-ed on the host side, so the shell's own Cmd+S still saves.
     if (!next || (this.state !== 'idle' && this.mode === next) || !this.canArm(event)) return;
     this.arm(next);
@@ -154,7 +157,7 @@ export class GestureHighlighter {
 
   handleKeyup(event) {
     if (this.state === 'idle') return;
-    const held = this.mode === 'highlight' ? (this.isMac ? event.metaKey : event.ctrlKey) : this.mode === 'preview' ? event.ctrlKey : event.altKey;
+    const held = this.mode === 'highlight' || this.mode === 'callout' ? (this.isMac ? event.metaKey : event.ctrlKey) : this.mode === 'preview' ? event.ctrlKey : event.altKey;
     if (!held) this.disarm();
   }
 

@@ -178,3 +178,30 @@
 .sr-mode--primary span{color:inherit;opacity:.85}
 .sr-mode:focus-visible,.sr-chooser-close:focus-visible{outline:2px solid var(--sr-accent,#7c3aed);outline-offset:2px}
 .sr-chooser-close{position:absolute;top:12px;right:12px;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--sr-muted,#71717a);cursor:pointer}
+
+/* Flow settings: how viewers play it, as radio cards. */
+.sr-playback{grid-column:1/-1;margin:0;padding:0;border:0;display:grid;gap:8px}
+.sr-playback legend{margin-bottom:6px;font-size:11px;font-weight:700;color:#52525b}
+.sr-playback-option{display:flex;justify-content:flex-start;gap:10px;align-items:flex-start;text-align:left;padding:10px 12px;border:1px solid #e4e4e7;border-radius:9px;cursor:pointer}
+.sr-playback-option:has(input:checked){border-color:var(--sr-accent,#7c3aed);background:#faf5ff}
+.sr-playback-option input{margin-top:2px;accent-color:var(--sr-accent,#7c3aed)}
+.sr-playback-option span{display:grid;gap:2px}
+.sr-playback-option strong{font-size:13px;color:#18181b}
+.sr-playback-option small{font-size:12px;color:#71717a}
+.sr-modal-note{display:flex;gap:8px;align-items:center;margin:0 0 14px;font-size:12px;color:#52525b}
+
+/* Studio: info cards edited on their timeline row, and the Guided/Autoplay preview toggle. */
+.sr-card-edit{display:grid;gap:6px;margin-top:8px}
+.sr-card-edit input,.sr-card-edit textarea{width:100%;box-sizing:border-box;border:1px solid #d4d4d8;border-radius:7px;padding:6px 8px;background:#fff;color:#18181b;font:inherit;font-size:12px}
+.sr-card-edit input{font-weight:600}
+.sr-card-edit textarea{resize:vertical;min-height:44px}
+.sr-card-edit input:focus,.sr-card-edit textarea:focus{outline:2px solid var(--sr-accent,#7c3aed);outline-offset:0;border-color:transparent}
+.sr-card-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#71717a}
+.sr-card-step{font-weight:700;color:var(--sr-accent,#7c3aed)}
+.sr-card-needs{padding:0 6px;border-radius:999px;background:#fef3c7;color:#92400e;font-weight:700}
+.sr-segmented{display:inline-flex;border:1px solid #d4d4d8;border-radius:8px;overflow:hidden}
+.sr-segmented button{border:0;border-radius:0;background:#fff;color:#52525b}
+.sr-segmented button[aria-pressed="true"]{background:var(--sr-accent,#7c3aed);color:#fff}
+.sr-cleanup-badge{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:#15803d}
+.sr-cleanup-badge.is-open{color:#a16207}
+.sr-cleanup-badge button{padding:1px 7px;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;font-size:11px;cursor:pointer}

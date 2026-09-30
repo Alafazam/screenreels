@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Studio authors guided and autoplay tours:
+  - **Flow settings** sets **How viewers play it** (`defaults.advance`: `'ask'`, the new-flow default, or `'guided'` / `'auto'`).
+  - **Info cards** are first-class. Capture one with **⇧⌘/⇧Ctrl+click** or the toolbar; it's titled from its element and edited inline on its row, with a live preview card.
+  - **Play scene** previews Guided or Autoplay.
+  - A card's autoplay time is never shorter than its reading time.
+- Automatic cleanup: the tour records how to put back every form control it changes, and pairs toggle-style clicks. A scene cut short, or a closed or finished tour, undoes its changes; the Studio timeline shows what will be put back.
 - Added guided tours: `advance: 'guided'` makes every callout a step that waits for Next, with a white card showing a title, "N of M", Skip, Back, and Next (→/Enter, ←, Esc work too). `chooser: true` asks the viewer Guided or Autoplay; `controls`, `studio: false`, and `position: 'center'` trim the pill. See `docs/guided-tours.md`.
 - Added dimming behind highlight, highlight sequence, and callout (`dim` per action or per mount); spotlight no longer darkens the presenter pill.
 - Added callout `title` and `highlight: true`, and placement that flips sides and clamps to the viewport; overlays follow a moving target.

@@ -4,10 +4,12 @@
 
   const field = (key, label, type = 'number', extra = {}) => ({ key, label, type, ...extra });
   const definitions = [
+    /* The info card: the unit of a tour. Guided viewers click Next through them; Autoplay holds each
+       for its autoplay time. It leads the catalog because it is what an author adds most. */
+    { id: 'callout', type: 'callout', category: 'Explain', label: 'Info card', picker: 'visual', defaults: { text: '', placement: 'auto', highlight: true, holdMs: 2200 }, fields: [field('title', 'Card title', 'text'), field('text', 'Card text', 'textarea'), field('highlight', 'Ring the target', 'checkbox'), field('placement', 'Placement', 'select', { options: ['auto', 'top', 'right', 'bottom', 'left'] }), field('holdMs', 'Autoplay time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'highlight', type: 'highlight', category: 'Emphasis', label: 'Highlight target', picker: 'visual', defaults: { holdMs: 1600 }, fields: [field('holdMs', 'Highlight time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'highlight-sequence', type: 'glow', category: 'Emphasis', label: 'Highlight target sequence', picker: 'collection', defaults: { sequence: true, count: 6, stepMs: 1050, afterMs: 400 }, fields: [field('count', 'Maximum targets', 'number', { min: 1, max: 30 }), field('stepMs', 'Time per target (ms)', 'number', { min: 100, max: 10000 })] },
     { id: 'spotlight', type: 'spotlight', category: 'Emphasis', label: 'Spotlight target', picker: 'visual', defaults: { holdMs: 1800, dim: 0.62 }, fields: [field('holdMs', 'Spotlight time (ms)', 'number', { min: 100, max: 30000 }), field('dim', 'Background dimming', 'number', { min: 0.1, max: 0.9, step: 0.05 })] },
-    { id: 'callout', type: 'callout', category: 'Emphasis', label: 'Target callout', picker: 'visual', defaults: { text: 'Add your callout', placement: 'auto', holdMs: 2200 }, fields: [field('title', 'Callout title (optional)', 'text'), field('text', 'Callout text', 'textarea'), field('highlight', 'Highlight the target too', 'checkbox'), field('placement', 'Placement', 'select', { options: ['auto', 'top', 'right', 'bottom', 'left'] }), field('holdMs', 'Callout time (ms)', 'number', { min: 100, max: 30000 })] },
     { id: 'flash', type: 'flash', category: 'Emphasis', label: 'Flash target', picker: 'visual', defaults: { times: 2 }, fields: [field('times', 'Flash count', 'number', { min: 1, max: 10 })] },
     { id: 'reel', type: 'reel', category: 'Emphasis', label: 'Reel text into place', picker: 'visual', defaults: { frames: 7, stepMs: 80, holdMs: 500 }, fields: [field('frames', 'Spin frames', 'number', { min: 2, max: 30 }), field('stepMs', 'Time per frame (ms)', 'number', { min: 20, max: 500 }), field('holdMs', 'Hold after landing (ms)', 'number', { min: 0, max: 10000 })] },
     { id: 'reveal', type: 'reveal', category: 'Emphasis', label: 'Reveal image over target', picker: 'visual', defaults: { holdMs: 1600 }, fields: [field('src', 'Image URL', 'text'), field('holdMs', 'Hold time (ms)', 'number', { min: 100, max: 30000 })] },
@@ -60,6 +62,40 @@
   const LEVER_INPUT_THROTTLE_MS = 90;  // input events while a slider moves, so listeners are not flooded
   const REEL_SCRAMBLE_INDEX_STRIDE = 3, REEL_SCRAMBLE_FRAME_STRIDE = 7; // deterministic glyph scramble
   const AFTER_MS_MAX = 30000;
+  /* Info cards. A card never leaves before it can be read: its autoplay time is the longer of its
+     holdMs and a reading estimate over its title and text (about 200 words per minute). */
+  const CARD_READ_BASE_MS = 1000, CARD_READ_MS_PER_WORD = 300;
+  const cardWords = (action) => `${action?.title || ''} ${action?.text || ''}`.trim().split(/\s+/).filter(Boolean).length;
+  function cardReadingMs(action) { const words = cardWords(action); return words ? CARD_READ_BASE_MS + words * CARD_READ_MS_PER_WORD : 0; }
+  function cardHoldMs(action) { return Math.max(Number(action?.holdMs) || DEFAULTS.callout.holdMs, cardReadingMs(action)); }
+  /* Automatic cleanup. Before a form control is changed, record how to put it back: the undo is an
+     ordinary action (set or toggle) so it replays through the same executor. Clicks are not
+     invertible in general; a toggle-style click is undone by the scene's own later click on the same
+     element, which pairedUndo finds. Both are pure over their inputs, so they are unit-tested. */
+  function inverseFor(action, el) {
+    const target = { selector: action.selector, ...(action.index != null ? { index: action.index } : {}) };
+    const type = actionType(action);
+    if (type === 'type' || type === 'set' || type === 'lever') return { type: 'set', ...target, value: String(el?.value ?? '') };
+    if (type === 'toggle') return { type: 'toggle', ...target, checked: !!el?.checked };
+    return null;
+  }
+  function pairedUndo(actions, index) {
+    const action = actions?.[index]; if (actionType(action) !== 'click') return -1;
+    const sameTarget = (other) => actionType(other) === 'click' && other.selector === action.selector && (other.index ?? 0) === (action.index ?? 0);
+    for (let later = index + 1; later < actions.length; later++) if (sameTarget(actions[later])) return later;
+    return -1;
+  }
+  /* In a guided tour, info cards are the steps: each waits for Next. One home for the rule. */
+  function isGuidedStep(action) { return actionType(action) === 'callout'; }
+  /* "N of M" for a card: its position among the info cards of every enabled scene, in order. */
+  function infoCardStep(scenes, sceneId, actionIndex) {
+    let step = 0; let total = 0;
+    for (const scene of scenes || []) (scene.actions || []).forEach((action, index) => {
+      if (!isGuidedStep(action)) return;
+      total += 1; if (scene.id === sceneId && index === actionIndex) step = total;
+    });
+    return { step, total };
+  }
   const CALLOUT_GAP_PX = 8;            // space between a callout and its target
   const CALLOUT_VIEWPORT_MARGIN_PX = 8; // a callout never comes closer than this to the viewport edge
   /* The side a callout tries first for `placement: 'auto'`, then the rest in order. */
@@ -233,7 +269,7 @@
     place(); const stopFollowing = followTarget(win, place);
     if (controls?.focusNext) tip.querySelector?.('.sr-callout-next')?.focus?.({ preventScroll: true });
     // A guided step waits for the viewer, not a timer: the host holds it until Next.
-    if (!ctx.skipHold) await sleep(action.holdMs || DEFAULTS.callout.holdMs, ctx.signal);
+    if (!ctx.skipHold) await sleep(cardHoldMs(action), ctx.signal);
     settleOverlays(action, ctx, [tip, ring, backdrop], stopFollowing);
   }
   const SCROLL_SETTLE_FRAMES = 3, SCROLL_SETTLE_MAX_MS = 1200, SCROLL_SETTLE_TICK_MS = 32;
@@ -473,6 +509,8 @@
     if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || (context.strictFunctions ? undefined : win[action.fn]); if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
     if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
+    // Automatic cleanup: note how to put this control back before changing it.
+    if (el && el !== true && ctx.journal) { const inverse = inverseFor(action, el); if (inverse) ctx.journal(inverse); }
     if (action.type === 'spotlight') {
       /* The dim lives on the shared backdrop (layered under the presenter pill), not on the ring:
          a spread shadow on the ring box sat above the pill and darkened the presenter's controls.
@@ -506,6 +544,7 @@
     if (definition.picker !== 'none' && !action.selector) errors.push('Choose a target');
     if (definition.picker === 'source-destination' && !action.toSelector && action.dx == null && action.dy == null) errors.push('Choose a destination or provide a drag distance');
     if (actionType(action) === 'goto' && !normalizeRoute(action.url, baseHref)) errors.push('Use a valid local route');
+    if (isGuidedStep(action) && !String(action.text || '').trim()) errors.push('Give this info card some text');
     if (actionType(action) === 'choice') {
       const options = Array.isArray(action.options) ? action.options : [];
       if (options.length < CHOICE_MIN_OPTIONS || options.length > CHOICE_MAX_OPTIONS) errors.push(`Provide ${CHOICE_MIN_OPTIONS}-${CHOICE_MAX_OPTIONS} options`);
@@ -586,5 +625,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { inverseFor, pairedUndo, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

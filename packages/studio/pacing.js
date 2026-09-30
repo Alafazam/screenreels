@@ -36,7 +36,9 @@ export function actionSelfMs(action, definition) {
   if (action.type === 'glow' && action.sequence) return num('stepMs', ESTIMATE_FALLBACKS.glowStepMs) * num('count', ESTIMATE_FALLBACKS.glowCount);
   // runCountdown plays `from…1` and then "Go", so a 3-count is four beats rather than one stepMs.
   if (action.type === 'countdown') return num('stepMs', ESTIMATE_FALLBACKS.countdownStepMs) * (Math.max(1, num('from', ESTIMATE_FALLBACKS.countdownFrom)) + 1);
-  let ms = num('holdMs', 0) || num('durMs', 0) || num('ms', 0) || num('stepMs', 0);
+  // An info card holds at least as long as it takes to read (ScreenReelCore.cardHoldMs).
+  const cardHold = action.type === 'callout' && typeof window !== 'undefined' ? window.ScreenReelCore?.cardHoldMs?.(action) : 0;
+  let ms = cardHold || num('holdMs', 0) || num('durMs', 0) || num('ms', 0) || num('stepMs', 0);
   if (action.type === 'type') ms += num('charMs', ESTIMATE_FALLBACKS.typeCharMs) * String(action.text ?? definition?.defaults?.text ?? '').length;
   if (action.type === 'choice') ms += num('timeoutMs', 0) || CHOICE_ESTIMATE_MS;
   return ms;

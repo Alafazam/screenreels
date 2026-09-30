@@ -130,10 +130,10 @@
         },
         "type": {
           "enum": [
+            "callout",
             "highlight",
             "glow",
             "spotlight",
-            "callout",
             "flash",
             "reel",
             "reveal",

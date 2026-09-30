@@ -4,6 +4,9 @@
   const clone = (value) => JSON.parse(JSON.stringify(value));
   /* Pacing a flow gets when it declares none, and that a new or captured scene starts with. */
   const NEW_FLOW_DEFAULTS = Object.freeze({ dwellMs: 6000, settleMs: 900 });
+  /* A flow created in Studio lets its viewers pick Guided or Autoplay. Only createBlank uses it, so a
+     manifest that declares no playback keeps playing auto, as before. */
+  const NEW_FLOW_PLAYBACK = 'ask';
   const PROJECT_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,79}$/i; // 2-80 chars, matching the error below
   const now = () => new Date().toISOString();
   const makeId = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 0xffffff).toString(36)}`;
@@ -21,6 +24,8 @@
       title: String(source.title ?? caption.title ?? `Scene ${index + 1}`),
       talkingPoints: String(source.talkingPoints ?? caption.body ?? source.sub ?? ''),
       actions: (source.actions || []).map((action, actionIndex) => normalizeAction(action, index, actionIndex)),
+      // Cleanup steps are actions too; their default ids get their own prefix so they never collide.
+      ...(Array.isArray(source.cleanup) ? { cleanup: source.cleanup.map((action, cleanupIndex) => ({ ...normalizeAction(action, index, cleanupIndex), id: String(action?.id || `cleanup_${index + 1}_${cleanupIndex + 1}`) })) } : {}),
     };
   }
   function normalizeFlow(flow, index, baseHref, readonly = false) {
@@ -105,7 +110,7 @@
       }) }));
       return flow;
     }
-    createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: clone(NEW_FLOW_DEFAULTS), scenes: [] }; }
+    createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: { ...clone(NEW_FLOW_DEFAULTS), advance: NEW_FLOW_PLAYBACK }, scenes: [] }; }
     save(flow) {
       if (flow.readonly || this.standardFlows.some((item) => item.id === flow.id)) throw new Error('Standard flows cannot be overwritten');
       const normalized = normalizeFlow(flow, 0, this.baseHref, false); normalized.updatedAt = now(); const flows = this.readLocal(); const index = flows.findIndex((item) => item.id === normalized.id);

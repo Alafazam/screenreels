@@ -4,10 +4,10 @@ Generated from `packages/core/action-runtime.js`.
 
 | Action | Type | Category | Picker | Defaults |
 |---|---|---|---|---|
+| Info card | `callout` | Explain | visual | `{"text":"","placement":"auto","highlight":true,"holdMs":2200}` |
 | Highlight target | `highlight` | Emphasis | visual | `{"holdMs":1600}` |
 | Highlight target sequence | `glow` | Emphasis | collection | `{"sequence":true,"count":6,"stepMs":1050,"afterMs":400}` |
 | Spotlight target | `spotlight` | Emphasis | visual | `{"holdMs":1800,"dim":0.62}` |
-| Target callout | `callout` | Emphasis | visual | `{"text":"Add your callout","placement":"auto","holdMs":2200}` |
 | Flash target | `flash` | Emphasis | visual | `{"times":2}` |
 | Reel text into place | `reel` | Emphasis | visual | `{"frames":7,"stepMs":80,"holdMs":500}` |
 | Reveal image over target | `reveal` | Emphasis | visual | `{"holdMs":1600}` |

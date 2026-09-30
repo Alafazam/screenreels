@@ -10,6 +10,15 @@
 /* A read-and-scroll rhythm pauses 0.5-1.5s between flicks, so the merge window has to outlast
    that without swallowing genuinely separate beats. It must also stay BELOW IDLE_GAP_MAX_MS so
    any pause long enough to split a scroll burst is still fully replayable as afterMs. */
+/* An info card captured on an element starts titled with that element's own text, so the author
+   edits words rather than starting from a blank card. Empty text means an untitled card. */
+export const CARD_TITLE_PREFILL_CHARS = 60;
+const RECORDING_KEYS = '⌘/Ctrl+click highlights · ⇧⌘/⇧Ctrl+click adds an info card · Alt+click spotlights · Esc stops';
+export function cardFieldsFor(annotation, fingerprint) {
+  if (annotation !== 'callout') return {};
+  const text = String(fingerprint?.text || '').replace(/\s+/g, ' ').trim();
+  return text ? { title: text.length > CARD_TITLE_PREFILL_CHARS ? `${text.slice(0, CARD_TITLE_PREFILL_CHARS - 1)}…` : text } : {};
+}
 export const SCROLL_BURST_GAP_MS = 2500;
 /* The debounce that ends a burst and calls flush() must outlast the merge window above it, or
    flush() ends the burst before a same-window scroll ever arrives, making the window dead code. */
@@ -86,9 +95,9 @@ export class Coalescer {
       this.emit(ops, { type: 'click', definitionId: 'click', selector: record.selector }, record.at, record.at, record.fingerprint);
     } else if (record.kind === 'annotate') {
       this.finalizeType(ops);
-      /* highlight/spotlight definitionIds share their type string in the registry (see
+      /* highlight/spotlight/callout definitionIds share their type string in the registry (see
          packages/core/action-runtime.js definitions), so record.annotation doubles as both. */
-      this.emit(ops, { type: record.annotation, definitionId: record.annotation, selector: record.selector, ...this.defaults(record.annotation) }, record.at, record.at, record.fingerprint);
+      this.emit(ops, { type: record.annotation, definitionId: record.annotation, selector: record.selector, ...this.defaults(record.annotation), ...cardFieldsFor(record.annotation, record.fingerprint) }, record.at, record.at, record.fingerprint);
     } else if (record.kind === 'drag') {
       this.finalizeType(ops);
       const action = { type: 'drag', definitionId: 'drag', selector: record.selector, durMs: clamp(record.durationMs, DRAG_DUR_MIN_MS, DRAG_DUR_MAX_MS) };
@@ -278,7 +287,7 @@ export class Recorder {
     this.active = true;
     this.attach(doc);
     this.frame.addEventListener('load', this.onFrameLoad);
-    if (this.banner) { this.banner.hidden = false; this.banner.textContent = 'Recording — ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops'; }
+    if (this.banner) { this.banner.hidden = false; this.banner.textContent = `Recording — ${RECORDING_KEYS}`; }
     return true;
   }
 
@@ -356,7 +365,7 @@ export class Recorder {
     const doc = this.frame.contentDocument;
     if (!doc) return this.stop('Recording stopped — preview document is unavailable');
     this.attach(doc);
-    if (this.banner && route) this.banner.textContent = `Recording continues on ${route} · ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops`;
+    if (this.banner && route) this.banner.textContent = `Recording continues on ${route} · ${RECORDING_KEYS}`;
   }
 
   /* Overlay chrome (ScreenReel's own boxes, ripples, cursor) must never record. */

@@ -1,5 +1,5 @@
 import { icon } from './icons.js';
-import { Recorder } from './recorder.js';
+import { Recorder, cardFieldsFor } from './recorder.js';
 import { GestureHighlighter, createOutline, describeTarget } from './target-picker.js';
 import { actionSelfMs, estimateSceneSeconds, estimateSpeechMs, planPace, PACE_SKIP_TYPES } from './pacing.js';
 
@@ -30,6 +30,19 @@ const SCENE_TIMING_FIELDS = [
 /* Save-time checks read their bounds from the field specs above, so the form and validation cannot disagree. */
 const SCENE_TIMING_ERRORS = [['dwellMs', 'invalid scene time'], ['timeoutMs', 'invalid ready timeout'], ['settleMs', 'invalid settle time']];
 const BLOB_URL_REVOKE_MS = 500;      // give the download a beat to start before the object URL goes
+/* How a flow plays for its viewers (flow.defaults.advance). One flow serves both ways: info cards
+   wait for Next in Guided and hold for their autoplay time in Autoplay. A flow that declares none
+   plays auto, which is how flows behaved before playback was a choice. */
+const FLOW_PLAYBACK = [
+  { value: 'ask', label: 'Let viewers choose', help: 'They pick Guided or Autoplay when the tour starts.' },
+  { value: 'guided', label: 'Guided', help: 'Viewers click through your info cards with Next.' },
+  { value: 'auto', label: 'Autoplay', help: 'The tour plays by itself; each info card stays up for its autoplay time.' },
+];
+const LEGACY_PLAYBACK = 'auto';
+const PREVIEW_MODES = [{ value: 'guided', label: 'Guided' }, { value: 'auto', label: 'Autoplay' }];
+/* The preview card in Studio shows the viewer's controls; they do nothing here but show the layout. */
+const PREVIEW_CARD_LABELS = { skip: 'Skip tour', back: 'Back', next: 'Next', finish: 'Finish' };
+const flowPlayback = (flow) => flow?.defaults?.advance ?? LEGACY_PLAYBACK;
 const ACTION_ICONS = { choice: 'right', highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
 const flowCounts = (flow) => ({ scenes: flow.scenes.length, enabled: flow.scenes.filter((scene) => scene.enabled !== false).length, actions: flow.scenes.reduce((total, scene) => total + scene.actions.length, 0) });
 function formatUpdated(flow) { if (flow.readonly) return 'Standard'; try { return new Date(flow.updatedAt).toLocaleDateString('en-GB'); } catch { return '—'; } }
@@ -65,8 +78,8 @@ class Studio {
     /* An empty flow has exactly one useful move, so Add scene carries the accent and the buttons
        that need existing scenes to mean anything stay out of the way until there are some. */
     const empty = this.draft.scenes.length === 0;
-    this.body.innerHTML = `<section class="sr-page sr-scene-page"><div class="sr-page-title"><div><button class="sr-back sr-back-labelled" data-back aria-label="Back to flows">${icon('left')} Back to flows</button><h1>${esc(this.draft.name)}</h1><p>${flowCounts(this.draft).scenes} scenes · ${flowCounts(this.draft).enabled} enabled · reorder, enable, or open a scene to edit its actions.</p></div><div class="sr-toolbar sr-scene-toolbar"><button data-add class="${empty ? 'sr-primary' : ''}">${icon('plus')} Add scene</button>${empty ? '' : `<button data-dup>${icon('copy')} Duplicate</button>`}<button data-variables>${icon('sliders')} Variables</button>${empty ? '' : `<button data-export>${icon('upload')} Export</button>`}${this.draft.readonly ? '' : `<button data-reset>${icon('rotate')} Reset</button>`}${empty ? '' : `<button data-play>${icon('play')} Play flow</button>`}</div></div><div class="sr-panel"><table class="sr-scene-table"><thead><tr><th>Order</th><th>Scene</th><th>Talking points</th><th>Actions</th><th>Time</th><th>Enabled</th><th><span class="sr-visually-hidden">Scene actions</span></th></tr></thead><tbody>${empty ? `<tr><td colspan="7" class="sr-empty"><strong>No scenes yet.</strong><p>Create the first scene, choose its page, then record the product directly in the preview.</p><button data-empty-add class="sr-primary">${icon('plus')} Create first scene</button></td></tr>` : ''}${this.draft.scenes.map((scene, index) => `<tr draggable="true" data-index="${index}"><td class="sr-order"><span class="sr-grip" title="Drag to reorder" aria-hidden="true">${icon('grip')}</span><span class="sr-order-num">${String(index + 1).padStart(2, '0')}</span></td><td><div class="sr-scene-name"><strong>${esc(scene.title)}</strong><small class="sr-route">${esc(scene.route)}</small></div></td><td class="sr-notes-preview">${esc(scene.talkingPoints)}</td><td><span class="sr-action-count" aria-label="${scene.actions.length} actions">${scene.actions.length}</span></td><td class="sr-muted sr-time">${estimateSceneSeconds(scene, this.draft.defaults)} sec</td><td><label class="sr-toggle"><input type="checkbox" data-enabled ${scene.enabled !== false ? 'checked' : ''}><span></span></label></td><td class="sr-row"><button data-up title="Move up" aria-label="Move up">${icon('up')}</button><button data-down title="Move down" aria-label="Move down">${icon('down')}</button><button data-edit>${icon('pencil')} Edit</button><button data-remove class="sr-danger" title="Delete scene" aria-label="Delete scene">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></section>`;
-    this.body.querySelector('[data-back]').onclick = () => this.backToFlows(); this.body.querySelector('[data-export]')?.addEventListener('click', () => this.exportFlow()); this.body.querySelector('[data-variables]').onclick = () => this.editVariables(); this.body.querySelector('[data-dup]')?.addEventListener('click', () => { const flow = this.store.save(this.store.createCopy(this.draft)); this.flowId = flow.id; this.sceneId = null; this.view = 'scenes'; this.dirty = false; this.loadDraft(); this.render(); }); this.body.querySelector('[data-play]')?.addEventListener('click', () => { if (!this.save()) return; this.close(); const flow = this.projector.store.activeFlow(); this.projector.start(flow.id, { position: 0, mode: this.projector.configuredMode(this.projector.store.enabledScenes(flow)[0], flow) }); }); // start() restarts a running tour (play() would refuse); the author's own Play never shows the viewer chooser
+    this.body.innerHTML = `<section class="sr-page sr-scene-page"><div class="sr-page-title"><div><button class="sr-back sr-back-labelled" data-back aria-label="Back to flows">${icon('left')} Back to flows</button><h1>${esc(this.draft.name)}</h1><p>${flowCounts(this.draft).scenes} scenes · ${flowCounts(this.draft).enabled} enabled · ${esc(FLOW_PLAYBACK.find((option) => option.value === flowPlayback(this.draft))?.label ?? flowPlayback(this.draft))} · reorder, enable, or open a scene to edit its actions.</p></div><div class="sr-toolbar sr-scene-toolbar"><button data-add class="${empty ? 'sr-primary' : ''}">${icon('plus')} Add scene</button>${empty ? '' : `<button data-dup>${icon('copy')} Duplicate</button>`}<button data-flow-settings>${icon('presentation')} Flow settings</button><button data-variables>${icon('sliders')} Variables</button>${empty ? '' : `<button data-export>${icon('upload')} Export</button>`}${this.draft.readonly ? '' : `<button data-reset>${icon('rotate')} Reset</button>`}${empty ? '' : `<button data-play>${icon('play')} Play flow</button>`}</div></div><div class="sr-panel"><table class="sr-scene-table"><thead><tr><th>Order</th><th>Scene</th><th>Talking points</th><th>Actions</th><th>Time</th><th>Enabled</th><th><span class="sr-visually-hidden">Scene actions</span></th></tr></thead><tbody>${empty ? `<tr><td colspan="7" class="sr-empty"><strong>No scenes yet.</strong><p>Create the first scene, choose its page, then record the product directly in the preview.</p><button data-empty-add class="sr-primary">${icon('plus')} Create first scene</button></td></tr>` : ''}${this.draft.scenes.map((scene, index) => `<tr draggable="true" data-index="${index}"><td class="sr-order"><span class="sr-grip" title="Drag to reorder" aria-hidden="true">${icon('grip')}</span><span class="sr-order-num">${String(index + 1).padStart(2, '0')}</span></td><td><div class="sr-scene-name"><strong>${esc(scene.title)}</strong><small class="sr-route">${esc(scene.route)}</small></div></td><td class="sr-notes-preview">${esc(scene.talkingPoints)}</td><td><span class="sr-action-count" aria-label="${scene.actions.length} actions">${scene.actions.length}</span></td><td class="sr-muted sr-time">${estimateSceneSeconds(scene, this.draft.defaults)} sec</td><td><label class="sr-toggle"><input type="checkbox" data-enabled ${scene.enabled !== false ? 'checked' : ''}><span></span></label></td><td class="sr-row"><button data-up title="Move up" aria-label="Move up">${icon('up')}</button><button data-down title="Move down" aria-label="Move down">${icon('down')}</button><button data-edit>${icon('pencil')} Edit</button><button data-remove class="sr-danger" title="Delete scene" aria-label="Delete scene">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></section>`;
+    this.body.querySelector('[data-back]').onclick = () => this.backToFlows(); this.body.querySelector('[data-export]')?.addEventListener('click', () => this.exportFlow()); this.body.querySelector('[data-variables]').onclick = () => this.editVariables(); this.body.querySelector('[data-flow-settings]').onclick = () => this.openFlowSettings(); this.body.querySelector('[data-dup]')?.addEventListener('click', () => { const flow = this.store.save(this.store.createCopy(this.draft)); this.flowId = flow.id; this.sceneId = null; this.view = 'scenes'; this.dirty = false; this.loadDraft(); this.render(); }); this.body.querySelector('[data-play]')?.addEventListener('click', () => { if (!this.save()) return; this.close(); const flow = this.projector.store.activeFlow(); this.projector.start(flow.id, { position: 0, mode: this.projector.asksViewer(flow) ? undefined : this.projector.configuredMode(null, flow) }); }); // start() restarts a running tour (play() would refuse); the author sees what a viewer sees, chooser included
     const createScene = () => this.openSceneSettings({ creating: true }); this.body.querySelector('[data-add]').onclick = createScene; this.body.querySelector('[data-empty-add]')?.addEventListener('click', createScene);
     const reset = this.body.querySelector('[data-reset]'); if (reset) reset.onclick = () => { if (!confirm('Replace this flow’s scenes with the first canonical flow?')) return; const standard = clone(this.store.standardFlows[0]); this.draft.scenes = standard.scenes; this.draft.defaults = standard.defaults; this.markDirty(); this.render(); };
     /* The empty-state row is not a scene and intentionally has no controls. Restrict bindings to
@@ -78,6 +91,21 @@ class Studio {
       row.querySelector('[data-up]').onclick = () => this.moveScene(index, index - 1); row.querySelector('[data-down]').onclick = () => this.moveScene(index, index + 1);
       row.ondragstart = () => { this.dragIndex = index; row.classList.add('dragging'); }; row.ondragend = () => row.classList.remove('dragging'); row.ondragover = (e) => e.preventDefault(); row.ondrop = () => this.moveScene(this.dragIndex, index);
     });
+  }
+  /* What a viewer experiences: how the tour advances, and the pause between scenes. The click shield
+     and cleanup are automatic, so the modal states them rather than offering settings for them. */
+  openFlowSettings() {
+    const current = flowPlayback(this.draft); const dwell = SCENE_TIMING_FIELDS.find((spec) => spec.key === 'dwellMs');
+    const options = FLOW_PLAYBACK.map((option) => `<label class="sr-playback-option"><input type="radio" name="sr-playback" value="${option.value}" ${option.value === current ? 'checked' : ''}><span><strong>${esc(option.label)}</strong><small>${esc(option.help)}</small></span></label>`).join('');
+    const modal = this.modal(`<h2>Flow settings</h2><p class="sr-modal-lead">How viewers experience this flow.</p><div class="sr-fields"><label class="sr-field wide"><span>Flow name</span><input data-flow-name value="${esc(this.draft.name)}"></label><fieldset class="sr-playback"><legend>How viewers play it</legend>${options}</fieldset>${this.fieldHtml({ ...dwell, label: 'Pause between scenes (ms)' }, this.draft.defaults?.dwellMs ?? '')}</div><p class="sr-modal-note">${icon('shield')} While a tour plays, viewers can't click the app by accident, and anything the tour changed is put back when it ends.</p><div class="sr-modal-actions"><button data-cancel>Cancel</button><button data-apply class="sr-primary">Save</button></div>`);
+    modal.querySelector('[data-cancel]').onclick = () => modal.remove();
+    modal.querySelector('[data-apply]').onclick = () => {
+      const name = modal.querySelector('[data-flow-name]').value.trim(); if (!name) return this.toast('Give this flow a name');
+      const advance = modal.querySelector('input[name="sr-playback"]:checked')?.value ?? current;
+      const dwellInput = modal.querySelector(`[data-key="${dwell.key}"]`).value; const dwellMs = dwellInput === '' ? undefined : Number(dwellInput);
+      if (dwellMs !== undefined && (!Number.isFinite(dwellMs) || dwellMs < dwell.min || dwellMs > dwell.max)) return this.toast(`Pause between scenes must be ${dwell.min}–${dwell.max} ms`);
+      this.ensureEditable(); this.draft.name = name; this.draft.defaults = { ...(this.draft.defaults || {}), advance, dwellMs }; this.markDirty(); modal.remove(); this.render();
+    };
   }
   /* Flow-level {{variable}} declarations. v1 edits the JSON map directly (the field system has no
      repeatable-row type); names are validated so a typo can't silently never resolve. */
@@ -99,7 +127,7 @@ class Studio {
   renderEditor() {
     const scene = this.scene(); if (!scene) { this.view = 'scenes'; return this.render(); }
     if (!this.editorPhase) this.editorPhase = scene.actions.length ? 'review' : 'ready';
-    this.body.innerHTML = `<section class="sr-page sr-editor-page" data-editor-phase="${this.editorPhase}"><div class="sr-page-title sr-editor-title"><div><button class="sr-back sr-back-labelled" data-back aria-label="Back to scenes">${icon('left')} Back to scenes</button><div><h1>${esc(scene.title)}</h1><p>${esc(this.draft.name)} · ${esc(scene.route)}</p><p class="sr-picker-banner" hidden></p></div></div><div class="sr-toolbar" data-editor-controls></div></div><div class="sr-editor-grid"><section class="sr-preview-panel"><div class="sr-preview-tools"><strong>Product preview</strong><input readonly value="${esc(scene.route)}"><button data-reload aria-label="Reload preview" title="Reload preview">${icon('rotate')} Reload preview</button><small class="sr-gesture-hint"><kbd>Ctrl</kbd> preview target · <kbd>⌘/Ctrl</kbd>+click highlight · <kbd>Alt</kbd>+click spotlight</small></div><div class="sr-preview-frame-wrap"><iframe class="sr-preview-frame" src="${esc(this.previewRoute(scene.route))}" title="Scene preview"></iframe></div></section><aside class="sr-timeline"><div class="sr-timeline-head" data-timeline-head></div><div class="sr-actions"></div></aside></div></section>`;
+    this.body.innerHTML = `<section class="sr-page sr-editor-page" data-editor-phase="${this.editorPhase}"><div class="sr-page-title sr-editor-title"><div><button class="sr-back sr-back-labelled" data-back aria-label="Back to scenes">${icon('left')} Back to scenes</button><div><h1>${esc(scene.title)}</h1><p>${esc(this.draft.name)} · ${esc(scene.route)}</p><p class="sr-picker-banner" hidden></p></div></div><div class="sr-toolbar" data-editor-controls></div></div><div class="sr-editor-grid"><section class="sr-preview-panel"><div class="sr-preview-tools"><strong>Product preview</strong><input readonly value="${esc(scene.route)}"><button data-reload aria-label="Reload preview" title="Reload preview">${icon('rotate')} Reload preview</button><small class="sr-gesture-hint">${this.gestureKeys().hint}</small></div><div class="sr-preview-frame-wrap"><iframe class="sr-preview-frame" src="${esc(this.previewRoute(scene.route))}" title="Scene preview"></iframe></div></section><aside class="sr-timeline"><div class="sr-timeline-head" data-timeline-head></div><div class="sr-actions"></div></aside></div></section>`;
     this.frame = this.body.querySelector('.sr-preview-frame'); this.body.querySelector('[data-back]').onclick = () => this.leaveEditor(); this.body.querySelector('[data-reload]').onclick = () => { this.frame.src = this.previewRoute(scene.route); };
     this.frame.addEventListener('load', () => this.armGestures());
     this.armGestures();
@@ -110,9 +138,9 @@ class Studio {
     const page = this.body?.querySelector('[data-editor-phase]'); const controls = this.body?.querySelector('[data-editor-controls]'); const head = this.body?.querySelector('[data-timeline-head]');
     if (!page || !controls || !head) return;
     page.dataset.editorPhase = this.editorPhase;
-    if (this.editorPhase === 'ready') controls.innerHTML = `<button data-record class="sr-primary sr-record">${icon('record')} Start recording</button><button data-add-action>${icon('plus')} Add manually</button><button data-settings>${icon('sliders')} Settings</button><button data-finish>${icon('check')} Finish scene</button>`;
+    if (this.editorPhase === 'ready') controls.innerHTML = `<button data-record class="sr-primary sr-record">${icon('record')} Start recording</button><button data-add-card>${icon('notes')} Info card</button><button data-add-action>${icon('plus')} Add manually</button><button data-settings>${icon('sliders')} Settings</button><button data-finish>${icon('check')} Finish scene</button>`;
     else if (this.editorPhase === 'recording') controls.innerHTML = `<span class="sr-recording-status"><span></span><strong data-recording-time>Recording · 00:00</strong><small data-recording-count></small></span><button data-undo-recording>${icon('rotate')} Undo last</button><button data-stop-recording class="sr-primary">${icon('check')} Stop &amp; review</button>`;
-    else controls.innerHTML = `<button data-record class="sr-record">${icon('record')} Record more</button><button data-play-scene aria-pressed="false">${icon('play')} <span data-play-label>Play scene</span></button><button data-settings>${icon('sliders')} Settings</button><button data-notes-edit>${icon('notes')} Notes</button><button data-voice-edit>${icon('sound')} Voice</button><button data-finish class="sr-primary">${icon('check')} Finish scene</button>`;
+    else controls.innerHTML = `<button data-record class="sr-record">${icon('record')} Record more</button><button data-add-card>${icon('notes')} Info card</button><span class="sr-segmented" role="group" aria-label="Preview as">${PREVIEW_MODES.map((mode) => `<button data-preview-mode="${mode.value}" aria-pressed="${String(this.previewMode() === mode.value)}">${mode.label}</button>`).join('')}</span><button data-play-scene aria-pressed="false">${icon('play')} <span data-play-label>Play scene</span></button><button data-settings>${icon('sliders')} Settings</button><button data-notes-edit>${icon('notes')} Notes</button><button data-voice-edit>${icon('sound')} Voice</button><button data-finish class="sr-primary">${icon('check')} Finish scene</button>`;
     const scene = this.scene(); const count = scene?.actions.length || 0;
     if (this.editorPhase === 'ready') head.innerHTML = `<div><strong>Record the scene by using your product</strong><span>Normal interactions are captured automatically</span></div>`;
     else if (this.editorPhase === 'recording') head.innerHTML = `<div><strong>Capturing actions</strong><span data-action-count>${count} actions · editing is locked until review</span></div>`;
@@ -126,6 +154,8 @@ class Studio {
     controls.querySelector('[data-voice-edit]')?.addEventListener('click', () => this.openNarration());
     controls.querySelector('[data-finish]')?.addEventListener('click', () => this.finishScene());
     controls.querySelector('[data-add-action]')?.addEventListener('click', () => this.openCatalog());
+    controls.querySelector('[data-add-card]')?.addEventListener('click', () => this.addInfoCard());
+    controls.querySelectorAll('[data-preview-mode]').forEach((button) => button.addEventListener('click', () => { this.previewModeChoice = button.dataset.previewMode; this.updateEditorChrome(); }));
     head.querySelector('[data-add-action]')?.addEventListener('click', () => this.openCatalog());
     this.renderActionList(); this.updateRecordingStatus();
   }
@@ -134,7 +164,7 @@ class Studio {
     const list = this.body?.querySelector('.sr-actions'); const scene = this.scene(); if (!list || !scene) return;
     if (!scene.actions.length) {
       list.innerHTML = this.editorPhase === 'ready'
-        ? `<div class="sr-record-ready"><span class="sr-ready-icon">${icon('record', 22)}</span><h2>Press Start recording, then use your app</h2><p>Clicks, typing, form controls, scrolling, and navigation become actions. Your product remains fully interactive.</p><dl><div><dt><kbd>Ctrl</kbd></dt><dd>Preview the element under your cursor</dd></div><div><dt><kbd>⌘/Ctrl</kbd> + click</dt><dd>Add a highlight without clicking the app</dd></div><div><dt><kbd>Alt</kbd> + click</dt><dd>Add a spotlight</dd></div></dl><button data-ready-record class="sr-primary">${icon('record')} Start recording</button><button data-ready-add>${icon('plus')} Add an action manually</button></div>`
+        ? `<div class="sr-record-ready"><span class="sr-ready-icon">${icon('record', 22)}</span><h2>Press Start recording, then use your app</h2><p>Clicks, typing, form controls, scrolling, and navigation become actions. Your product remains fully interactive.</p><dl>${this.gestureKeys().rows.map(([keys, what]) => `<div><dt>${keys}</dt><dd>${what}</dd></div>`).join('')}</dl><button data-ready-record class="sr-primary">${icon('record')} Start recording</button><button data-ready-add>${icon('plus')} Add an action manually</button></div>`
         : `<div class="sr-empty"><strong>No actions captured yet.</strong><p>Record more or add an action manually.</p></div>`;
       list.querySelector('[data-ready-record]')?.addEventListener('click', () => this.toggleRecording());
       list.querySelector('[data-ready-add]')?.addEventListener('click', () => this.openCatalog());
@@ -273,7 +303,9 @@ class Studio {
   }
   /* Every action row is bound here — the full render() and the recorder's incremental append both
      go through it — so drag-reorder lives here rather than in the render template. */
-  bindActionRow(row) { const index = Number(row.dataset.actionIndex); row.querySelector('[data-action-voice]').onclick = () => this.editActionNarration(index); row.querySelector('[data-action-edit]').onclick = () => this.editAction(index); row.querySelector('[data-action-up]').onclick = () => this.moveAction(index, index - 1); row.querySelector('[data-action-down]').onclick = () => this.moveAction(index, index + 1); row.querySelector('[data-action-insert]').onclick = () => this.openCatalog(index + 1); row.querySelector('[data-action-delete]').onclick = () => { this.ensureEditable(); this.scene().actions.splice(index, 1); this.markDirty(); this.renderActionList(); this.updateActionCount(); };
+  bindActionRow(row) { const index = Number(row.dataset.actionIndex); this.bindCardEditor(row, index);
+    row.querySelector('[data-cleanup-add]')?.addEventListener('click', () => { const action = this.scene().actions[index]; this.ensureEditable(); const scene = this.scene(); scene.cleanup = [...(scene.cleanup || []), { id: window.ScreenReelStore.makeId('action'), type: 'click', definitionId: 'click', selector: action.selector, ...(action.index != null ? { index: action.index } : {}) }]; this.markDirty(); this.renderActionList(); });
+    row.querySelector('[data-cleanup-remove]')?.addEventListener('click', (event) => { this.ensureEditable(); this.scene().cleanup.splice(Number(event.currentTarget.dataset.cleanupRemove), 1); this.markDirty(); this.renderActionList(); }); row.querySelector('[data-action-voice]').onclick = () => this.editActionNarration(index); row.querySelector('[data-action-edit]').onclick = () => this.editAction(index); row.querySelector('[data-action-up]').onclick = () => this.moveAction(index, index - 1); row.querySelector('[data-action-down]').onclick = () => this.moveAction(index, index + 1); row.querySelector('[data-action-insert]').onclick = () => this.openCatalog(index + 1); row.querySelector('[data-action-delete]').onclick = () => { this.ensureEditable(); this.scene().actions.splice(index, 1); this.markDirty(); this.renderActionList(); this.updateActionCount(); };
     row.ondragstart = () => { this.actionDragIndex = index; row.classList.add('dragging'); }; row.ondragend = () => row.classList.remove('dragging'); row.ondragover = (event) => event.preventDefault(); row.ondrop = () => this.moveAction(this.actionDragIndex, index);
   }
   /* Hold ⌘/Ctrl (highlight) or Alt (spotlight) over the preview and a box follows the pointer
@@ -296,8 +328,8 @@ class Studio {
       onCommit: ({ annotation, selector, fingerprint }) => {
         this.ensureEditable(); // safe mid-take: it does not render()
         if (this.recorder?.active) this.recorder.annotate({ annotation, selector, fingerprint });
-        else { this.editorPhase = 'review'; this.applyRecordedOp({ op: 'append', action: { type: annotation, definitionId: annotation, selector, fingerprint, ...clone(window.ScreenReelCore.getDefinition(annotation)?.defaults || {}) } }); this.updateEditorChrome(); }
-        this.toast(`Added ${annotation} · ${selector}`);
+        else { this.editorPhase = 'review'; this.applyRecordedOp({ op: 'append', action: { type: annotation, definitionId: annotation, selector, fingerprint, ...clone(window.ScreenReelCore.getDefinition(annotation)?.defaults || {}), ...cardFieldsFor(annotation, fingerprint) } }); this.updateEditorChrome(); }
+        this.toast(`Added ${window.ScreenReelCore.getDefinition(annotation)?.label.toLowerCase() || annotation} · ${selector}`);
       },
       onReject: (message) => this.toast(message),
     });
@@ -318,7 +350,7 @@ class Studio {
     if (this.store.recordPrimerSeen()) this.startRecording(); else this.openRecordPrimer();
   }
   openRecordPrimer() {
-    const modal = this.modal(`<h2>What recording captures</h2><ul class="sr-primer-list"><li>Every click on a button, link, or control.</li><li>A burst of typing becomes <strong>one</strong> <code>type</code> action, at the speed you actually typed.</li><li>Selects, checkboxes, and sliders become <code>set</code>, <code>toggle</code>, and <code>lever</code>.</li><li>A scroll becomes <strong>one</strong> <code>scroll</code> per burst, as a percentage of the viewport.</li><li>Pauses become <code>afterMs</code> on the previous action, so replay keeps your rhythm.</li><li>A click that navigates becomes <code>goto</code>, and recording continues on the new page.</li><li>Password fields are never recorded — nor is anything your app dispatches itself.</li></ul><p class="sr-primer-keys">While recording: ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops.</p><label class="sr-primer-soon"><input type="checkbox" data-record-voice disabled> Record my narration while I go<em>Coming soon</em></label><div class="sr-modal-actions"><label class="sr-primer-skip"><input type="checkbox" data-record-skip> Don’t show this again</label><button data-cancel>Cancel</button><button data-record-start class="sr-primary">${icon('record')} Start recording</button></div>`);
+    const modal = this.modal(`<h2>What recording captures</h2><ul class="sr-primer-list"><li>Every click on a button, link, or control.</li><li>A burst of typing becomes <strong>one</strong> <code>type</code> action, at the speed you actually typed.</li><li>Selects, checkboxes, and sliders become <code>set</code>, <code>toggle</code>, and <code>lever</code>.</li><li>A scroll becomes <strong>one</strong> <code>scroll</code> per burst, as a percentage of the viewport.</li><li>Pauses become <code>afterMs</code> on the previous action, so replay keeps your rhythm.</li><li>A click that navigates becomes <code>goto</code>, and recording continues on the new page.</li><li>Hold <kbd>⇧</kbd> with the capture key and click an element to add an <strong>info card</strong> there: the step a guided viewer reads before clicking Next.</li><li>Password fields are never recorded — nor is anything your app dispatches itself.</li></ul><p class="sr-primer-keys">While recording: ⌘/Ctrl+click highlights · Alt+click spotlights · Esc stops.</p><label class="sr-primer-soon"><input type="checkbox" data-record-voice disabled> Record my narration while I go<em>Coming soon</em></label><div class="sr-modal-actions"><label class="sr-primer-skip"><input type="checkbox" data-record-skip> Don’t show this again</label><button data-cancel>Cancel</button><button data-record-start class="sr-primary">${icon('record')} Start recording</button></div>`);
     modal.querySelector('[data-cancel]').onclick = () => modal.remove();
     modal.querySelector('[data-record-start]').onclick = () => {
       if (modal.querySelector('[data-record-skip]').checked) this.store.setRecordPrimerSeen(true);
@@ -389,15 +421,87 @@ class Studio {
     catch (error) { this.autosaveError = error; this.setSaveStatus('Draft not saved', 'error'); console.error('ScreenReel draft autosave failed', error); return false; }
   }
   flushAutosave() { return this.persistDraft(); }
-  actionRow(action, index, { readonly = false } = {}) { const definition = window.ScreenReelCore.definitionForAction(action); const hasLine = !!String(action.narration || '').trim(); const voice = hasLine ? `<span class="sr-action-voice" title="Has narration">${icon('sound', 13)}</span>` : ''; const waitMs = Math.max(0, Number(action.afterMs) || 0); const wait = waitMs ? `<span class="sr-action-wait" data-action-wait>${icon('clock', 12)} Wait after · ${this.formatPlaybackTime(waitMs)}</span>` : ''; const buttons = readonly ? '<span class="sr-captured">Captured</span>' : `<div class="sr-action-btns"><button data-action-voice class="${hasLine ? 'has-line' : ''}" title="Voiceover" aria-label="Voiceover">${icon('sound')}</button><button data-action-edit title="Settings" aria-label="Settings">${icon('sliders')}</button><button data-action-up title="Move up" aria-label="Move up">${icon('up')}</button><button data-action-down title="Move down" aria-label="Move down">${icon('down')}</button><button data-action-insert title="Insert after" aria-label="Insert action after">${icon('plus')}</button><button data-action-delete class="sr-danger" title="Remove action" aria-label="Remove">${icon('close')}</button></div>`; return `<article class="sr-action ${this.failedAction === index ? 'failed' : ''}" draggable="${readonly ? 'false' : 'true'}" data-action-index="${index}" aria-current="false"><span class="sr-action-index">${index + 1}</span><span class="sr-action-ico">${icon(ACTION_ICONS[action.type] || 'spark')}</span><div class="sr-action-body"><strong>${esc(definition?.label || action.type)}</strong><small>${voice}${esc(action.selector || action.url || action.fn || `${action.ms || ''} ms`)}</small><div class="sr-action-playback"><span data-action-status></span>${wait}</div></div>${buttons}</article>`; }
+  actionRow(action, index, { readonly = false } = {}) { const definition = window.ScreenReelCore.definitionForAction(action); const hasLine = !!String(action.narration || '').trim(); const voice = hasLine ? `<span class="sr-action-voice" title="Has narration">${icon('sound', 13)}</span>` : ''; const waitMs = Math.max(0, Number(action.afterMs) || 0); const wait = waitMs ? `<span class="sr-action-wait" data-action-wait>${icon('clock', 12)} Wait after · ${this.formatPlaybackTime(waitMs)}</span>` : ''; const buttons = readonly ? '<span class="sr-captured">Captured</span>' : `<div class="sr-action-btns"><button data-action-voice class="${hasLine ? 'has-line' : ''}" title="Voiceover" aria-label="Voiceover">${icon('sound')}</button><button data-action-edit title="Settings" aria-label="Settings">${icon('sliders')}</button><button data-action-up title="Move up" aria-label="Move up">${icon('up')}</button><button data-action-down title="Move down" aria-label="Move down">${icon('down')}</button><button data-action-insert title="Insert after" aria-label="Insert action after">${icon('plus')}</button><button data-action-delete class="sr-danger" title="Remove action" aria-label="Remove">${icon('close')}</button></div>`; return `<article class="sr-action ${this.failedAction === index ? 'failed' : ''}" draggable="${readonly ? 'false' : 'true'}" data-action-index="${index}" aria-current="false"><span class="sr-action-index">${index + 1}</span><span class="sr-action-ico">${icon(ACTION_ICONS[action.type] || 'spark')}</span><div class="sr-action-body"><strong>${esc(definition?.label || action.type)}</strong><small>${voice}${esc(action.selector || action.url || action.fn || `${action.ms || ''} ms`)}</small><div class="sr-action-playback"><span data-action-status></span>${wait}</div>${this.cleanupBadge(action, index, readonly)}${window.ScreenReelCore.isGuidedStep(action) ? this.cardEditorHtml(action, index, readonly) : ''}</div>${buttons}</article>`; }
+  /* The capture keys, spelled for this platform. On macOS Ctrl only previews and ⌘ captures; on
+     Windows/Linux Ctrl captures. Shift added to the capture key makes an info card. */
+  gestureKeys() {
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || ''); const capture = mac ? '⌘' : 'Ctrl';
+    const gestures = [
+      ...(mac ? [{ keys: '<kbd>Ctrl</kbd>', short: 'preview target', long: 'Preview the element under your cursor' }] : []),
+      { keys: `<kbd>${capture}</kbd>+click`, short: 'highlight', long: 'Add a highlight without clicking the app' },
+      { keys: `<kbd>⇧${capture}</kbd>+click`, short: 'info card', long: 'Add an info card: a guided viewer reads it, then clicks Next' },
+      { keys: '<kbd>Alt</kbd>+click', short: 'spotlight', long: 'Add a spotlight' },
+    ];
+    return { rows: gestures.map((gesture) => [gesture.keys, gesture.long]), hint: gestures.map((gesture) => `${gesture.keys} ${gesture.short}`).join(' · ') };
+  }
+  previewMode() { return this.previewModeChoice || (flowPlayback(this.draft) === 'auto' ? 'auto' : 'guided'); }
+  previewCardControls(index, onNext) {
+    const { step, total } = window.ScreenReelCore.infoCardStep(this.draft.scenes.filter((item) => item.enabled !== false), this.sceneId, index);
+    return { labels: { ...PREVIEW_CARD_LABELS, next: step === total ? PREVIEW_CARD_LABELS.finish : PREVIEW_CARD_LABELS.next }, step: `${step} of ${total}`, onSkip: onNext, onBack: step > 1 ? () => {} : null, onNext: onNext || (() => {}) };
+  }
+  /* Cleanup is automatic, so the timeline says what will happen instead of asking for anything:
+     controls are put back by themselves, a toggle-style click is undone by its own later click,
+     and only a click with nothing to undo it gets a quiet "Add undo". */
+  cleanupBadge(action, index, readonly) {
+    const core = window.ScreenReelCore; const scene = this.scene(); const type = core.actionType(action);
+    if (['type', 'set', 'toggle', 'lever'].includes(type)) return `<span class="sr-cleanup-badge">↺ Put back automatically</span>`;
+    if (type !== 'click') return '';
+    const pair = core.pairedUndo(scene.actions, index);
+    if (pair >= 0) return `<span class="sr-cleanup-badge">↺ Undone by action ${pair + 1}</span>`;
+    if (scene.actions.some((other, otherIndex) => otherIndex < index && core.pairedUndo(scene.actions, otherIndex) === index)) return '';
+    if (core.actionType(scene.actions[index + 1]) === 'goto') return '';
+    const undo = (scene.cleanup || []).findIndex((other) => core.actionType(other) === 'click' && other.selector === action.selector);
+    if (undo >= 0) return `<span class="sr-cleanup-badge">↺ Clicked again when the scene ends ${readonly ? '' : `<button data-cleanup-remove="${undo}">Remove</button>`}</span>`;
+    return `<span class="sr-cleanup-badge is-open">May stay changed after the tour ${readonly ? '' : '<button data-cleanup-add>Add undo</button>'}</span>`;
+  }
+  /* An info card is words, so its words are edited right on its row; the modal keeps the rest. */
+  cardEditorHtml(action, index, readonly) {
+    const { step, total } = window.ScreenReelCore.infoCardStep(this.draft.scenes.filter((item) => item.enabled !== false), this.sceneId, index);
+    const needsText = !String(action.text || '').trim();
+    const meta = `<span class="sr-card-meta"><span class="sr-card-step">${step ? `Step ${step} of ${total}` : 'Scene disabled'}</span><span data-card-time>Autoplay · ${this.formatPlaybackTime(window.ScreenReelCore.cardHoldMs(action))}</span>${needsText ? '<span class="sr-card-needs" data-card-needs>Needs text</span>' : ''}</span>`;
+    if (readonly) return `<div class="sr-card-edit">${meta}</div>`;
+    return `<div class="sr-card-edit" data-card-edit><input data-card-title value="${esc(action.title || '')}" placeholder="Card title" aria-label="Card title"><textarea data-card-text rows="2" placeholder="What should the viewer notice here?" aria-label="Card text">${esc(action.text || '')}</textarea>${meta}</div>`;
+  }
+  bindCardEditor(row, index) {
+    const editor = row.querySelector('[data-card-edit]'); if (!editor) return;
+    const action = () => this.scene().actions[index];
+    const refreshMeta = () => {
+      editor.querySelector('[data-card-time]').textContent = `Autoplay · ${this.formatPlaybackTime(window.ScreenReelCore.cardHoldMs(action()))}`;
+      const empty = !String(action().text || '').trim(); let badge = editor.querySelector('[data-card-needs]');
+      if (empty && !badge) { badge = document.createElement('span'); badge.className = 'sr-card-needs'; badge.dataset.cardNeeds = ''; badge.textContent = 'Needs text'; editor.querySelector('.sr-card-meta').appendChild(badge); }
+      if (!empty) badge?.remove();
+    };
+    // Typing edits the draft in place and autosaves, without re-rendering (and so reloading) the preview.
+    const bind = (selector, key) => { const input = editor.querySelector(selector); input.addEventListener('input', () => { this.ensureEditable(); action()[key] = input.value; this.markDirty(); refreshMeta(); this.previewCard(index); }); input.addEventListener('focus', () => this.previewCard(index)); input.addEventListener('blur', () => this.releaseCardPreview()); input.addEventListener('pointerdown', (event) => event.stopPropagation()); };
+    bind('[data-card-title]', 'title'); bind('[data-card-text]', 'text');
+    editor.querySelectorAll('input,textarea').forEach((field) => { field.draggable = false; field.addEventListener('dragstart', (event) => { event.preventDefault(); event.stopPropagation(); }); });
+  }
+  /* While a card's words are being edited, the card itself sits on its target in the preview, so
+     the author judges wording and placement the way a viewer will see them. */
+  previewCard(index) {
+    const doc = this.frame?.contentDocument; const win = this.frame?.contentWindow; const action = this.scene()?.actions[index];
+    if (!doc || !action || this.scenePlayback) return;
+    this.releaseCardPreview();
+    window.ScreenReelCore.runAction({ ...action, afterMs: 0, narration: undefined }, { document: doc, window: win, persist: true, skipHold: true, retain: (release) => { this.cardPreviewRelease = release; }, calloutControls: this.previewCardControls(index), variables: window.ScreenReelCore.variableDefaults(this.draft?.variables), warn: () => {} });
+  }
+  releaseCardPreview() { const release = this.cardPreviewRelease; this.cardPreviewRelease = null; release?.(); }
+  /* One click from the toolbar to a card on a picked element, titled from that element's text. */
+  addInfoCard(insertIndex = this.scene()?.actions.length || 0) {
+    if (this.editorPhase === 'recording') return this.toast('Use ⇧ + the capture key to add a card while recording');
+    const definition = window.ScreenReelCore.getDefinition('callout');
+    this.startPicker(definition.picker, (selection) => {
+      this.addActions([{ type: definition.type, definitionId: definition.id, ...clone(definition.defaults), ...selection, ...cardFieldsFor('callout', selection.fingerprint) }], insertIndex);
+      requestAnimationFrame(() => this.body?.querySelector(`[data-action-index="${insertIndex}"] [data-card-text]`)?.focus());
+    });
+  }
   formatPlaybackTime(ms) { const seconds = Math.max(0, Number(ms) || 0) / 1000; return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`; }
   moveAction(from, to) { if (from == null || from === to || to < 0 || to >= this.scene().actions.length) return; this.ensureEditable(); const [action] = this.scene().actions.splice(from, 1); this.scene().actions.splice(to, 0, action); this.markDirty(); this.renderActionList(); }
   openCatalog(insertIndex = this.scene()?.actions.length || 0) {
     if (this.editorPhase === 'recording') return this.toast('Stop recording before editing the sequence');
-    const categoryLabels = { Emphasis: 'Emphasize', Interaction: 'Interact', Viewport: 'Move the view', Timing: 'Control playback', Navigation: 'Navigate', Advanced: 'Advanced' };
+    const categoryLabels = { Explain: 'Explain', Emphasis: 'Emphasize', Interaction: 'Interact', Viewport: 'Move the view', Timing: 'Control playback', Navigation: 'Navigate', Advanced: 'Advanced' };
     const categories = [...new Set(window.ScreenReelCore.definitions.map((item) => item.category))]; const modal = this.modal(`<h2>Add action</h2><p class="sr-modal-lead">Use recording for normal product interactions. Add actions here when timing, narration, branching, or a precise visual treatment needs author intent.</p><div class="sr-field"><label>Search actions</label><input data-search placeholder="Highlight, wait, choice…"></div><div class="sr-catalog">${categories.flatMap((category) => window.ScreenReelCore.definitions.filter((item) => item.category === category).map((item) => `<button data-definition="${item.id}"><strong>${esc(item.label)}</strong><span>${esc(categoryLabels[category] || category)} · ${esc(item.picker === 'none' ? 'no target needed' : 'pick in preview')}</span></button>`)).join('')}</div><h2>Suggested sequences</h2><div class="sr-catalog">${window.ScreenReelCore.recipes.map((item) => `<button data-recipe="${item.id}"><strong>${esc(item.label)}</strong><span>Inserts editable actions as one useful pattern</span></button>`).join('')}</div>`);
     const filter = () => modal.querySelectorAll('.sr-catalog button').forEach((button) => button.hidden = !button.textContent.toLowerCase().includes(modal.querySelector('[data-search]').value.toLowerCase())); modal.querySelector('[data-search]').oninput = filter;
-    modal.querySelectorAll('[data-definition]').forEach((button) => button.onclick = () => { const definition = window.ScreenReelCore.getDefinition(button.dataset.definition); modal.remove(); const action = { id: window.ScreenReelStore.makeId('action'), type: definition.type, definitionId: definition.id, ...clone(definition.defaults) }; definition.picker === 'none' ? this.addActions([action], insertIndex) : this.startPicker(definition.picker, (selection) => this.addActions([{ ...action, ...selection }], insertIndex)); });
+    modal.querySelectorAll('[data-definition]').forEach((button) => button.onclick = () => { const definition = window.ScreenReelCore.getDefinition(button.dataset.definition); modal.remove(); const action = { id: window.ScreenReelStore.makeId('action'), type: definition.type, definitionId: definition.id, ...clone(definition.defaults) }; definition.picker === 'none' ? this.addActions([action], insertIndex) : this.startPicker(definition.picker, (selection) => this.addActions([{ ...action, ...selection, ...cardFieldsFor(definition.id, selection.fingerprint) }], insertIndex)); });
     modal.querySelectorAll('[data-recipe]').forEach((button) => button.onclick = () => { const recipe = window.ScreenReelCore.recipes.find((item) => item.id === button.dataset.recipe); modal.remove(); recipe.picker === 'none' ? this.addActions(recipe.build({}), insertIndex) : this.startPicker(recipe.picker, (selection) => this.addActions(recipe.build(selection), insertIndex)); });
   }
   addActions(actions, insertIndex = this.scene().actions.length) { this.ensureEditable(); const normalized = actions.map((action) => ({ id: window.ScreenReelStore.makeId('action'), ...action })); this.scene().actions.splice(insertIndex, 0, ...normalized); this.editorPhase = 'review'; this.markDirty(); this.updateEditorChrome(); }
@@ -493,7 +597,7 @@ class Studio {
       row.classList.toggle('is-running', active); row.classList.toggle('is-complete', complete); row.setAttribute('aria-current', active ? 'step' : 'false');
       row.setAttribute('draggable', 'false');
       const status = row.querySelector('[data-action-status]'); const wait = row.querySelector('[data-action-wait]');
-      if (status) status.textContent = active ? (phase === 'wait' ? 'Action done' : 'Running now') : complete ? 'Done' : '';
+      if (status) status.textContent = active ? (phase === 'wait' ? 'Action done' : phase === 'step' ? 'Waiting for Next in the preview' : 'Running now') : complete ? 'Done' : '';
       if (wait && active && phase === 'wait') wait.innerHTML = `${icon('clock', 12)} Waiting · ${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
       else if (wait) { const action = this.scene()?.actions[rowIndex]; wait.innerHTML = `${icon('clock', 12)} Wait after · ${this.formatPlaybackTime(action?.afterMs)}`; }
       row.querySelectorAll('button').forEach((control) => { control.disabled = true; });
@@ -535,8 +639,13 @@ class Studio {
     for (let index = 0; index < scene.actions.length; index++) {
       if (controller.signal.aborted) return;
       const action = scene.actions[index]; const actionWithoutWait = { ...action }; delete actionWithoutWait.afterMs; this.updateScenePlayback({ index, phase: 'action' });
-      const result = await window.ScreenReelCore.runAction(actionWithoutWait, { document: doc, window: win, signal: controller.signal, variables: window.ScreenReelCore.variableDefaults(this.draft?.variables), narrateAction: (text) => window.__screenreelNarrator?.speak(text), navigate: (route) => { this.frame.src = this.previewRoute(route); } });
-      if (controller.signal.aborted) return;
+      const step = this.previewMode() === 'guided' && window.ScreenReelCore.isGuidedStep(action); let release = null; let next = null;
+      const advanced = step ? new Promise((resolve) => { next = resolve; controller.signal.addEventListener('abort', resolve, { once: true }); }) : null;
+      const result = await window.ScreenReelCore.runAction(actionWithoutWait, { document: doc, window: win, signal: controller.signal, variables: window.ScreenReelCore.variableDefaults(this.draft?.variables), narrateAction: (text) => window.__screenreelNarrator?.speak(text), navigate: (route) => { this.frame.src = this.previewRoute(route); },
+        // Guided preview plays a card exactly as a guided viewer gets it: it waits for Next.
+        ...(step ? { persist: true, skipHold: true, retain: (fn) => { release = fn; }, calloutControls: this.previewCardControls(index, next) } : {}) });
+      if (step && result.ok) { this.updateScenePlayback({ index, phase: 'step' }); await advanced; release?.(); }
+      if (controller.signal.aborted) { release?.(); return; }
       if (!result.ok) { this.failedAction = index; this.stopScenePlayback(); this.toast(`Action ${index + 1} failed`); this.render(); return; }
       if (action.afterMs) await this.playActionWait(action.afterMs, controller.signal, index);
       if (controller.signal.aborted) return;
