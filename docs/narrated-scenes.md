@@ -234,6 +234,25 @@ The recorder (Playwright plus a CDP screencast) does this:
    pixel every 120 ms to keep frames coming.
 7. Writes `<clip>.timing.json` with each action's planned and actual time and every camera box.
 
+### Compositing a scene
+
+`wire` writes the scene as a beat in the film's project file; the compositor turns beats into
+video. In the reference it generates an HTML page with a GSAP timeline and renders it with
+HyperFrames, then mixes and muxes the audio with ffmpeg:
+
+- **Camera keys** become zooms on the clip: fit the box with padding, cap the scale (1.4x), and
+  never zoom out past covering the frame. Moves take 0.5-0.8 s (0.65 s by default) and ease in and
+  out.
+- **Captions** appear at their word's time, and the build fails if one cannot be read in time.
+- **The logo** is pinned in a corner between a `brandIn` and a `brandOut` anchor.
+- **Music** sets where scenes end: each beat's end snaps up to the next musical beat, read from
+  the track's beat file or a fallback BPM. The bed fades in and out and is ducked under the
+  narrator with a sidechain compressor.
+- **Narration** is placed at each line's `leadS`, mixed with the music, limited, and muxed as AAC
+  onto a silent render.
+- **Per-scene builds** get their own HTML, timing and mix files, so several scenes render in
+  parallel; each render uses one HyperFrames worker.
+
 ## Timing rules
 
 `plan` checks these before anything is recorded:
@@ -260,6 +279,9 @@ The reference implementation is in the `ms-planning-brain` repository, under `ui
 | `capture/scene/record.mjs` | records one take from a plan |
 | `capture/scene/presets.mjs` | named presets |
 | `capture/real-app/lib.mjs` | the `Take` recorder: 2x CDP screencast, clock-pinned frames, drawn cursor, write blocking |
+| `scripts/build-mg2.py`, `scripts/mg2.template.html` | the compositor: beats to an HTML timeline, rendered with HyperFrames |
+| `scripts/mix_mg2.py` | narration and music mix (ducking, fades, limiter) and the AAC mux |
+| `launch/mg2.json` (`style`, `audio`, `render`) | camera, caption, logo and audio settings; render workers |
 | `.claude/skills/film-scene/SKILL.md` | the working skill for that film |
 
 Commands, run from `ui/ai-pitch-video/`:
@@ -274,13 +296,13 @@ python3 scripts/scene.py render 10 11 12 --jobs 3
 python3 scripts/scene.py all 10              # voice (if changed), record, wire, render
 ```
 
-A real-app scene also needs `--state <storageState.json>` for the login session. The compositor
-(HyperFrames, through `scripts/build-mg.py`) and the music-beat snapping belong to that film's
-project, not to this workflow.
+A real-app scene also needs `--state <storageState.json>` for the login session. The ElevenLabs
+key is read from the environment and never stored.
 
-To reuse the workflow elsewhere, copy `scene.py`'s `plan` (the resolver and the checks) and
-`record.mjs` with `lib.mjs`. The rest (TTS provider, presets, compositor, file layout) is
-project-specific.
+Only the key and the film's own content (script, scenes, presets, brand assets, music) are
+specific to that project. The TTS adapter, the compositor and the app's story mode are reusable,
+and the [proposal](proposals/narrated-scenes-feature.md) moves them into ScreenReel. Until then,
+reusing the workflow means copying the reference files above.
 
 ## Lessons learned
 
@@ -304,6 +326,8 @@ same render, and one of them is never seen on screen.
 on cue (an AI building a graph, a run finishing), give the app a story mode that prepares each frame
 and holds it until it receives a window event such as `story-step`. The scene then fires `step` on
 the word it belongs to. The app owns what each frame looks like; the scene owns when it appears.
+This is the same idea as ScreenReel itself, and the proposal makes it a ScreenReel contract rather
+than something each app invents.
 
 **Pin the clip to the take's clock.** A still page sends no screencast frames. Without back-filling
 the first frame and holding the last one to the scene's end, the clip comes out shorter than planned

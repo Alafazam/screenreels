@@ -11,9 +11,11 @@ word timestamps; everything else is placed on the scene's clock from those words
 [docs/narrated-scenes.md](../../docs/narrated-scenes.md) for the format, the pipeline and the timing
 rules before writing a spec.
 
-This is not a built-in ScreenReel command yet. The reference implementation is a project script
-(`scene.py` + `record.mjs`, listed in the doc under "Using it today"). Use the project's own copy;
-if there is none, say so and propose the smallest port before building anything.
+This is not a built-in ScreenReel command yet. The reference implementation is a set of project
+scripts: the orchestrator and recorder, the ElevenLabs voice adapter, the HyperFrames compositor,
+and the app's story mode (listed in the doc under "Using it today"). All of it is reusable; only the
+TTS key and the film's content belong to the user. Use the project's own copy; if there is none, say
+so and propose the smallest port before building anything.
 
 Use `screenreel-demo-craft` for the story and scene boundaries, and `screenreel-capture` for plain,
 un-narrated recordings.
@@ -47,6 +49,8 @@ Never commit, publish, or write to a real tenant during this loop unless the use
 - Prefer `demo` (`data-demo-id`) and `css` targets; resolve role targets before the take.
 - Prefer camera `focus` targets over hand-measured `box`es.
 - Use `continuesFrom` instead of re-creating an earlier scene's end state by hand.
+- For state the app cannot reach on cue, use its story mode: the app holds each prepared frame and
+  the scene fires `step` on the word. Do not script the state change from the recorder.
 - Set `blockWrites` for any real-app scene that could save, publish or run.
 
 ## Voice rules
