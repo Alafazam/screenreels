@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Documented the narrated-scene workflow (`docs/narrated-scenes.md`): one JSON file per scene, voice generated first with word timestamps, and actions, captions and camera keys placed on the narrator's words. Added the `screenreel-narrated-scenes` skill and a feature proposal (`docs/proposals/narrated-scenes-feature.md`). Documentation only; no runtime change.
 - Studio authors guided and autoplay tours:
   - **Flow settings** sets **How viewers play it** (`defaults.advance`: `'ask'`, the new-flow default, or `'guided'` / `'auto'`).
   - **Info cards** are first-class. Capture one with **⇧⌘/⇧Ctrl+click** or the toolbar; it's titled from its element and edited inline on its row, with a live preview card.

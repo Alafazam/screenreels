@@ -65,6 +65,7 @@ Task-oriented walkthroughs for each capability live in **[docs/](docs/README.md)
 | [Sharing and analytics](docs/sharing-and-analytics.md) | Hand over a self-playing link and see what viewers did |
 | [Branching with choices](docs/branching.md) | Let the viewer pick what they see |
 | [Pacing and the cursor](docs/pacing-and-cursor.md) | Make it calmer; change or hide the pointer |
+| [Narrated scenes](docs/narrated-scenes.md) | Time clicks, captions and camera to a narrator's words (workflow, not built in yet) |
 | [Landing demo recording worksheet](docs/landing-demo-recording-worksheet.md) | Record the deterministic six-scene marketing demo and log dogfooding findings |
 
 The sections below are the reference: formats, options, and CLI surface.
