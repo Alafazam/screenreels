@@ -223,3 +223,10 @@
 .sr-cleanup-badge{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:#15803d}
 .sr-cleanup-badge.is-open{color:#a16207}
 .sr-cleanup-badge button{padding:1px 7px;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;font-size:11px;cursor:pointer}
+/* Buttons outside the toolbars (modal footers, flow-table rows) got the browser's default look.
+   Give them the same outlined style as the toolbar buttons; .sr-primary and .sr-danger build on it. */
+.sr-studio .sr-modal-actions button,.sr-studio .sr-flow-table button{border:1px solid #d4d4d8;background:#fff;color:#3f3f46;border-radius:7px;padding:7px 14px;min-height:34px}
+.sr-studio .sr-flow-table button{padding:7px 9px}
+.sr-studio .sr-modal-actions button:hover,.sr-studio .sr-flow-table button:hover{background:#f4f4f5}
+.sr-studio .sr-danger{border-color:#fecaca!important}
+.sr-studio .sr-danger:hover{background:#fef2f2!important}
