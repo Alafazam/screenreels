@@ -107,13 +107,17 @@ class Studio {
   openFlowSettings() {
     const playback = window.ScreenReelPlayback; const config = playback.flowConfig(this.draft);
     const current = flowPlayback(this.draft); const offered = config.modes ?? playback.DEFAULT_MODES; const dwell = SCENE_TIMING_FIELDS.find((spec) => spec.key === 'dwellMs');
-    const effective = (mode, key) => config.overrides[mode]?.[key] ?? playback.PRESETS[mode][key];
+    // What the flow plays today: a flow and host with no `playback` keep the older look, so show that, not the preset.
+    const legacy = !config.modeled && !this.projector?.playback?.modeled;
+    const effective = (mode, key) => config.overrides[mode]?.[key] ?? (legacy && key in playback.LEGACY_LOOK ? playback.LEGACY_LOOK[key] : playback.PRESETS[mode][key]);
+    const playbackState = () => JSON.stringify([...modal.querySelectorAll('input[name="sr-playback"], input[name="sr-playback-offer"], [data-mode-setting]')].map((input) => (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value));
     const options = FLOW_PLAYBACK.map((option) => `<label class="sr-playback-option"><input type="radio" name="sr-playback" value="${option.value}" ${option.value === current ? 'checked' : ''}><span><strong>${esc(option.label)}</strong><small>${esc(option.help)}</small></span></label>`).join('');
     const offers = STUDIO_MODE_ORDER.map((mode) => `<label class="sr-playback-offer"><input type="checkbox" name="sr-playback-offer" value="${mode}" ${offered.includes(mode) ? 'checked' : ''}> ${esc(MODE_LABELS[mode])}</label>`).join('');
     const rows = STUDIO_MODE_ORDER.map((mode) => `<tr data-mode-row="${mode}"><th scope="row">${esc(MODE_LABELS[mode])}</th><td><select data-mode-setting="callouts" aria-label="${esc(MODE_LABELS[mode])} info cards">${playback.CALLOUT_STYLES.map((style) => `<option value="${style}" ${effective(mode, 'callouts') === style ? 'selected' : ''}>${esc(CALLOUT_STYLE_LABELS[style])}</option>`).join('')}</select></td>${STUDIO_MODE_SETTINGS.map(([key, label]) => `<td><input type="checkbox" data-mode-setting="${key}" aria-label="${esc(MODE_LABELS[mode])} ${esc(label.toLowerCase())}" ${effective(mode, key) ? 'checked' : ''}></td>`).join('')}</tr>`).join('');
     const table = `<details class="sr-playback-modes"><summary>Per-mode settings</summary><table><thead><tr><th></th><th>Info cards</th>${STUDIO_MODE_SETTINGS.map(([, label]) => `<th>${esc(label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></details>`;
     const modal = this.modal(`<h2>Flow settings</h2><p class="sr-modal-lead">How viewers experience this flow.</p><div class="sr-fields"><label class="sr-field wide"><span>Flow name</span><input data-flow-name value="${esc(this.draft.name)}"></label><fieldset class="sr-playback"><legend>How viewers play it</legend>${options}</fieldset><fieldset class="sr-playback sr-playback-offers"><legend>Modes the chooser offers</legend>${offers}</fieldset>${table}${this.fieldHtml({ ...dwell, label: 'Pause between scenes (ms)' }, this.draft.defaults?.dwellMs ?? '')}</div><p class="sr-modal-note">${icon('shield')} While a tour plays, viewers can't click the app by accident, and anything the tour changed is put back when it ends.</p><div class="sr-modal-actions"><button data-cancel>Cancel</button><button data-apply class="sr-primary">Save</button></div>`);
     modal.querySelector('[data-cancel]').onclick = () => modal.remove();
+    const initialPlayback = playbackState();
     modal.querySelector('[data-apply]').onclick = () => {
       const name = modal.querySelector('[data-flow-name]').value.trim(); if (!name) return this.toast('Give this flow a name');
       const chosen = modal.querySelector('input[name="sr-playback"]:checked')?.value ?? current;
@@ -131,7 +135,9 @@ class Studio {
         }
         if (Object.keys(override).length) next[mode] = override;
       }
-      this.ensureEditable(); this.draft.name = name; this.draft.defaults = { ...(this.draft.defaults || {}), playback: next, advance: OLDER_ADVANCE[chosen], dwellMs }; this.markDirty(); modal.remove(); this.render();
+      // A flow without `playback` keeps it that way (and its older look) unless a playback setting changed here.
+      const playbackChanged = config.modeled || playbackState() !== initialPlayback;
+      this.ensureEditable(); this.draft.name = name; this.draft.defaults = { ...(this.draft.defaults || {}), ...(playbackChanged ? { playback: next, advance: OLDER_ADVANCE[chosen] } : {}), dwellMs }; this.markDirty(); modal.remove(); this.render();
     };
   }
   /* Flow-level {{variable}} declarations. v1 edits the JSON map directly (the field system has no

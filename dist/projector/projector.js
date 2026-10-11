@@ -23,6 +23,8 @@ const DEFAULT_LABELS = {
   finished: 'Finished', endHint: (scenes) => `You have seen all ${scenes} ${scenes === 1 ? 'scene' : 'scenes'}.`, replay: 'Replay',
 };
 /* Pill controls in display order; a mode's `controls` setting picks a subset (see core/playback.js). */
+/* playback.js must load first (the loader does). Fail with the real cause, not an opaque TypeError. */
+if (!window.ScreenReelPlayback) throw new Error('ScreenReel: playback.js is not loaded. Vendor the whole dist/projector folder and load screenreel.js.');
 const PILL_CONTROLS = window.ScreenReelPlayback.PILL_CONTROLS;
 const SHARE_CONTROLS = ['count', 'play', 'sound', 'exit'];
 const GUIDED_SHARE_CONTROLS = ['count', 'prev', 'play', 'next', 'sound', 'exit'];
@@ -98,8 +100,11 @@ class Projector {
   }
   /* Every setting of the mode a scene plays in: the mode's preset with the host's and the flow's overrides. */
   settings(scene = this.current().scene, flow = this.store.activeFlow()) {
-    const playback = window.ScreenReelPlayback;
-    return playback.resolveSettings(this.playMode(scene, flow), playback.flowConfig(flow), this.playback);
+    const playback = window.ScreenReelPlayback; const mode = this.playMode(scene, flow);
+    // Called from every render, cursor and narrator lookup; the result only changes with the flow (or its edits) and the mode.
+    const key = `${flow?.id}|${flow?.updatedAt ?? ''}|${mode}`;
+    if (this.settingsCache?.key !== key) this.settingsCache = { key, value: playback.resolveSettings(mode, playback.flowConfig(flow), this.playback) };
+    return this.settingsCache.value;
   }
   labels() { return { ...DEFAULT_LABELS, ...(this.options.labels || {}) }; }
   /* With a host `functions` map, `call` resolves only through it and registerFn — never through
@@ -303,12 +308,12 @@ class Projector {
   /* A card in the chooser layer — the start and end cards. Resolves when it times out or a button
      is pressed, with that button's `data-card` value ('' for a timeout, Esc, or a click on the
      card), or null when something else took over (start() or disable()), so its caller does nothing. */
-  showCard(html, durationMs) {
+  showCard(html, durationMs, scale = window.ScreenReelCore.timeScale()) {
     const layer = this.chooserLayer; if (!layer) return Promise.resolve('');
     layer.innerHTML = html; layer.hidden = false; layer.classList.add('sr-card-layer');
     return new Promise((resolve) => {
-      const finish = (value) => { clearTimeout(timer); if (this.resolveCard === finish) this.resolveCard = null; layer.hidden = true; layer.innerHTML = ''; layer.classList.remove('sr-card-layer'); resolve(value); };
-      const timer = setTimeout(() => finish(''), durationMs * (Number(this.options.timeScale) || 1));
+      const finish = (value) => { clearTimeout(timer); if (this.resolveCard === finish) this.resolveCard = null; layer.onclick = null; layer.hidden = true; layer.innerHTML = ''; layer.classList.remove('sr-card-layer'); resolve(value); };
+      const timer = setTimeout(() => finish(''), durationMs * scale);
       this.resolveCard = finish;
       layer.onclick = (clickEvent) => { const button = clickEvent.target.closest?.('[data-card]'); finish(button ? button.dataset.card : ''); };
     });
@@ -322,9 +327,9 @@ class Projector {
   }
   /* When the flow finishes: an end card with Replay and Close. Close (or the card timing out with
      `disableOnComplete`) ends the tour with reason 'complete'. Resolves 'replay', 'close', or ''. */
-  showEndCard() {
+  showEndCard(scale) {
     const labels = this.labels(); const flow = this.store.activeFlow(); const scenes = this.current().scenes.length;
-    return this.showCard(`<div class="sr-chooser sr-end-card" role="dialog" aria-labelledby="sr-end-title"><h2 id="sr-end-title">${esc(labels.finished)}: ${esc(this.displayText(flow.name))}</h2><p>${esc(labels.endHint(scenes))}</p><div class="sr-card-actions"><button type="button" class="sr-mode" data-card="replay">${esc(labels.replay)}</button><button type="button" class="sr-mode sr-mode--primary" data-card="close">${esc(labels.close)}</button></div></div>`, END_CARD_MS);
+    return this.showCard(`<div class="sr-chooser sr-end-card" role="dialog" aria-labelledby="sr-end-title"><h2 id="sr-end-title">${esc(labels.finished)}: ${esc(this.displayText(flow.name))}</h2><p>${esc(labels.endHint(scenes))}</p><div class="sr-card-actions"><button type="button" class="sr-mode" data-card="replay">${esc(labels.replay)}</button><button type="button" class="sr-mode sr-mode--primary" data-card="close">${esc(labels.close)}</button></div></div>`, END_CARD_MS, scale);
   }
   /* Caption-style callouts (video's optional captions): the card's words with no card, for as long
      as the card would have stayed up. */
@@ -520,13 +525,16 @@ class Projector {
      `disableOnComplete`, as it always has. */
   complete() {
     const settings = this.settings(); const mode = this.playMode();
+    // Replay keeps what the viewer (or start()) picked; a configured run re-resolves, so scene `advance` still applies.
+    const picked = window.ScreenReelPlayback.modeName(this.store.advanceChoice());
+    const cardScale = settings.pace ?? (Number(this.options.timeScale) || 1); // read before restorePace() drops the mode's pace
     this.pause(); this.undoTour(); this.restorePace(); this.startCardShown = false;
     const { scene, position, scenes } = this.current(); const flowId = this.store.activeFlow().id;
     this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId, sceneId: scene?.id, position, sceneCount: scenes.length, mode });
     if (!settings.endCard) { if (this.options.disableOnComplete) this.disable('complete'); return this; }
-    this.showEndCard().then((choice) => {
+    this.showEndCard(cardScale).then((choice) => {
       if (choice === null) return null;
-      if (choice === 'replay') return this.start(flowId, { mode });
+      if (choice === 'replay') return this.start(flowId, picked ? { mode: picked } : {});
       if (choice === 'close' || this.options.disableOnComplete) this.disable('complete');
       return null;
     }).catch((error) => console.warn('[screenreel] end card failed', error));
