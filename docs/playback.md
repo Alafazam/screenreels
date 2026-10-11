@@ -13,6 +13,16 @@ ask:
 A mode is a **preset**: a named set of the lower-level settings below. A flow or a host picks a mode
 and can override any of its settings.
 
+### What each mode looks like
+
+| `video` | `autoplay` | `guided` |
+|---|---|---|
+| ![Video: progress bar and a minimal pill](images/playback/video-progress.png) | ![Autoplay: a timed info card, the labelled pill and the progress bar](images/playback/autoplay-card.png) | ![Guided: a step card with 1 of 3, Skip tour and Next](images/playback/guided-step.png) |
+
+`ask` shows a chooser with only the modes the flow offers:
+
+![The chooser offering Guided and Video](images/playback/ask-chooser.png)
+
 ## Quick examples
 
 **A video** — cursor and actions only, no cards:
@@ -170,6 +180,10 @@ Then:
 - `guided`: **Finish** on the last card.
 - `video` and `autoplay`: the end card. **Replay** starts the flow again in the same mode.
   **Close** ends the tour.
+
+| Start card | End card | Last guided card |
+|---|---|---|
+| ![Start card: flow name, mode and scene count](images/playback/video-start-card.png) | ![End card with Replay and Close](images/playback/video-end-card.png) | ![The last guided card reads Finish](images/playback/guided-finish.png) |
 - When the card times out, the tour ends only with `disableOnComplete`, as before.
 
 Each ending is an event:
@@ -245,6 +259,10 @@ In **Studio**, **Flow settings** sets:
 - per mode: how info cards play, the start card, the progress bar, and the end card.
 
 **Play scene** previews the scene as Guided, Autoplay, or Video.
+
+| Flow settings | Play scene preview modes |
+|---|---|
+| ![Studio Flow settings: default mode, offered modes, per-mode settings](images/playback/studio-flow-settings.png) | ![Studio Play scene with the Guided, Autoplay and Video switch](images/playback/studio-play-scene-modes.png) |
 
 ## Labels
 
