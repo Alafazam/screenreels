@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Added playback modes (`docs/playback.md`). A flow plays in one of three modes:
+  - **`video`:** hands-off, no info cards (or `callouts: 'caption'` for their words only).
+  - **`autoplay`:** hands-off, info cards held for their reading time.
+  - **`guided`:** the viewer presses Next on each card.
+
+  Or **`ask`** shows a chooser over the modes the flow offers. Each mode is a preset of one set of settings (`callouts`, `controls`, `controlLabels`, `progress`, `startCard`, `endCard`, `notes`, `narration`, `cursor`, `dim`, `shield`, `keys`, `pace`). They live in one pure module, `packages/core/playback.js`, which Projector, Studio, and the CLI share.
+  - **Configuration:** a flow sets `defaults.playback` (`modes`, `default`, and per-mode overrides). The mount's `playback` adds host defaults and per-mode overrides, plus `modes` (a restriction), `force`, and `remember` (the viewer's last pick per flow: `'preselect'` or `'skip'`). `start(flowId, { mode })` takes the new names and `'ask'`. One guide list can now play some guides as a video, some guided, and ask for others.
+  - **Visible start and end:** video and autoplay show a title card first, a thin "Scene N of M" progress bar, and an end card with Replay and Close (Close exits with reason `'complete'`). The pill's arrows say "Previous scene" / "Next scene" (`controlLabels` puts the words on the pill; all are in `labels`). New `screenreel:start` event; `complete` and `exit` carry the run's `mode`.
+  - **Back-compat:** `advance`, `chooser`, `controls`, `defaults.advance`, scene `advance`, and `mode: 'auto'` map onto the model, each with a one-time `console.info` hint. A run that uses only the older options looks exactly as before. Breaking for selectors only: the chooser's autoplay button is `data-choose="autoplay"` (was `"auto"`).
+  - **Validation:** `flow validate` and `flow doctor` report per-flow `playback` errors (unknown modes or settings, a default outside `modes`) and warn when a flow that can play guided has scenes with no info cards. The manifest schema and `screenreel.d.ts` describe `defaults.playback` and the mount `playback`.
+  - **Studio:** Flow settings sets the default mode, the modes the chooser offers, and per-mode settings. Play scene previews Guided, Autoplay, or Video. New flows carry `playback.default: 'ask'` beside `advance: 'ask'`.
+  - **`<screenreel-projector>`:** accepts `playback-mode="…"`.
+  - **The new runtime file `playback.js`:** hosts that vendor `dist/projector` must copy it too. The loader fetches it.
+
 - Studio authors guided and autoplay tours:
   - **Flow settings** sets **How viewers play it** (`defaults.advance`: `'ask'`, the new-flow default, or `'guided'` / `'auto'`).
   - **Info cards** are first-class. Capture one with **⇧⌘/⇧Ctrl+click** or the toolbar; it's titled from its element and edited inline on its row, with a live preview card.

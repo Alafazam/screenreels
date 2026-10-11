@@ -44,7 +44,7 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
   timeScale: 1,     // pacing multiplier for every delay in the runtime
   cursor: 'dot',    // 'dot', 'arrow', or false to hide the agent cursor
   narration: true,  // speak each scene's talking points aloud; false to disable
-  advance: 'auto',  // 'guided' waits for Next after each scene instead of the dwell timer
+  // playback: { default: 'video' }, // how flows play: 'video', 'autoplay', 'guided', or 'ask'; see docs/playback.md
   dim: 0.45,        // background dimming behind highlights and callouts; false to disable
   pages: ['/dashboard', '/reports']  // optional: routes Studio offers when picking a scene's route
 });
@@ -65,6 +65,7 @@ Task-oriented walkthroughs for each capability live in **[docs/](docs/README.md)
 | [Sharing and analytics](docs/sharing-and-analytics.md) | Hand over a self-playing link and see what viewers did |
 | [Branching with choices](docs/branching.md) | Let the viewer pick what they see |
 | [Pacing and the cursor](docs/pacing-and-cursor.md) | Make it calmer; change or hide the pointer |
+| [Playback modes](docs/playback.md) | Play a flow as a video, an autoplay with pop-ups, a guided tour, or let the viewer choose |
 | [Landing demo recording worksheet](docs/landing-demo-recording-worksheet.md) | Record the deterministic six-scene marketing demo and log dogfooding findings |
 
 The sections below are the reference: formats, options, and CLI surface.
@@ -75,7 +76,7 @@ Projector and Capture share one pointer implementation, so a live tour and a rec
 
 `timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and internal constants (countdown steps, flash pulses, reveal fades) that manifest rewriting cannot reach. Timeouts and scroll-settle limits are excluded: those are limits, not pacing. Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, `settleMs` to `flow.defaults.settleMs`.
 
-`advance: 'guided'` turns the tour into a click-through (see [Guided tours and onboarding](docs/guided-tours.md)): each finished scene waits for Next instead of its `dwellMs`. Flows can default it with `defaults.advance`; the mount option wins. The `<screenreel-projector>` element accepts `advance="guided"`.
+A flow plays in one of three modes: `video` (hands-off, no info cards), `autoplay` (hands-off, cards held for their reading time), or `guided` (the viewer presses Next on each card), or `ask` shows a chooser. Each flow picks its own in `defaults.playback`; the mount's `playback` sets defaults, per-mode settings, and limits; `start(flowId, { mode })` picks one directly. See **[Playback modes](docs/playback.md)** and [Guided tours and onboarding](docs/guided-tours.md). The older `advance` and `chooser` options still work. The `<screenreel-projector>` element accepts `playback-mode="guided"` (and the older `advance="guided"`).
 
 See [Pacing and the cursor](docs/pacing-and-cursor.md).
 
