@@ -566,6 +566,86 @@ try {
   await inlinePage.locator('.sr-choice-overlay .sr-choice-card', { hasText: 'Skip ahead' }).click();
   await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
   await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
+  // Playback modes (docs/playback.md): one host, one guide list, each flow picking how it plays.
+  // video: start card, no info cards, progress bar, end card; captions on request; autoplay: timed
+  // cards and a labelled pill; guided: "N of M" and Finish; ask: a chooser over the flow's own modes
+  // that remembers the viewer's pick.
+  const modes = await inlinePage.evaluate(async () => {
+    const spot = document.createElement('div'); spot.id = 'pm-spot'; spot.textContent = 'Spot'; spot.style.cssText = 'position:fixed;left:200px;top:200px;width:120px;height:40px'; document.body.appendChild(spot);
+    const target = document.createElement('button'); target.id = 'pm-demo'; document.body.appendChild(target);
+    const card = (text) => ({ type: 'callout', selector: '#pm-spot', title: 'Card', text, holdMs: 100 });
+    const scenes = (prefix) => [{ id: `${prefix}-1`, title: 'First', route: '/', actions: [card('One')] }, { id: `${prefix}-2`, title: 'Second', route: '/', actions: [card('Two')] }];
+    const flows = [
+      { id: 'film', name: 'Film', defaults: { dwellMs: 50, playback: { default: 'video' } }, scenes: scenes('film') },
+      { id: 'captioned', name: 'Captioned', defaults: { dwellMs: 50, playback: { default: 'video', video: { callouts: 'caption', endCard: false } } }, scenes: scenes('cap') },
+      { id: 'auto', name: 'Auto', defaults: { dwellMs: 50, playback: { default: 'autoplay' } }, scenes: scenes('auto') },
+      { id: 'steps', name: 'Steps', defaults: { dwellMs: 50, playback: { default: 'guided' } }, scenes: scenes('steps') },
+      { id: 'choose', name: 'Choose', defaults: { dwellMs: 50, playback: { default: 'ask', modes: ['video', 'guided'] } }, scenes: scenes('choose') },
+    ];
+    const projector = await window.ScreenReel.mount(target, { projectId: 'modes-example', loop: false, narration: false, cursor: false, disableOnComplete: true, timeScale: 0.25, playback: { remember: true }, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows } } });
+    const root = () => document.querySelector('#screenreel-projector-modes-example')?.shadowRoot;
+    const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
+    const until = async (check, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { const value = check(); if (value) return value; await new Promise((resolve) => setTimeout(resolve, 20)); } return null; };
+    const sawCard = () => { let seen = false; const watcher = new MutationObserver(() => { if (document.querySelector('.sr-action-callout')) seen = true; }); watcher.observe(document.body, { childList: true, subtree: true }); return () => { watcher.disconnect(); return seen; }; };
+    const result = {};
+
+    // video
+    let started = once('start'); let exited = once('exit'); let stopWatching = sawCard();
+    await projector.start('film'); result.videoStart = (await started).mode;
+    result.videoStartCard = !!(await until(() => root()?.querySelector('.sr-start-card')))?.textContent.includes('Film');
+    result.videoProgress = (await until(() => { const label = root()?.querySelector('.sr-progress:not([hidden]) .sr-progress-label')?.textContent; return label?.startsWith('Scene') && label; }));
+    result.videoPill = [...root().querySelectorAll('.sr-pill [data-cmd]')].map((button) => button.dataset.cmd);
+    const endCard = await until(() => root()?.querySelector('.sr-end-card'));
+    result.videoEnd = endCard?.textContent.includes('Finished') && !!endCard.querySelector('[data-card="replay"]');
+    endCard.querySelector('[data-card="close"]').click();
+    result.videoExit = (await exited).reason; result.videoCards = stopWatching();
+
+    // video with captions
+    exited = once('exit'); stopWatching = sawCard();
+    await projector.start('captioned');
+    result.caption = (await until(() => { const caption = root()?.querySelector('.sr-caption:not([hidden])'); return caption?.textContent; }));
+    result.captionExit = (await exited).reason; result.captionCards = stopWatching();
+
+    // autoplay
+    exited = once('exit');
+    await projector.start('auto');
+    result.autoCard = !!(await until(() => document.querySelector('.sr-action-callout')));
+    result.autoCardButtons = document.querySelectorAll('.sr-callout-actions button').length;
+    result.autoPillText = [...root().querySelectorAll('.sr-pill .sr-pill-label')].map((label) => label.textContent);
+    await until(() => root()?.querySelector('.sr-end-card'));
+    result.autoExit = (await exited).reason;
+
+    // guided
+    exited = once('exit'); let waiting = once('awaitingnext');
+    await projector.start('steps'); await waiting;
+    result.guidedStartCard = !!root().querySelector('.sr-start-card');
+    result.guidedStep = document.querySelector('.sr-callout-step')?.textContent;
+    result.guidedPillHidden = root().querySelector('.sr-pill').hidden;
+    waiting = once('awaitingnext'); document.querySelector('.sr-callout-next').click(); await waiting;
+    result.guidedLast = document.querySelector('.sr-callout-next')?.textContent;
+    document.querySelector('.sr-callout-next').click();
+    result.guidedExit = (await exited).reason;
+
+    // ask, remembered
+    projector.start('choose');
+    const chooser = await until(() => root()?.querySelector('.sr-chooser-layer:not([hidden]) .sr-chooser-options'));
+    result.offered = [...chooser.querySelectorAll('[data-choose]')].map((button) => button.dataset.choose);
+    exited = once('exit'); waiting = once('awaitingnext');
+    chooser.querySelector('[data-choose="guided"]').click(); await waiting;
+    projector.disable('user'); await exited;
+    projector.start('choose');
+    const again = await until(() => root()?.querySelector('.sr-chooser-layer:not([hidden]) .sr-mode--primary'));
+    result.preselected = again.dataset.choose;
+    projector.destroy(); spot.remove(); target.remove();
+    return result;
+  });
+  assert.deepEqual(modes, {
+    videoStart: 'video', videoStartCard: true, videoProgress: 'Scene 1 of 2 · First', videoPill: ['play', 'exit'], videoEnd: true, videoExit: 'complete', videoCards: false,
+    caption: 'CardOne', captionExit: 'complete', captionCards: false,
+    autoCard: true, autoCardButtons: 0, autoPillText: ['Previous scene', 'Next scene'], autoExit: 'complete',
+    guidedStartCard: false, guidedStep: '1 of 2', guidedPillHidden: true, guidedLast: 'Finish', guidedExit: 'complete',
+    offered: ['video', 'guided'], preselected: 'guided',
+  });
   await inlinePage.close();
   // Studio authoring of guided + autoplay tours: Flow settings ("Let viewers choose" for new flows),
   // an Info card from the toolbar titled from its element, words edited on the row and persisted,

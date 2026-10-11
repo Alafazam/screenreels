@@ -219,7 +219,7 @@ class Projector {
       exit: `<button data-cmd="exit" title="${esc(labels.exit)}" aria-label="${esc(labels.exit)}">${icon('close')}</button>`,
     };
     const controls = this.visibleControls(share, settings);
-    this.renderProgress(settings.progress && scenes.length ? { position, total: scenes.length, scene } : null);
+    this.renderProgress(settings.progress && scenes.length && !this.resolveChooser ? { position, total: scenes.length, scene } : null); // not behind the chooser: nothing has started
     this.pill.innerHTML = controls.map((name) => buttons[name]).join('');
     this.pill.hidden = !controls.length;
     this.pill.classList.toggle('sr-pill--share', share);
@@ -285,6 +285,7 @@ class Projector {
     layer.hidden = false;
     return new Promise((resolve) => {
       this.resolveChooser = (mode) => { this.resolveChooser = null; layer.hidden = true; layer.innerHTML = ''; resolve(mode); };
+      this.render();
       layer.querySelectorAll('[data-choose]').forEach((button) => { button.onclick = () => this.resolveChooser?.(button.dataset.choose || null); });
       layer.querySelector(`[data-choose="${primary}"]`).focus({ preventScroll: true });
     });
