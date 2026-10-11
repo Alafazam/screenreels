@@ -122,3 +122,10 @@ test('validation warns when guided would play a scene with no info cards', () =>
   assert.match(warn({ advance: 'guided', playback: { default: 'video' } }).find((line) => line.includes('disagrees')), /playback wins/);
   assert.deepEqual(warn({ advance: 'auto', playback: { default: 'video' } }), [], 'Studio writes autoplay as the older name for video');
 });
+
+test('the shipped example flows have valid playback config', async () => {
+  const { loadManifest, playbackReport } = await import('../lib/flow-tools.mjs');
+  for (const file of ['examples/action-showcase/screenreel.demo.json', 'examples/action-showcase/showcase.demo.json']) {
+    for (const entry of playbackReport(loadManifest(file))) assert.deepEqual(entry.errors, [], `${file} ${entry.flowId}`);
+  }
+});

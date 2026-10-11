@@ -33,7 +33,29 @@
           "type": "string"
         },
         "defaults": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "playback": {
+              "$ref": "#/$defs/playback"
+            },
+            "advance": {
+              "enum": [
+                "video",
+                "autoplay",
+                "guided",
+                "ask",
+                "auto"
+              ],
+              "description": "Older name for playback.default; still read when playback is absent."
+            },
+            "dwellMs": {
+              "type": "number"
+            },
+            "settleMs": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
         },
         "variables": {
           "type": "object",
@@ -110,6 +132,15 @@
           "type": "number",
           "minimum": 0
         },
+        "advance": {
+          "enum": [
+            "video",
+            "autoplay",
+            "guided",
+            "auto"
+          ],
+          "description": "Play this one scene in another mode, unless the viewer or start() picked one."
+        },
         "actions": {
           "type": "array",
           "items": {
@@ -118,6 +149,133 @@
         }
       },
       "additionalProperties": true
+    },
+    "playback": {
+      "type": "object",
+      "description": "How the flow plays: the modes a chooser offers, the default, and per-mode settings. See docs/playback.md.",
+      "properties": {
+        "modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "video",
+              "autoplay",
+              "guided"
+            ]
+          }
+        },
+        "default": {
+          "enum": [
+            "video",
+            "autoplay",
+            "guided",
+            "ask"
+          ]
+        },
+        "video": {
+          "$ref": "#/$defs/playbackSettings"
+        },
+        "autoplay": {
+          "$ref": "#/$defs/playbackSettings"
+        },
+        "guided": {
+          "$ref": "#/$defs/playbackSettings"
+        }
+      },
+      "additionalProperties": false
+    },
+    "playbackSettings": {
+      "type": "object",
+      "properties": {
+        "callouts": {
+          "enum": [
+            "step",
+            "timed",
+            "caption",
+            "off"
+          ],
+          "description": "How info cards play: step (wait for Next), timed (hold for reading time), caption (words only), off."
+        },
+        "controls": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "flow",
+                  "count",
+                  "prev",
+                  "play",
+                  "next",
+                  "sound",
+                  "notes",
+                  "studio",
+                  "exit"
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pill buttons, in display order. [] hides the pill; null keeps the presenter/share default."
+        },
+        "controlLabels": {
+          "type": "boolean",
+          "description": "Show \"Previous scene\" / \"Next scene\" text on the pill, not just arrows."
+        },
+        "progress": {
+          "type": "boolean",
+          "description": "A thin bar with \"Scene N of M\" while the flow plays."
+        },
+        "startCard": {
+          "type": "boolean",
+          "description": "A brief title card before the first scene."
+        },
+        "endCard": {
+          "type": "boolean",
+          "description": "An end card with Replay and Close when the flow finishes."
+        },
+        "notes": {
+          "type": "boolean",
+          "description": "Toast each action's `note`."
+        },
+        "narration": {
+          "type": "boolean",
+          "description": "Speak narration (the viewer can still mute; mount `narration: false` turns it off everywhere)."
+        },
+        "cursor": {
+          "type": "boolean",
+          "description": "Show the agent cursor."
+        },
+        "dim": {
+          "type": "boolean",
+          "description": "Dim the page behind highlights and cards."
+        },
+        "shield": {
+          "type": "boolean",
+          "description": "Block stray viewer clicks on the app while it plays."
+        },
+        "keys": {
+          "type": "boolean",
+          "description": "→/Enter next, ← back, Esc exit."
+        },
+        "pace": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Time scale for this mode (1 = authored timing, 1.5 = slower). null keeps the host's."
+        }
+      },
+      "additionalProperties": false
     },
     "action": {
       "type": "object",
