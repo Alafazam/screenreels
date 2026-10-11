@@ -184,11 +184,11 @@
   /* Every setting for one mode, lowest to highest: the preset; the pre-model look when neither the
      host nor the flow uses `playback`; the host's `playback.<mode>` (and older `controls`); the
      flow's `defaults.playback.<mode>`; then the host's hard limits (`narration: false`,
-     `cursor: false`, `shield: false`, `dim: false`). */
+     `cursor: false`, `shield: false`, `dim: false`). `legacy` says the run uses only older options. */
   function resolveSettings(mode, flow, mount) {
     const name = modeName(mode) ?? FALLBACK_MODE;
     const legacy = !flow.modeled && !mount.modeled;
-    return { mode: name, ...PRESETS[name], ...(legacy ? LEGACY_LOOK : {}), ...pick(mount.overrides[name]), ...pick(flow.overrides[name]), ...mount.limits };
+    return { mode: name, legacy, ...PRESETS[name], ...(legacy ? LEGACY_LOOK : {}), ...pick(mount.overrides[name]), ...pick(flow.overrides[name]), ...mount.limits };
   }
   /* Only known settings, so a typo in an override cannot leak into the resolved object. */
   function pick(override) { return Object.fromEntries(Object.entries(override || {}).filter(([key]) => key in FIELDS)); }

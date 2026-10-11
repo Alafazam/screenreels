@@ -8,13 +8,6 @@ const PILL_INTRO_MS = 1100;
 const VARIABLE_PARAM_PREFIX = 'srv_';
 const DEFAULT_DWELL_MS = 3000;         // rest after a scene when neither it nor its flow sets dwellMs
 const TRIGGER_ICON_PX = 18;
-/* 'auto' advances after each scene's dwell; 'guided' holds on the finished scene until the
-   viewer presses Next. */
-const ADVANCE_MODES = ['auto', 'guided'];
-/* A flow's `defaults.advance` may also be 'ask': the viewer picks Guided or Autoplay in the chooser.
-   Until they pick (or on a path that never asks, like a share link), an 'ask' flow plays auto. */
-const ASK_VIEWER = 'ask';
-const DEFAULT_ADVANCE_MODE = 'auto';
 /* Every string the guide surface shows. Hosts pass `labels` to translate any of them. */
 const DEFAULT_LABELS = {
   back: 'Back', next: 'Next', finish: 'Finish', skip: 'Skip tour', close: 'Close',
@@ -22,12 +15,32 @@ const DEFAULT_LABELS = {
   chooserHint: 'Take the tour at your pace, or sit back and watch.',
   guided: 'Guided', guidedHint: 'One step at a time. Press Next to continue.',
   autoplay: 'Autoplay', autoplayHint: 'Plays by itself. Pause anytime.',
+  video: 'Video', videoHint: 'Watch it like a video, without info cards.',
+  // The pill moves between scenes; the guided card's Next moves between steps (info cards).
+  previousScene: 'Previous scene', nextScene: 'Next scene', nextStep: 'Next step', play: 'Play', pause: 'Pause', exit: 'Exit demo mode',
+  sceneOf: (scene, total) => `Scene ${scene} of ${total}`,
+  startHint: (mode, scenes) => `${mode} · ${scenes} ${scenes === 1 ? 'scene' : 'scenes'}`,
+  finished: 'Finished', endHint: (scenes) => `You have seen all ${scenes} ${scenes === 1 ? 'scene' : 'scenes'}.`, replay: 'Replay',
 };
-/* Pill controls in display order. `controls` picks a subset (per mode, if an object). */
-const PILL_CONTROLS = ['flow', 'count', 'prev', 'play', 'next', 'sound', 'notes', 'studio', 'exit'];
+/* Pill controls in display order; a mode's `controls` setting picks a subset (see core/playback.js). */
+const PILL_CONTROLS = window.ScreenReelPlayback.PILL_CONTROLS;
 const SHARE_CONTROLS = ['count', 'play', 'sound', 'exit'];
 const GUIDED_SHARE_CONTROLS = ['count', 'prev', 'play', 'next', 'sound', 'exit'];
 const PILL_POSITIONS = ['right', 'center'];
+/* The start card (video and autoplay) and the end card stay up this long, scaled by timeScale. */
+const START_CARD_MS = 1800;
+const END_CARD_MS = 4000;
+/* Older options, each named once per page with what replaces it (docs/playback.md#migrating). */
+const DEPRECATION_HINTS = {
+  advance: "mount `advance` → `playback: { force: 'guided' | 'autoplay' }`",
+  chooser: "mount `chooser: true` → `playback: { force: 'ask' }` (or let each flow's `defaults.playback.default` decide)",
+  controls: 'mount `controls` → `playback: { guided: { controls: [...] }, autoplay: { controls: [...] } }`',
+};
+const hinted = new Set();
+function hintOnce(name) {
+  if (hinted.has(name) || !DEPRECATION_HINTS[name]) return;
+  hinted.add(name); console.info(`[screenreel] ${DEPRECATION_HINTS[name]}. The older option still works; see docs/playback.md.`);
+}
 /* Authoring controls a share-link viewer never gets, whatever `controls` says. */
 const PRESENTER_ONLY_CONTROLS = new Set(['flow', 'notes', 'studio']);
 /* The tour layer's own box: full-screen and click-through, overriding the UA popover style (a
@@ -58,27 +71,35 @@ class Projector {
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
     this.retained = []; this.stepReleases = []; this.stepWaiter = null; this.runningScene = null; this.runningSceneFinished = false; this.journal = []; this.leaving = Promise.resolve();
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
+    this.playback = window.ScreenReelPlayback.mountConfig(options);
+    window.ScreenReelPlayback.validateMountPlayback(options.playback).forEach((message) => console.warn(`[screenreel] ${message}`));
+    this.playback.deprecated.forEach(hintOnce);
   }
-  /* Precedence: the viewer's pick in the chooser (or start()'s `mode`), then the scene's own
-     `advance`, then the mount option, then the flow's `defaults.advance`. The mount option beats
-     the flow so one flow can run guided inside the product and auto on a share link. An unknown
-     value warns and falls back to auto. */
-  advanceMode(scene = this.current().scene) {
-    return this.store.advanceChoice() ?? this.configuredMode(scene);
+  /* Playback (core/playback.js, docs/playback.md). A run's mode is fixed when it starts: start()'s
+     `mode` or the viewer's chooser pick is kept for the run, so it survives page navigations.
+     Otherwise it follows the configuration — the host's `playback.force`, the flow's default, the
+     host's default, autoplay — and a scene's own `advance` can switch that one scene. */
+  playMode(scene = this.current().scene, flow = this.store.activeFlow()) {
+    const playback = window.ScreenReelPlayback;
+    const chosen = playback.modeName(this.store.advanceChoice());
+    if (chosen) return chosen;
+    if (scene?.advance != null) {
+      const own = playback.modeName(scene.advance);
+      if (own) return own;
+      console.warn(`[screenreel] Unknown scene advance "${scene.advance}"; expected ${[...playback.MODES, 'auto'].join(', ')}`);
+    }
+    return this.configuredMode(flow);
   }
-  /* The mode the flow itself asks for, ignoring the viewer's pick — what an author's Play uses. */
-  configuredMode(scene = this.current().scene, flow = this.store.activeFlow()) {
-    const mode = scene?.advance ?? this.options.advance ?? flow?.defaults?.advance ?? DEFAULT_ADVANCE_MODE;
-    if (mode === ASK_VIEWER) return DEFAULT_ADVANCE_MODE;
-    if (ADVANCE_MODES.includes(mode)) return mode;
-    console.warn(`[screenreel] Unknown advance mode "${mode}"; expected ${[...ADVANCE_MODES, ASK_VIEWER].join(', ')}`);
-    return DEFAULT_ADVANCE_MODE;
+  /* The mode the configuration picks without asking anyone — what an author's Play and a share
+     link use. An 'ask' flow plays autoplay here, as it always has. */
+  configuredMode(flow = this.store.activeFlow()) {
+    const playback = window.ScreenReelPlayback;
+    return playback.resolveMode({ flow: playback.flowConfig(flow), mount: this.playback, canAsk: false }).mode;
   }
-  /* Whether start() asks the viewer: the host's `chooser` option wins either way; otherwise a flow
-     whose playback is 'ask' asks, unless the host pinned `advance`. */
-  asksViewer(flow = this.store.activeFlow()) {
-    if (typeof this.options.chooser === 'boolean') return this.options.chooser; // unset: follow the flow
-    return !this.options.advance && flow?.defaults?.advance === ASK_VIEWER;
+  /* Every setting of the mode a scene plays in: the mode's preset with the host's and the flow's overrides. */
+  settings(scene = this.current().scene, flow = this.store.activeFlow()) {
+    const playback = window.ScreenReelPlayback;
+    return playback.resolveSettings(this.playMode(scene, flow), playback.flowConfig(flow), this.playback);
   }
   labels() { return { ...DEFAULT_LABELS, ...(this.options.labels || {}) }; }
   /* With a host `functions` map, `call` resolves only through it and registerFn — never through
@@ -90,18 +111,18 @@ class Projector {
   }
   strictFunctions() { return !!this.options.functions; }
   assetUrl(name) { const url = new URL(name, this.assetBase); if (this.assetVersion) url.search = this.assetVersion; return url.href; }
-  /* Shared agent cursor, configured to this projector's glyph. Null when the host opted out. */
+  /* Shared agent cursor, configured to this projector's glyph. Null when the host or the mode opted out. */
   cursor() {
-    if (this.options.cursor === false) return null;
+    if (this.options.cursor === false || !this.settings().cursor) return null;
     const cursor = window.__screenreelCursor; if (!cursor) return null;
     const config = { glyph: this.options.cursor === true ? 'dot' : this.options.cursor };
     if (this.options.cursorMotion) config.motion = this.options.cursorMotion;
     return cursor.configure(config);
   }
-  /* Live narrator, or null when the host opted out, the browser has no speech engine, or the
-     viewer muted it. Every call site treats null as "stay silent", so narration is additive. */
+  /* Live narrator, or null when the host or the mode opted out, the browser has no speech engine,
+     or the viewer muted it. Every call site treats null as "stay silent", so narration is additive. */
   narrator() {
-    if (this.options.narration === false || this.store.muted()) return null;
+    if (this.options.narration === false || !this.settings().narration || this.store.muted()) return null;
     const narrator = window.__screenreelNarrator;
     if (!narrator?.available()) return null;
     return narrator.configure(this.options.narration === true ? {} : this.options.narration);
@@ -158,18 +179,17 @@ class Projector {
     if (this.rootHost) return;
     this.ensureLayer(); this.rootHost = document.createElement('div'); this.rootHost.id = `screenreel-projector-${this.store.projectId}`; this.layer.appendChild(this.rootHost); this.shadow = this.rootHost.attachShadow({ mode: 'open' });
     const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = this.assetUrl('screenreel.css'); this.shadow.appendChild(link);
-    const shell = document.createElement('div'); shell.className = 'sr-shell'; shell.innerHTML = '<div class="sr-pill" role="toolbar" aria-label="ScreenReel projector"></div><section class="sr-notes" hidden></section><div class="sr-toast" hidden></div><div class="sr-chooser-layer" hidden></div>'; this.shadow.appendChild(shell);
-    this.chooserLayer = shell.querySelector('.sr-chooser-layer');
+    const shell = document.createElement('div'); shell.className = 'sr-shell'; shell.innerHTML = '<div class="sr-progress" role="progressbar" aria-valuemin="0" hidden><div class="sr-progress-fill"></div><span class="sr-progress-label"></span></div><div class="sr-pill" role="toolbar" aria-label="ScreenReel projector"></div><section class="sr-notes" hidden></section><div class="sr-toast" hidden></div><div class="sr-caption" role="status" aria-live="polite" hidden></div><div class="sr-chooser-layer" hidden></div>'; this.shadow.appendChild(shell);
+    this.chooserLayer = shell.querySelector('.sr-chooser-layer'); this.progress = shell.querySelector('.sr-progress'); this.caption = shell.querySelector('.sr-caption');
     this.pill = shell.querySelector('.sr-pill'); this.notes = shell.querySelector('.sr-notes'); this.toastNode = shell.querySelector('.sr-toast'); this.render();
   }
-  /* Which pill controls show. Presenters get everything; share-link viewers get progress and
-     playback; `controls` (an array, or { guided, auto } per mode) and `studio: false` trim it.
-     An empty set hides the pill, as a guided tour driven from its callouts does. */
-  visibleControls(share) {
-    const guided = this.advanceMode() === 'guided';
-    const configured = this.options.controls;
-    const chosen = Array.isArray(configured) ? configured : configured ? configured[guided ? 'guided' : 'auto'] : null;
-    const base = chosen ?? (share ? (guided ? GUIDED_SHARE_CONTROLS : SHARE_CONTROLS) : PILL_CONTROLS);
+  /* Which pill controls show: the mode's `controls` setting. `null` (a run configured only by the
+     older options) keeps the old default: everything for a presenter, progress and playback for a
+     share-link viewer. A share-link viewer never gets the authoring controls, and `studio: false`
+     drops Studio. An empty set hides the pill, as a guided tour driven from its cards does. */
+  visibleControls(share, settings = this.settings()) {
+    const guided = settings.mode === 'guided';
+    const base = settings.controls ?? (share ? (guided ? GUIDED_SHARE_CONTROLS : SHARE_CONTROLS) : PILL_CONTROLS);
     const unknown = base.filter((name) => !PILL_CONTROLS.includes(name));
     if (unknown.length) console.warn(`[screenreel] Unknown pill controls: ${unknown.join(', ')}`);
     return PILL_CONTROLS.filter((name) => base.includes(name)
@@ -178,24 +198,28 @@ class Projector {
   }
   render() {
     if (!this.pill) return; const flow = this.store.activeFlow(); const scenes = this.store.enabledScenes(flow); const position = Math.min(this.store.position(), Math.max(0, scenes.length - 1)); const scene = scenes[position];
-    const share = this.store.share();
+    const share = this.store.share(); const settings = this.settings(scene, flow); const labels = this.labels();
     const playing = this.store.playing(); const muted = this.store.muted();
     const waiting = !!this.stepWaiter;
+    /* The pill moves between scenes. Only while a guided card waits does its Next continue the step. */
+    const nextLabel = waiting ? labels.nextStep : labels.nextScene;
+    const text = (label) => settings.controlLabels ? `<span class="sr-pill-label">${esc(label)}</span>` : '';
     const narrationAvailable = this.options.narration !== false && window.__screenreelNarrator?.available();
     const buttons = {
       flow: `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select>`,
       count: `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>`,
-      prev: `<button data-cmd="prev" title="Previous scene">${icon('left')}</button>`,
-      play: `<button data-cmd="play" class="sr-play" title="${playing ? 'Pause' : 'Play'}">${icon(playing ? 'pause' : 'play')}</button>`,
-      next: `<button data-cmd="next" class="${waiting ? 'sr-await-next' : ''}" title="Next scene">${icon('right')}</button>`,
+      prev: `<button data-cmd="prev" title="${esc(labels.previousScene)}" aria-label="${esc(labels.previousScene)}">${icon('left')}${text(labels.previousScene)}</button>`,
+      play: `<button data-cmd="play" class="sr-play" title="${esc(playing ? labels.pause : labels.play)}" aria-label="${esc(playing ? labels.pause : labels.play)}">${icon(playing ? 'pause' : 'play')}</button>`,
+      next: `<button data-cmd="next" class="${waiting ? 'sr-await-next' : ''}" title="${esc(nextLabel)}" aria-label="${esc(nextLabel)}">${text(nextLabel)}${icon('right')}</button>`,
       // Narration rides in both chromes: a share-link viewer needs it most, and a presenter talking
       // over the demo needs to silence it fast. Hidden when there is no engine.
       sound: narrationAvailable ? `<button data-cmd="sound" class="${muted ? '' : 'active'}${this.narrationBlocked ? ' sr-needs-sound' : ''}" title="${muted ? 'Turn on narration' : 'Mute narration'}" aria-pressed="${String(!muted)}">${icon(muted ? 'mute' : 'sound')}</button>` : '',
       notes: `<button data-cmd="notes" class="${this.store.notesVisible() ? 'active' : ''}" title="Presenter notes">${icon('notes')}</button>`,
       studio: `<span class="sr-pill-separator" aria-hidden="true"></span><button data-cmd="studio" class="sr-pill-studio" title="Open Studio" aria-label="Open Studio">${icon('studio')}</button>`,
-      exit: `<button data-cmd="exit" title="Exit demo mode">${icon('close')}</button>`,
+      exit: `<button data-cmd="exit" title="${esc(labels.exit)}" aria-label="${esc(labels.exit)}">${icon('close')}</button>`,
     };
-    const controls = this.visibleControls(share);
+    const controls = this.visibleControls(share, settings);
+    this.renderProgress(settings.progress && scenes.length ? { position, total: scenes.length, scene } : null);
     this.pill.innerHTML = controls.map((name) => buttons[name]).join('');
     this.pill.hidden = !controls.length;
     this.pill.classList.toggle('sr-pill--share', share);
@@ -235,7 +259,7 @@ class Projector {
      (el.click()), and the pill, callout controls, and choice cards all sit above it. Its layout is
      inline so a missing or stale stylesheet can never silently disable it. */
   syncShield() {
-    const wanted = this.options.shield !== false && this.store.enabled() && this.store.playing();
+    const wanted = this.store.enabled() && this.store.playing() && this.settings().shield;
     if (wanted && !this.shieldNode) {
       const node = document.createElement('div'); node.className = 'sr-click-shield'; node.setAttribute('aria-hidden', 'true');
       node.style.cssText = `position:fixed;inset:0;z-index:${SHIELD_Z_INDEX};background:transparent;`;
@@ -252,16 +276,62 @@ class Projector {
     }
     if (!wanted && this.shieldNode) { this.shieldNode.remove(); this.shieldNode = null; }
   }
-  /* Guided or Autoplay, before anything plays. Resolves 'guided', 'auto', or null if dismissed. */
-  chooseMode(flow) {
-    const labels = this.labels(); const layer = this.chooserLayer;
-    layer.innerHTML = `<div class="sr-chooser" role="dialog" aria-modal="true" aria-labelledby="sr-chooser-title"><button type="button" class="sr-chooser-close" data-choose="" aria-label="${esc(labels.close)}" title="${esc(labels.close)}">${icon('close')}</button><h2 id="sr-chooser-title">${esc(this.displayText(flow.name))}</h2><p>${esc(labels.chooserHint)}</p><div class="sr-chooser-options"><button type="button" class="sr-mode sr-mode--primary" data-choose="guided"><strong>${esc(labels.guided)}</strong><span>${esc(labels.guidedHint)}</span></button><button type="button" class="sr-mode" data-choose="auto"><strong>${esc(labels.autoplay)}</strong><span>${esc(labels.autoplayHint)}</span></button></div></div>`;
+  /* The chooser: one button per offered mode, the preselected (or first) one primary and focused.
+     Resolves the picked mode, or null if dismissed. */
+  chooseMode(flow, offered, preselect = null) {
+    const labels = this.labels(); const layer = this.chooserLayer; const primary = preselect ?? offered[0];
+    const options = offered.map((mode) => `<button type="button" class="sr-mode${mode === primary ? ' sr-mode--primary' : ''}" data-choose="${mode}"><strong>${esc(labels[mode])}</strong><span>${esc(labels[`${mode}Hint`])}</span></button>`).join('');
+    layer.innerHTML = `<div class="sr-chooser" role="dialog" aria-modal="true" aria-labelledby="sr-chooser-title"><button type="button" class="sr-chooser-close" data-choose="" aria-label="${esc(labels.close)}" title="${esc(labels.close)}">${icon('close')}</button><h2 id="sr-chooser-title">${esc(this.displayText(flow.name))}</h2><p>${esc(labels.chooserHint)}</p><div class="sr-chooser-options">${options}</div></div>`;
     layer.hidden = false;
     return new Promise((resolve) => {
       this.resolveChooser = (mode) => { this.resolveChooser = null; layer.hidden = true; layer.innerHTML = ''; resolve(mode); };
       layer.querySelectorAll('[data-choose]').forEach((button) => { button.onclick = () => this.resolveChooser?.(button.dataset.choose || null); });
-      layer.querySelector('[data-choose="guided"]').focus({ preventScroll: true });
+      layer.querySelector(`[data-choose="${primary}"]`).focus({ preventScroll: true });
     });
+  }
+  /* A thin bar across the top: how far through the flow the viewer is, by scene. */
+  renderProgress(state) {
+    if (!this.progress) return;
+    this.progress.hidden = !state; if (!state) return;
+    const { position, total, scene } = state; const labels = this.labels();
+    this.progress.setAttribute('aria-valuemax', String(total)); this.progress.setAttribute('aria-valuenow', String(position + 1));
+    this.progress.querySelector('.sr-progress-fill').style.width = `${((position + 1) / total) * 100}%`;
+    const title = this.displayText(scene?.title);
+    this.progress.querySelector('.sr-progress-label').textContent = title ? `${labels.sceneOf(position + 1, total)} · ${title}` : labels.sceneOf(position + 1, total);
+  }
+  /* A card in the chooser layer — the start and end cards. Resolves when it times out or a button
+     is pressed, with that button's `data-card` value ('' for a timeout or a click on the card). */
+  showCard(html, durationMs) {
+    const layer = this.chooserLayer; if (!layer) return Promise.resolve('');
+    layer.innerHTML = html; layer.hidden = false; layer.classList.add('sr-card-layer');
+    return new Promise((resolve) => {
+      const finish = (value) => { clearTimeout(timer); if (this.resolveCard === finish) this.resolveCard = null; layer.hidden = true; layer.innerHTML = ''; layer.classList.remove('sr-card-layer'); resolve(value); };
+      const timer = setTimeout(() => finish(''), durationMs * (Number(this.options.timeScale) || 1));
+      this.resolveCard = finish;
+      layer.onclick = (clickEvent) => { const button = clickEvent.target.closest?.('[data-card]'); finish(button ? button.dataset.card : ''); };
+    });
+  }
+  /* Before the first scene of a run in video or autoplay: the flow's name and how it will play, so
+     the viewer knows it has started. Any click skips it. */
+  async showStartCard(scene) {
+    const labels = this.labels(); const flow = this.store.activeFlow(); const scenes = this.current().scenes.length;
+    const mode = labels[this.playMode(scene)] ?? '';
+    await this.showCard(`<div class="sr-chooser sr-start-card" role="status"><h2>${esc(this.displayText(flow.name))}</h2><p>${esc(labels.startHint(mode, scenes))}</p></div>`, START_CARD_MS);
+  }
+  /* When the flow finishes: an end card with Replay and Close. Close (or the card timing out with
+     `disableOnComplete`) ends the tour with reason 'complete'. Resolves 'replay', 'close', or ''. */
+  showEndCard() {
+    const labels = this.labels(); const flow = this.store.activeFlow(); const scenes = this.current().scenes.length;
+    return this.showCard(`<div class="sr-chooser sr-end-card" role="dialog" aria-labelledby="sr-end-title"><h2 id="sr-end-title">${esc(labels.finished)}: ${esc(this.displayText(flow.name))}</h2><p>${esc(labels.endHint(scenes))}</p><div class="sr-card-actions"><button type="button" class="sr-mode" data-card="replay">${esc(labels.replay)}</button><button type="button" class="sr-mode sr-mode--primary" data-card="close">${esc(labels.close)}</button></div></div>`, END_CARD_MS);
+  }
+  /* Caption-style callouts (video's optional captions): the card's words with no card, for as long
+     as the card would have stayed up. */
+  async showCaption(action, signal) {
+    if (!this.caption) return;
+    const title = this.displayText(action.title); const body = this.displayText(action.text);
+    this.caption.innerHTML = `${title ? `<strong>${esc(title)}</strong>` : ''}${body ? `<span>${esc(body)}</span>` : ''}`;
+    this.caption.hidden = !(title || body);
+    try { await window.ScreenReelCore.sleep(window.ScreenReelCore.cardHoldMs(action), signal); } finally { if (this.caption) this.caption.hidden = true; }
   }
   renderNotes(scene) {
     const visible = this.store.notesVisible() && !!scene; this.notes.hidden = !visible;
@@ -301,12 +371,12 @@ class Projector {
   /* `reason` tells a host a skip from a finish: 'user' (pill, trigger, Esc), 'complete'
      (disableOnComplete), or 'api' (a host call, destroy()). */
   disable(reason = 'api') {
-    const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id; const origin = this.store.origin();
+    const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id; const origin = this.store.origin(); const mode = this.playMode(scene);
     document.removeEventListener('keydown', this.keyHandler); this.keyHandler = null;
-    this.resolveChooser?.(null);
-    this.pause(); this.undoTour(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); this.cursor()?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
+    this.resolveChooser?.(null); this.resolveCard?.('');
+    this.pause(); this.restorePace(); this.startCardShown = false; this.undoTour(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); window.__screenreelCursor?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
     this.layer?.remove(); this.layer = null;
-    if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason });
+    if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason, mode });
     if (wasEnabled && origin && this.options.restoreOnExit && (reason === 'user' || reason === 'complete')) this.restoreOrigin(origin);
     return this;
   }
@@ -328,11 +398,12 @@ class Projector {
     const restore = () => scrollTo(pending.scrollX, pending.scrollY);
     if (document.readyState === 'complete') restore(); else addEventListener('load', restore, { once: true });
   }
-  /* Guided tours are paced by the viewer. Keys typed into the host's own controls — or the
+  /* Guided tours are paced by the viewer (a mode's `keys` setting). Keys typed into the host's own controls — or the
      projector's buttons, found through the shadow boundary — are left alone. */
   handleKey(keyEvent) {
     if (keyEvent.key === 'Escape' && this.resolveChooser) { keyEvent.preventDefault(); this.resolveChooser(null); return; }
-    if (!this.store.playing() || this.advanceMode() !== 'guided') return;
+    if (keyEvent.key === 'Escape' && this.resolveCard) { keyEvent.preventDefault(); this.resolveCard(''); return; }
+    if (!this.store.playing() || !this.settings().keys) return;
     if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
     const command = GUIDED_KEYS[keyEvent.key]; if (!command) return;
     const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
@@ -394,21 +465,34 @@ class Projector {
     };
   }
   /* Start a flow at a scene: the entry point for hosts that launch tours themselves (onboarding,
-     a help menu). Throws on an unknown flow or an out-of-range position rather than guessing. */
+     a help menu). `mode` is 'video', 'autoplay', 'guided', or 'ask' (show the chooser); without it
+     the configuration decides (docs/playback.md#which-mode-plays). Throws on an unknown flow, mode,
+     or position, or a mode the host's `playback.modes` excludes, rather than guessing. */
   async start(flowId, { position = 0, mode } = {}) {
+    const playback = window.ScreenReelPlayback;
     const flow = this.store.getFlow(flowId); if (!flow) throw new Error(`ScreenReel start(): unknown flow "${flowId}"`);
-    if (mode != null && !ADVANCE_MODES.includes(mode)) throw new Error(`ScreenReel start(): mode must be ${ADVANCE_MODES.join(' or ')}, got "${mode}"`);
+    const requested = mode == null ? null : playback.modeName(mode, { allowAsk: true });
+    if (mode != null && !requested) throw new Error(`ScreenReel start(): mode must be ${[...playback.MODES, playback.ASK].join(', ')}, got "${mode}"`);
+    if (requested && requested !== playback.ASK && this.playback.modes && !this.playback.modes.includes(requested)) throw new Error(`ScreenReel start(): mode "${requested}" is not in this host's playback.modes (${this.playback.modes.join(', ')})`);
     const sceneCount = this.store.enabledScenes(flow).length;
     if (!Number.isInteger(position) || position < 0 || position >= sceneCount) throw new Error(`ScreenReel start(): position ${position} is outside the ${sceneCount} enabled scenes of "${flowId}"`);
-    this.pause(); await this.undoTour();
-    this.store.setActive(flow.id); this.store.setPosition(position); this.store.setAdvanceChoice(null);
+    this.pause(); await this.undoTour(); this.resolveCard?.('');
+    this.store.setActive(flow.id); this.store.setPosition(position); this.store.setAdvanceChoice(null); this.startCardShown = false;
     this.store.setOrigin({ route: this.router.getRoute(), scrollX, scrollY });
     if (this.store.enabled()) this.render(); else this.enable();
-    // `mode` skips the chooser; otherwise it shows when the host asked for it or the flow's playback is 'ask'.
-    const asks = !mode && this.asksViewer(flow);
-    const chosen = mode ?? (asks ? await this.chooseMode(flow) : null);
-    if (asks && !chosen) { this.disable('user'); return this; }
-    this.store.setAdvanceChoice(chosen); this.store.setPlaying(true);
+    const remembered = this.playback.remember ? this.store.playbackPick(flow.id) : null;
+    const plan = playback.resolveMode({ flow: playback.flowConfig(flow), mount: this.playback, requested, canAsk: !this.store.share(), remembered });
+    let chosen = plan.mode;
+    if (plan.ask) {
+      chosen = await this.chooseMode(flow, plan.offered, plan.preselect);
+      if (!chosen) { this.disable('user'); return this; }
+      if (this.playback.remember) this.store.setPlaybackPick(flow.id, chosen);
+    }
+    // A mode someone picked (start()'s `mode`, the chooser, a remembered pick) holds for the whole
+    // run; a configured one is re-read per scene, so a scene's own `advance` still applies.
+    const picked = plan.ask || plan.source === 'start' || plan.source === 'remembered';
+    this.store.setAdvanceChoice(picked ? chosen : null); this.store.setPlaying(true);
+    event('start', { projectId: this.store.projectId, flowId: flow.id, position, mode: chosen, source: plan.ask ? 'chooser' : plan.source });
     this.playScene(); // not awaited: it resolves only when the first scene finishes
     return this;
   }
@@ -429,10 +513,30 @@ class Projector {
     const { scenes, position } = this.current(); if (!scenes.length) return null;
     const next = (position + 1) % scenes.length; this.store.setPosition(next); this.render(); return scenes[next];
   }
+  /* The flow's end. With the mode's `endCard`, the end card shows first: Replay starts the flow again
+     in the same mode, Close ends the tour as complete, and when it times out the tour ends only with
+     `disableOnComplete`, as it always has. */
   complete() {
-    this.pause(); this.undoTour(); const { scene, position, scenes } = this.current(); this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene?.id, position, sceneCount: scenes.length });
-    if (this.options.disableOnComplete) this.disable('complete');
+    const settings = this.settings(); const mode = this.playMode();
+    this.pause(); this.undoTour(); this.restorePace(); this.startCardShown = false;
+    const { scene, position, scenes } = this.current(); const flowId = this.store.activeFlow().id;
+    this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId, sceneId: scene?.id, position, sceneCount: scenes.length, mode });
+    if (!settings.endCard) { if (this.options.disableOnComplete) this.disable('complete'); return this; }
+    this.showEndCard().then((choice) => {
+      if (choice === 'replay') return this.start(flowId, { mode });
+      if (choice === 'close' || this.options.disableOnComplete) this.disable('complete');
+      return null;
+    }).catch((error) => console.warn('[screenreel] end card failed', error));
     return this;
+  }
+  /* A mode's `pace` sets the time scale for its run; leaving the run puts the host's back. */
+  applyPace(settings) {
+    if (settings.pace == null) return;
+    window.ScreenReelCore.setTimeScale(settings.pace); this.paceApplied = true;
+  }
+  restorePace() {
+    if (!this.paceApplied) return;
+    window.ScreenReelCore.setTimeScale(this.options.timeScale); this.paceApplied = false;
   }
   validateScene(sceneId) {
     const flow = this.store.activeFlow(); const scene = sceneId ? flow.scenes.find((item) => item.id === sceneId) : this.current().scene;
@@ -481,20 +585,29 @@ class Projector {
     if (settleMs && generation === this.playGeneration && this.store.playing()) await window.ScreenReelCore.sleep(settleMs, this.controller.signal);
     if (generation !== this.playGeneration || !this.store.playing()) return;
     const { position: sceneIndex } = this.current();
+    const settings = this.settings(scene); this.applyPace(settings);
+    // The run's visible start: a title card once per run (video, autoplay), then the pill's intro beat.
+    if (sceneIndex === 0 && settings.startCard && !this.startCardShown) { this.startCardShown = true; await this.showStartCard(scene); }
+    if (generation !== this.playGeneration || !this.store.playing()) return;
     if (sceneIndex === 0) await this.introducePill();
     if (generation !== this.playGeneration || !this.store.playing()) return;
     // Narration starts with the scene's actions and runs alongside them, not before: the viewer
     // should hear the description of the thing while watching it happen. Deliberately not awaited.
     this.narrate(scene);
-    const guided = this.advanceMode(scene) === 'guided';
+    const cursorOn = this.options.cursor !== false && settings.cursor;
     for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
       const action = scene.actions[actionIndex];
       if (generation !== this.playGeneration || !this.store.playing()) break;
       event('step', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, sceneIndex, sceneTitle: scene.title, actionIndex, total: (scene.actions || []).length, action });
       let navigationSameDocument = false; let priorPosition = null;
-      /* Guided: every callout is a step. It skips its hold and waits for Next at once, so the card's
-         buttons are never live while nothing is listening; everything else plays through. */
-      const step = guided && window.ScreenReelCore.isGuidedStep(action);
+      /* The mode's `callouts` setting decides how an info card plays. 'step' (guided): it skips its
+         hold and waits for Next at once, so the card's buttons are never live while nothing is
+         listening; everything else plays through. 'timed': it holds for its reading time. 'caption':
+         its words show as a caption, no card. 'off': it is skipped. */
+      const callout = window.ScreenReelCore.isGuidedStep(action);
+      if (callout && settings.callouts === 'off') continue;
+      if (callout && settings.callouts === 'caption') { await this.showCaption(action, this.controller.signal); continue; }
+      const step = callout && settings.callouts === 'step';
       const holder = step ? this.stepReleases : this.retained;
       this.raiseLayer(); // the previous action may have opened a host pop-up over the tour
       // A toggle-style click is undone by the scene's own later click on the same element: journal that
@@ -505,10 +618,10 @@ class Projector {
         variables: this.variablesFor(),
         // The executor already calls these at every interaction site; supplying them is what makes
         // the agent cursor visible during a live tour instead of a no-op.
-        moveCursor: this.options.cursor === false ? undefined : async (el) => { if (el) await this.cursor()?.moveTo(el)?.catch?.(() => {}); },
-        pressCursor: this.options.cursor === false ? undefined : async () => { await this.cursor()?.press()?.catch?.(() => {}); },
-        scrollCursor: this.options.cursor === false ? undefined : (direction) => this.cursor()?.startBob(direction),
-        stopScrollCursor: this.options.cursor === false ? undefined : () => this.cursor()?.stopBob(),
+        moveCursor: cursorOn ? async (el) => { if (el) await this.cursor()?.moveTo(el)?.catch?.(() => {}); } : undefined,
+        pressCursor: cursorOn ? async () => { await this.cursor()?.press()?.catch?.(() => {}); } : undefined,
+        scrollCursor: cursorOn ? (direction) => this.cursor()?.startBob(direction) : undefined,
+        stopScrollCursor: cursorOn ? () => this.cursor()?.stopBob() : undefined,
         // An action's line REPLACES whatever is currently speaking (speak() cancels in flight):
         // a queue would drift behind the visuals, and the words must land on what is on screen.
         // narrator() is null when the viewer muted or the host opted out, so this stays silent.
@@ -520,12 +633,12 @@ class Projector {
           if (position >= scenes.length - 1 && this.options.loop === false) this.complete(); else this.advancePosition();
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
-        dim: this.options.dim,
+        dim: settings.dim ? this.options.dim : false,
         persist: step, skipHold: step, retain: (release) => holder.push(release),
         journal: (undo) => this.journal.push({ sceneId: scene.id, action: undo }),
         calloutControls: step ? this.calloutControls(scene, actionIndex) : undefined,
-        // Notes are presenter captions; a guided tour's card already carries the words.
-        announce: guided ? undefined : (message) => this.toast(message),
+        // Notes are presenter captions (the mode's `notes`); a guided tour's card already carries the words.
+        announce: settings.notes ? (message) => this.toast(message) : undefined,
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
       if (result.jumpTo && generation === this.playGeneration && this.store.playing()) {
@@ -577,7 +690,7 @@ class Projector {
     // Held by reference: disable() (or opening Studio) during the beat drops this.pill to null.
     pill.dataset.intro = 'done';
   }
-  pause() { this.playGeneration++; this.stepWaiter?.(); this.leaving = this.leaveScene('pause').catch((error) => console.warn('[screenreel] scene cleanup failed', error)); this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; this.cursor()?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
+  pause() { this.playGeneration++; this.stepWaiter?.(); this.leaving = this.leaveScene('pause').catch((error) => console.warn('[screenreel] scene cleanup failed', error)); this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; window.__screenreelCursor?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
     // The last scene of a non-looping flow has nowhere to go: Next — the timer's or the viewer's — completes it.
@@ -592,18 +705,20 @@ class Projector {
       if (sameDocument && generation === this.playGeneration && shouldPlay && this.store.playing() && this.routeMatches(scene)) return this.playScene();
     } else if (shouldPlay && this.store.playing()) return this.playScene();
   }
-  /* Presenter Back pauses on the previous scene. Guided Back plays it, the way a viewer expects,
-     and does nothing on the first scene rather than wrapping to the end of the tour. */
+  /* Back goes to the previous scene. A presenter's pill (the older look) pauses there. A viewer's —
+     guided, or any mode configured with `playback` — plays it, the way a viewer expects, and does
+     nothing on the first scene rather than wrapping to the end of the tour. */
   async previous() {
     const { scenes, position } = this.current(); if (!scenes.length) return;
-    const guided = this.advanceMode() === 'guided' && this.store.playing();
-    if (guided && position === 0) return;
+    const settings = this.settings();
+    const replays = (settings.mode === 'guided' || !settings.legacy) && this.store.playing();
+    if (replays && position === 0) return;
     this.pause();
     const target = (position - 1 + scenes.length) % scenes.length; this.store.setPosition(target); this.render();
     // Going back replays that scene, so its changes are undone first; toggles must not apply twice.
     const undoTarget = () => this.undoJournal((entry) => entry.sceneId === scenes[target].id, `undoing scene ${scenes[target].id} to replay it`);
     this.leaving = this.leaving.then(undoTarget, undoTarget);
-    if (guided) { this.store.setPlaying(true); return this.playScene(); }
+    if (replays) { this.store.setPlaying(true); return this.playScene(); }
     if (!this.routeMatches(scenes[target])) await this.router.navigate(scenes[target].route);
   }
   captureCurrent() {
@@ -632,7 +747,7 @@ export function createPublicApi(assetBase, assetVersion = '') {
       if (this.instance) return; const shadow = this.attachShadow({ mode: 'open' }); const link = document.createElement('link'); link.rel = 'stylesheet'; const styleUrl = new URL('screenreel.css', assetBase); if (assetVersion) styleUrl.search = assetVersion; link.href = styleUrl.href; shadow.appendChild(link);
       const button = document.createElement('button'); button.className = 'sr-trigger'; button.title = 'Toggle ScreenReel demo'; button.setAttribute('aria-label', 'Toggle ScreenReel demo'); button.innerHTML = icon('presentation', TRIGGER_ICON_PX); shadow.appendChild(button);
       let data; const inlineId = this.getAttribute('flow-data'); if (inlineId) { const node = document.getElementById(inlineId); if (node) data = JSON.parse(node.textContent); }
-      this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict'), ...(this.hasAttribute('advance') ? { advance: this.getAttribute('advance') } : {}), ...(this.getAttribute('studio') === 'false' ? { studio: false } : {}), ...(this.hasAttribute('position') ? { position: this.getAttribute('position') } : {}), ...(this.getAttribute('shield') === 'false' ? { shield: false } : {}) });
+      this.instance = await publicApi.mount(button, { projectId: this.getAttribute('project-id') || 'screenreel', assetBase: this.getAttribute('asset-base') || assetBase, flow: data ? { data } : { src: this.getAttribute('flow-src') }, notesMode: this.getAttribute('notes-mode') || 'reserve', loop: this.getAttribute('loop') !== 'false', strict: this.hasAttribute('strict'), ...(this.hasAttribute('advance') ? { advance: this.getAttribute('advance') } : {}), ...(this.hasAttribute('playback-mode') ? { playback: { force: this.getAttribute('playback-mode') } } : {}), ...(this.getAttribute('studio') === 'false' ? { studio: false } : {}), ...(this.hasAttribute('position') ? { position: this.getAttribute('position') } : {}), ...(this.getAttribute('shield') === 'false' ? { shield: false } : {}) });
     }
     disconnectedCallback() { this.instance?.destroy(); this.instance = null; }
   }

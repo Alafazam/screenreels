@@ -6,7 +6,7 @@ const root = path.resolve(new URL('..', import.meta.url).pathname); const out = 
 fs.rmSync(path.join(root, 'dist'), { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
 for (const [source, target] of [
   ['packages/projector/screenreel.js', 'screenreel.js'], ['packages/projector/projector.js', 'projector.js'], ['packages/projector/icons.js', 'icons.js'], ['packages/projector/analytics.js', 'analytics.js'], ['packages/projector/screenreel.css', 'screenreel.css'],
-  ['packages/studio/studio.js', 'studio.js'], ['packages/studio/recorder.js', 'recorder.js'], ['packages/studio/target-picker.js', 'target-picker.js'], ['packages/studio/pacing.js', 'pacing.js'], ['packages/core/action-runtime.js', 'action-runtime.js'], ['packages/core/flow-store.js', 'flow-store.js'], ['packages/core/cursor.js', 'cursor.js'], ['packages/core/narrator.js', 'narrator.js'],
+  ['packages/studio/studio.js', 'studio.js'], ['packages/studio/recorder.js', 'recorder.js'], ['packages/studio/target-picker.js', 'target-picker.js'], ['packages/studio/pacing.js', 'pacing.js'], ['packages/core/action-runtime.js', 'action-runtime.js'], ['packages/core/flow-store.js', 'flow-store.js'], ['packages/core/playback.js', 'playback.js'], ['packages/core/cursor.js', 'cursor.js'], ['packages/core/narrator.js', 'narrator.js'],
 ]) fs.copyFileSync(path.join(root, source), path.join(out, target));
 
 const definitions = globalThis.ScreenReelCore.definitions;

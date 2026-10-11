@@ -153,6 +153,10 @@
     setPendingRestore(value) { this.writeSessionJson('pending-restore', value); }
     readSessionJson(name) { try { return JSON.parse(this.session.getItem(this.sessionKey(name))) || null; } catch { return null; } }
     writeSessionJson(name, value) { value ? this.session.setItem(this.sessionKey(name), JSON.stringify(value)) : this.session.removeItem(this.sessionKey(name)); }
+    /* The viewer's last chooser pick per flow, for a host that mounts with `playback.remember`. Local,
+       not session, so it outlives the visit; namespaced like everything else, so "Clear local data" resets it. */
+    playbackPick(flowId) { return this.storage.getItem(this.key(`playback-pick:${flowId}`)) || null; }
+    setPlaybackPick(flowId, mode) { mode ? this.storage.setItem(this.key(`playback-pick:${flowId}`), mode) : this.storage.removeItem(this.key(`playback-pick:${flowId}`)); }
     advanceChoice() { return this.session.getItem(this.sessionKey('advance-choice')) || null; }
     setAdvanceChoice(value) { value ? this.session.setItem(this.sessionKey('advance-choice'), value) : this.session.removeItem(this.sessionKey('advance-choice')); }
     share() { return this.session.getItem(this.sessionKey('share')) === '1'; }

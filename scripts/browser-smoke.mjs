@@ -53,7 +53,7 @@ try {
   }));
   await visiblePill(page);
   // Nothing plays until the viewer picks a mode; playing then routes to the first scene.
-  await page.locator('[data-choose="auto"]').click();
+  await page.locator('[data-choose="autoplay"]').click();
   await page.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true' && !location.search.includes('variant'));
   await visiblePill(page);
   const productValidation = await page.evaluate(() => window.ScreenReel.validateScene());
@@ -81,7 +81,7 @@ try {
   // Both forced variants launch the same canonical six-scene dogfooding demo.
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   // The landing asks Guided or Autoplay first; this pass checks Autoplay end to end.
-  await page.locator('[data-choose="auto"]').click();
+  await page.locator('[data-choose="autoplay"]').click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
   const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'open-source-hook');
   assert.equal(await page.locator('.sr-count').innerText(), '1/6');
@@ -253,7 +253,7 @@ try {
   await page.getByRole('button', { name: 'Play flow', exact: true }).click();
   await page.locator('.sr-studio').waitFor({ state: 'detached' });
   // The author sees what a viewer sees: this host asks Guided or Autoplay first.
-  await page.locator('[data-choose="auto"]').click();
+  await page.locator('[data-choose="autoplay"]').click();
   await page.locator('.sr-action-box,.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
   // The landing's trimmed bar has no flow picker, so read the active flow from the projector.
   assert.equal(await page.evaluate(() => [...window.ScreenReel.instances][0].store.activeFlow().name), 'All actions showcase copy');
@@ -602,7 +602,7 @@ try {
   await authorPage.locator('.sr-action').nth(1).waitFor();
   assert.deepEqual(await authorPage.locator('.sr-action strong').allInnerTexts(), ['Info card', 'Info card'], '⇧⌘-click captures a second info card');
   await authorPage.close();
-  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="auto"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="autoplay"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
   // stable session id. Fresh context so presenter-mode session state can't leak in.
   const shareContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
