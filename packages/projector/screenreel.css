@@ -133,6 +133,11 @@
 @media(max-width:980px){.sr-scene-toolbar{width:100%;margin-top:12px}.sr-flow-page .sr-page-title{align-items:flex-start}.sr-flow-toolbar{margin-bottom:0}}
 @media(max-width:1100px){.sr-editor-title{align-items:flex-start}.sr-editor-title .sr-toolbar{max-width:55%}.sr-editor-grid{grid-template-columns:minmax(0,1fr) 300px}}
 .sr-pace-hint{color:#71717a;font-size:11px}
+.sr-playback-offers{display:flex;flex-wrap:wrap;gap:8px 16px}.sr-playback-offers legend{width:100%}
+.sr-playback-offer{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:#18181b}.sr-playback-offer input{accent-color:var(--sr-accent,#7c3aed)}
+.sr-playback-modes{grid-column:1/-1;font-size:12px;color:#52525b}.sr-playback-modes summary{cursor:pointer;font-size:11px;font-weight:700}
+.sr-playback-modes table{width:100%;margin-top:8px;border-collapse:collapse}.sr-playback-modes th,.sr-playback-modes td{padding:4px 6px;text-align:left;font-weight:500}.sr-playback-modes thead th{font-size:11px;color:#71717a}
+.sr-playback-modes select{border:1px solid #d4d4d8;border-radius:6px;padding:3px 6px;background:#fff;color:#18181b;font:inherit}.sr-playback-modes input{accent-color:var(--sr-accent,#7c3aed)}
 .sr-modal-note{margin:0 0 14px;display:flex;align-items:center;gap:6px;color:#71717a;font-size:11px}
 /* Record primer. .sr-modal-actions is flex/flex-end, so the skip label needs margin-right:auto to
    sit opposite the buttons rather than crowding them. */
@@ -179,6 +184,19 @@
 .sr-mode:focus-visible,.sr-chooser-close:focus-visible{outline:2px solid var(--sr-accent,#7c3aed);outline-offset:2px}
 .sr-chooser-close{position:absolute;top:12px;right:12px;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--sr-muted,#71717a);cursor:pointer}
 
+/* Playback modes (docs/playback.md): start and end cards, the progress bar, captions, labelled pill buttons. */
+.sr-chooser-layer.sr-card-layer{background:var(--sr-card-backdrop,rgba(9,9,11,.18))}
+.sr-start-card{text-align:center}.sr-start-card h2{margin:0 0 4px}.sr-start-card p{margin:0}
+.sr-card-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sr-card-actions .sr-mode{text-align:center;justify-items:center}
+.sr-progress{position:absolute;top:0;left:0;right:0;height:var(--sr-progress-height,4px);background:var(--sr-progress-track,rgba(161,161,170,.28))}
+.sr-progress[hidden]{display:none}
+.sr-progress-fill{height:100%;width:0;background:var(--sr-accent,#7c3aed);transition:width .4s ease}
+.sr-progress-label{position:absolute;top:calc(var(--sr-progress-height,4px) + 6px);left:50%;transform:translateX(-50%);max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--sr-surface,rgba(255,255,255,.92));color:var(--sr-muted,#52525b);font-size:var(--sr-text-small,12px);box-shadow:0 4px 14px rgba(15,23,42,.12)}
+@media(prefers-reduced-motion:reduce){.sr-progress-fill{transition:none}}
+.sr-caption{position:absolute;left:50%;bottom:76px;transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:min(640px,calc(100vw - 32px));display:grid;gap:2px;padding:10px 16px;border-radius:var(--sr-radius,8px);background:var(--sr-caption-background,rgba(9,9,11,.82));color:var(--sr-caption-foreground,#fff);font-size:var(--sr-text-body,14px);line-height:1.45;text-align:center}
+.sr-caption[hidden]{display:none}.sr-caption strong{font-weight:600}
+.sr-pill button:has(.sr-pill-label){width:auto;display:inline-flex;gap:4px;padding:0 8px;font-size:12px;font-weight:500;white-space:nowrap}
+
 /* Flow settings: how viewers play it, as radio cards. */
 .sr-playback{grid-column:1/-1;margin:0;padding:0;border:0;display:grid;gap:8px}
 .sr-playback legend{margin-bottom:6px;font-size:11px;font-weight:700;color:#52525b}
@@ -205,3 +223,10 @@
 .sr-cleanup-badge{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:#15803d}
 .sr-cleanup-badge.is-open{color:#a16207}
 .sr-cleanup-badge button{padding:1px 7px;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;font-size:11px;cursor:pointer}
+/* Buttons outside the toolbars (modal footers, flow-table rows) got the browser's default look.
+   Give them the same outlined style as the toolbar buttons; .sr-primary and .sr-danger build on it. */
+.sr-studio .sr-modal-actions button,.sr-studio .sr-flow-table button{border:1px solid #d4d4d8;background:#fff;color:#3f3f46;border-radius:7px;padding:7px 14px;min-height:34px}
+.sr-studio .sr-flow-table button{padding:7px 9px}
+.sr-studio .sr-modal-actions button:hover,.sr-studio .sr-flow-table button:hover{background:#f4f4f5}
+.sr-studio .sr-danger{border-color:#fecaca!important}
+.sr-studio .sr-danger:hover{background:#fef2f2!important}

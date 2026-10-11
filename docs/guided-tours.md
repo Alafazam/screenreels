@@ -8,8 +8,10 @@ const projector = await ScreenReel.mount(helpButton, {
   projectId: 'app-guides',
   flow: { src: '/guides/getting-started.json' },
   loop: false,
-  chooser: true,                                  // ask Guided or Autoplay before playing
-  controls: { guided: [], auto: ['prev', 'play', 'next', 'exit'] }, // pill contents per mode
+  playback: {
+    default: 'ask',                                  // flows that say nothing ask Guided or Autoplay
+    autoplay: { controls: ['prev', 'play', 'next', 'exit'] }, // pill contents per mode
+  },
   studio: false,                                  // never show the Studio button
   position: 'center',                             // pill bottom-centre instead of bottom-right
   disableOnComplete: true,                        // close the tour when it finishes
@@ -17,15 +19,24 @@ const projector = await ScreenReel.mount(helpButton, {
   labels: { next: 'Weiter', stepOf: (step, total) => `${step} von ${total}` },
 });
 
-await projector.start('getting-started');                   // shows the chooser
+await projector.start('getting-started');                   // plays as the flow says (here: the chooser)
 await projector.start('getting-started', { mode: 'guided' }); // skips it
 ```
 
-A flow can carry its own playback in `defaults.advance`:
-- `'ask'` shows the chooser. It's the default for flows created in Studio.
-- `'guided'` and `'auto'` fix the mode.
+Guided is one of three playback modes, beside `autoplay` and `video`. Each flow picks its own in
+`defaults.playback`, so one guide list can play some guides guided, some as a video, and let the
+viewer choose for others:
 
-A host's `chooser` or `advance` mount option overrides it. See [Recording a scene](recording.md#info-cards-one-flow-guided-and-autoplay) for authoring all of this in Studio.
+```json
+{ "id": "getting-started", "defaults": { "playback": { "default": "ask", "modes": ["guided", "autoplay"] } } }
+{ "id": "whats-new", "defaults": { "playback": { "default": "video" } } }
+```
+
+See [Playback modes](playback.md) for every option, the presets, and the precedence. The older
+options (`chooser: true`, mount and flow `advance`, `controls: { guided, auto }`) keep working, and
+map onto that model. See [Playback modes](playback.md#migrating-from-the-older-options) for how.
+In Studio, **Flow settings** sets all of this (see
+[Recording a scene](recording.md#info-cards-one-flow-guided-autoplay-and-video)).
 
 ## How guided mode plays
 
@@ -42,8 +53,8 @@ A host's `chooser` or `advance` mount option overrides it. See [Recording a scen
   and buttons are left alone.
 - **Callouts follow their target** every frame, because panels push the page around.
 
-Mode precedence, highest first: the viewer's pick (or `start()`'s `mode`), the scene's `advance`,
-the mount option `advance`, then the flow's `defaults.advance`. Autoplay is `'auto'`.
+Which mode plays, and which settings it gets, is decided in one place. See
+[Playback modes: precedence](playback.md#precedence).
 
 ## Callouts
 
@@ -96,9 +107,10 @@ it off with `shield: false`.
 
 | | |
 |---|---|
-| `projector.start(flowId, { position, mode })` | Start or restart a flow. Throws on an unknown flow, position, or mode. |
+| `projector.start(flowId, { position, mode })` | Start or restart a flow. `mode` is `'video'`, `'autoplay'`, `'guided'`, or `'ask'` (`'auto'` still works). Throws on an unknown flow, position, or mode, or a mode the host's `playback.modes` excludes. |
+| `screenreel:start` | `{ projectId, flowId, position, mode, source }`. The run began, in this mode. |
 | `screenreel:awaitingnext` | `{ projectId, flowId, sceneId, actionIndex? }`. The tour is waiting for Next. |
-| `screenreel:exit` | `{ projectId, flowId, sceneId, position, reason }`. `reason` is `'user'` (pill, Skip, Esc, chooser close), `'complete'` (`disableOnComplete`), or `'api'` (a host call). |
+| `screenreel:exit` | `{ projectId, flowId, sceneId, position, reason }`. `reason` is `'user'` (pill, Skip, Esc, chooser close), `'complete'` (`disableOnComplete`, or the end card's Close), or `'api'` (a host call). Carries the run's `mode`. |
 | `screenreel:complete` | The last scene of a `loop: false` flow finished. |
 
 A second `play()` while a scene is running warns and does nothing. Use `start()` to restart.

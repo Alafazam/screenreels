@@ -1,0 +1,4 @@
+interface:
+  display_name: "ScreenReel Narrated Scenes"
+  short_description: "Film voiced scenes with actions on the narrator's words"
+  default_prompt: "Use $screenreel-narrated-scenes to plan, voice, record and render the next scene."

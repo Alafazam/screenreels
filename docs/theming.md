@@ -27,6 +27,7 @@ class hooks below win at equal specificity. You don't need `body > …` override
 | Countdown `.sr-count-num`, `.sr-count-cap` | `--sr-countdown-color`, `--sr-countdown-caption-color`, `--sr-countdown-size` (220px), `--sr-countdown-backdrop` (transparent), `--sr-countdown-backdrop-filter` (none) |
 | Choice `.sr-choice-card`, `.sr-choice-prompt` | `--sr-choice-backdrop`, `--sr-choice-card-bg`, `--sr-choice-card-fg`, `--sr-choice-radius` (14px), `--sr-choice-prompt-color` |
 | Chooser and pill (inside the projector's shadow root) | `--sr-surface`, `--sr-foreground`, `--sr-muted`, `--sr-border`, `--sr-backdrop`, `--sr-radius`, `--sr-radius-lg`, `--sr-shadow`, `--sr-text-title`, `--sr-text-body`, `--sr-text-small`, `--sr-chooser-width` |
+| Playback (inside the projector's shadow root) | Progress bar: `--sr-progress-height` (4px), `--sr-progress-track`; captions: `--sr-caption-background`, `--sr-caption-foreground`; start and end cards: `--sr-card-backdrop` (they reuse the chooser's properties) |
 
 A readable countdown, for example, is a frosted title card:
 

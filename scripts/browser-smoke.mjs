@@ -53,7 +53,7 @@ try {
   }));
   await visiblePill(page);
   // Nothing plays until the viewer picks a mode; playing then routes to the first scene.
-  await page.locator('[data-choose="auto"]').click();
+  await page.locator('[data-choose="autoplay"]').click();
   await page.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true' && !location.search.includes('variant'));
   await visiblePill(page);
   const productValidation = await page.evaluate(() => window.ScreenReel.validateScene());
@@ -81,7 +81,7 @@ try {
   // Both forced variants launch the same canonical six-scene dogfooding demo.
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
   // The landing asks Guided or Autoplay first; this pass checks Autoplay end to end.
-  await page.locator('[data-choose="auto"]').click();
+  await page.locator('[data-choose="autoplay"]').click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
   const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'open-source-hook');
   assert.equal(await page.locator('.sr-count').innerText(), '1/6');
@@ -253,7 +253,7 @@ try {
   await page.getByRole('button', { name: 'Play flow', exact: true }).click();
   await page.locator('.sr-studio').waitFor({ state: 'detached' });
   // The author sees what a viewer sees: this host asks Guided or Autoplay first.
-  await page.locator('[data-choose="auto"]').click();
+  await page.locator('[data-choose="autoplay"]').click();
   await page.locator('.sr-action-box,.sr-glow-box').waitFor({ state: 'visible', timeout: 5000 });
   // The landing's trimmed bar has no flow picker, so read the active flow from the projector.
   assert.equal(await page.evaluate(() => [...window.ScreenReel.instances][0].store.activeFlow().name), 'All actions showcase copy');
@@ -566,6 +566,91 @@ try {
   await inlinePage.locator('.sr-choice-overlay .sr-choice-card', { hasText: 'Skip ahead' }).click();
   await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
   await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
+  // Playback modes (docs/playback.md): one host, one guide list, each flow picking how it plays.
+  // video: start card, no info cards, progress bar, end card; captions on request; autoplay: timed
+  // cards and a labelled pill; guided: "N of M" and Finish; ask: a chooser over the flow's own modes
+  // that remembers the viewer's pick.
+  const modes = await inlinePage.evaluate(async () => {
+    const spot = document.createElement('div'); spot.id = 'pm-spot'; spot.textContent = 'Spot'; spot.style.cssText = 'position:fixed;left:200px;top:200px;width:120px;height:40px'; document.body.appendChild(spot);
+    const target = document.createElement('button'); target.id = 'pm-demo'; document.body.appendChild(target);
+    const card = (text) => ({ type: 'callout', selector: '#pm-spot', title: 'Card', text, holdMs: 100 });
+    const scenes = (prefix) => [{ id: `${prefix}-1`, title: 'First', route: '/', actions: [card('One')] }, { id: `${prefix}-2`, title: 'Second', route: '/', actions: [card('Two')] }];
+    const flows = [
+      { id: 'film', name: 'Film', defaults: { dwellMs: 50, playback: { default: 'video' } }, scenes: scenes('film') },
+      { id: 'captioned', name: 'Captioned', defaults: { dwellMs: 50, playback: { default: 'video', video: { callouts: 'caption', endCard: false } } }, scenes: scenes('cap') },
+      { id: 'auto', name: 'Auto', defaults: { dwellMs: 50, playback: { default: 'autoplay' } }, scenes: scenes('auto') },
+      { id: 'steps', name: 'Steps', defaults: { dwellMs: 50, playback: { default: 'guided' } }, scenes: scenes('steps') },
+      { id: 'choose', name: 'Choose', defaults: { dwellMs: 50, playback: { default: 'ask', modes: ['video', 'guided'] } }, scenes: scenes('choose') },
+    ];
+    const projector = await window.ScreenReel.mount(target, { projectId: 'modes-example', loop: false, narration: false, cursor: false, disableOnComplete: true, timeScale: 0.25, playback: { remember: true }, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows } } });
+    const root = () => document.querySelector('#screenreel-projector-modes-example')?.shadowRoot;
+    const once = (name) => new Promise((resolve) => addEventListener(`screenreel:${name}`, (event) => resolve(event.detail), { once: true }));
+    const until = async (check, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { const value = check(); if (value) return value; await new Promise((resolve) => setTimeout(resolve, 20)); } return null; };
+    const sawCard = () => { let seen = false; const watcher = new MutationObserver(() => { if (document.querySelector('.sr-action-callout')) seen = true; }); watcher.observe(document.body, { childList: true, subtree: true }); return () => { watcher.disconnect(); return seen; }; };
+    const result = {};
+
+    // video
+    let started = once('start'); let exited = once('exit'); let stopWatching = sawCard();
+    await projector.start('film'); result.videoStart = (await started).mode;
+    result.videoStartCard = !!(await until(() => root()?.querySelector('.sr-start-card')))?.textContent.includes('Film');
+    result.videoProgress = (await until(() => { const label = root()?.querySelector('.sr-progress:not([hidden]) .sr-progress-label')?.textContent; return label?.startsWith('Scene') && label; }));
+    result.videoPill = [...root().querySelectorAll('.sr-pill [data-cmd]')].map((button) => button.dataset.cmd);
+    let endCard = await until(() => root()?.querySelector('.sr-end-card'));
+    result.videoEnd = endCard?.textContent.includes('Finished') && !!endCard.querySelector('[data-card="replay"]');
+    // Replay restarts in the same mode, and the ended run's card cannot close the new one.
+    started = once('start'); endCard.querySelector('[data-card="replay"]').click();
+    result.replayMode = (await started).mode;
+    result.replayStartCard = !!(await until(() => root()?.querySelector('.sr-start-card')));
+    endCard = await until(() => root()?.querySelector('.sr-end-card'));
+    endCard.querySelector('[data-card="close"]').click();
+    result.videoExit = (await exited).reason; result.videoCards = stopWatching();
+
+    // video with captions
+    exited = once('exit'); stopWatching = sawCard();
+    await projector.start('captioned');
+    result.caption = (await until(() => { const caption = root()?.querySelector('.sr-caption:not([hidden])'); return caption?.textContent; }));
+    result.captionExit = (await exited).reason; result.captionCards = stopWatching();
+
+    // autoplay
+    exited = once('exit');
+    await projector.start('auto');
+    result.autoCard = !!(await until(() => document.querySelector('.sr-action-callout')));
+    result.autoCardButtons = document.querySelectorAll('.sr-callout-actions button').length;
+    result.autoPillText = [...root().querySelectorAll('.sr-pill .sr-pill-label')].map((label) => label.textContent);
+    await until(() => root()?.querySelector('.sr-end-card'));
+    result.autoExit = (await exited).reason;
+
+    // guided
+    exited = once('exit'); let waiting = once('awaitingnext');
+    await projector.start('steps'); await waiting;
+    result.guidedStartCard = !!root().querySelector('.sr-start-card');
+    result.guidedStep = document.querySelector('.sr-callout-step')?.textContent;
+    result.guidedPillHidden = root().querySelector('.sr-pill').hidden;
+    waiting = once('awaitingnext'); document.querySelector('.sr-callout-next').click(); await waiting;
+    result.guidedLast = document.querySelector('.sr-callout-next')?.textContent;
+    document.querySelector('.sr-callout-next').click();
+    result.guidedExit = (await exited).reason;
+
+    // ask, remembered
+    projector.start('choose');
+    const chooser = await until(() => root()?.querySelector('.sr-chooser-layer:not([hidden]) .sr-chooser-options'));
+    result.offered = [...chooser.querySelectorAll('[data-choose]')].map((button) => button.dataset.choose);
+    exited = once('exit'); waiting = once('awaitingnext');
+    chooser.querySelector('[data-choose="guided"]').click(); await waiting;
+    projector.disable('user'); await exited;
+    projector.start('choose');
+    const again = await until(() => root()?.querySelector('.sr-chooser-layer:not([hidden]) .sr-mode--primary'));
+    result.preselected = again.dataset.choose;
+    projector.destroy(); spot.remove(); target.remove();
+    return result;
+  });
+  assert.deepEqual(modes, {
+    videoStart: 'video', videoStartCard: true, videoProgress: 'Scene 1 of 2 · First', videoPill: ['play', 'exit'], videoEnd: true, replayMode: 'video', replayStartCard: true, videoExit: 'complete', videoCards: false,
+    caption: 'CardOne', captionExit: 'complete', captionCards: false,
+    autoCard: true, autoCardButtons: 0, autoPillText: ['Previous scene', 'Next scene'], autoExit: 'complete',
+    guidedStartCard: false, guidedStep: '1 of 2', guidedPillHidden: true, guidedLast: 'Finish', guidedExit: 'complete',
+    offered: ['video', 'guided'], preselected: 'guided',
+  });
   await inlinePage.close();
   // Studio authoring of guided + autoplay tours: Flow settings ("Let viewers choose" for new flows),
   // an Info card from the toolbar titled from its element, words edited on the row and persisted,
@@ -590,7 +675,7 @@ try {
   assert.equal(await cardRow.locator('[data-card-needs]').count(), 1, 'an empty card is flagged');
   await cardRow.locator('[data-card-text]').fill('Apache 2.0, self-hosted, no account needed.');
   assert.equal(await cardRow.locator('[data-card-needs]').count(), 0);
-  await authorPage.waitForFunction(() => Object.entries(localStorage).some(([key, value]) => key.endsWith(':flows:v1') && value.includes('Apache 2.0, self-hosted') && value.includes('"advance":"guided"')), null, { timeout: 5000 });
+  await authorPage.waitForFunction(() => Object.entries(localStorage).some(([key, value]) => key.endsWith(':flows:v1') && value.includes('Apache 2.0, self-hosted') && value.includes('"advance":"guided"') && value.includes('"playback":{"modes":["guided","autoplay"],"default":"guided"}')), null, { timeout: 5000 });
   await authorPage.locator('[data-play-scene]').click();
   await authorFrame.locator('.sr-callout-next').waitFor({ timeout: 10000 });
   assert.match(await cardRow.locator('[data-action-status]').innerText(), /waiting for next/i);
@@ -601,8 +686,12 @@ try {
   await gestureTarget.click({ modifiers: [captureKey, 'Shift'] }); await authorPage.keyboard.up('Shift'); await authorPage.keyboard.up(captureKey);
   await authorPage.locator('.sr-action').nth(1).waitFor();
   assert.deepEqual(await authorPage.locator('.sr-action strong').allInnerTexts(), ['Info card', 'Info card'], '⇧⌘-click captures a second info card');
+  // Play scene previews any mode: Video leaves the info card out, so the scene completes with no card.
+  await authorPage.locator('[data-preview-mode="video"]').click(); await authorPage.getByText('Scene completed').waitFor({ state: 'hidden', timeout: 10000 });
+  await authorPage.locator('[data-play-scene]').click(); await authorPage.getByText('Scene completed').waitFor({ timeout: 10000 });
+  assert.equal(await authorFrame.locator('.sr-action-callout').count(), 0, 'video preview shows no info card');
   await authorPage.close();
-  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="auto"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
+  const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="autoplay"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
   // stable session id. Fresh context so presenter-mode session state can't leak in.
   const shareContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });

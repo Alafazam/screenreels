@@ -4,8 +4,9 @@
   const clone = (value) => JSON.parse(JSON.stringify(value));
   /* Pacing a flow gets when it declares none, and that a new or captured scene starts with. */
   const NEW_FLOW_DEFAULTS = Object.freeze({ dwellMs: 6000, settleMs: 900 });
-  /* A flow created in Studio lets its viewers pick Guided or Autoplay. Only createBlank uses it, so a
-     manifest that declares no playback keeps playing auto, as before. */
+  /* A flow created in Studio lets its viewers pick Guided or Autoplay (docs/playback.md). It carries
+     the older `advance` too, so an older runtime still asks. Only createBlank uses it, so a manifest
+     that declares no playback keeps playing autoplay, as before. */
   const NEW_FLOW_PLAYBACK = 'ask';
   const PROJECT_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,79}$/i; // 2-80 chars, matching the error below
   const now = () => new Date().toISOString();
@@ -110,7 +111,7 @@
       }) }));
       return flow;
     }
-    createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: { ...clone(NEW_FLOW_DEFAULTS), advance: NEW_FLOW_PLAYBACK }, scenes: [] }; }
+    createBlank(name = 'New demo flow') { const stamp = now(); return { id: makeId('flow'), name, readonly: false, createdAt: stamp, updatedAt: stamp, defaults: { ...clone(NEW_FLOW_DEFAULTS), advance: NEW_FLOW_PLAYBACK, playback: { default: NEW_FLOW_PLAYBACK } }, scenes: [] }; }
     save(flow) {
       if (flow.readonly || this.standardFlows.some((item) => item.id === flow.id)) throw new Error('Standard flows cannot be overwritten');
       const normalized = normalizeFlow(flow, 0, this.baseHref, false); normalized.updatedAt = now(); const flows = this.readLocal(); const index = flows.findIndex((item) => item.id === normalized.id);
@@ -153,6 +154,10 @@
     setPendingRestore(value) { this.writeSessionJson('pending-restore', value); }
     readSessionJson(name) { try { return JSON.parse(this.session.getItem(this.sessionKey(name))) || null; } catch { return null; } }
     writeSessionJson(name, value) { value ? this.session.setItem(this.sessionKey(name), JSON.stringify(value)) : this.session.removeItem(this.sessionKey(name)); }
+    /* The viewer's last chooser pick per flow, for a host that mounts with `playback.remember`. Local,
+       not session, so it outlives the visit; namespaced like everything else, so "Clear local data" resets it. */
+    playbackPick(flowId) { return this.storage.getItem(this.key(`playback-pick:${flowId}`)) || null; }
+    setPlaybackPick(flowId, mode) { mode ? this.storage.setItem(this.key(`playback-pick:${flowId}`), mode) : this.storage.removeItem(this.key(`playback-pick:${flowId}`)); }
     advanceChoice() { return this.session.getItem(this.sessionKey('advance-choice')) || null; }
     setAdvanceChoice(value) { value ? this.session.setItem(this.sessionKey('advance-choice'), value) : this.session.removeItem(this.sessionKey('advance-choice')); }
     share() { return this.session.getItem(this.sessionKey('share')) === '1'; }

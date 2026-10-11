@@ -62,24 +62,31 @@ or narrow until it says one: an ambiguous selector is a scene that will not save
 joins the same coalesced sequence as everything else. On macOS Chrome, prefer ⌘; Ctrl+click is a
 right-click there.
 
-## Info cards: one flow, Guided and Autoplay
+## Info cards: one flow, Guided, Autoplay, and Video
 
-An info card is a titled note beside an element, and it is what makes one flow work two ways:
+An info card is a titled note beside an element, and it is what makes one flow work three ways
+(see [Playback modes](playback.md)):
 
 - **Guided:** each card waits until the viewer presses Next.
 - **Autoplay:** each card stays up for its autoplay time, and never less than it takes to read.
+- **Video:** cards are left out, or shown as captions; the cursor and actions carry the story.
 
 Add one with **⇧⌘/⇧Ctrl+click** while recording, or with **Info card** in the editor toolbar and a
 click on the element. Its title starts as the element's own text. Type the card's words straight
 into its row in the timeline. The card sits on its element in the preview while you edit, and the
 row shows its step number and autoplay time. A card with no text shows **Needs text** and won't save.
 
-**Preview as Guided / Autoplay** beside **Play scene** plays the scene the way that viewer gets it:
-Guided waits for **Next** on each card in the preview.
+**Preview as Guided / Autoplay / Video** beside **Play scene** plays the scene the way that viewer
+gets it: Guided waits for **Next** on each card, and Video leaves cards out.
 
-**Flow settings** (on the scene list) sets **How viewers play it**:
-- **Let viewers choose:** the default for new flows. Viewers pick Guided or Autoplay when the tour starts.
-- **Guided** or **Autoplay** fixes one of them.
+**Flow settings** (on the scene list) sets:
+- **How viewers play it:**
+  - **Let viewers choose:** the default for new flows. Viewers pick from the offered modes when the tour starts.
+  - **Guided**, **Autoplay**, or **Video** fixes one of them.
+- **Modes the chooser offers:** Guided and Autoplay by default. Tick Video to offer it too.
+- **Per-mode settings:** how info cards play in each mode, and whether it shows a start card, a progress bar, and an end card.
+
+These are saved as `defaults.playback` (with the older `defaults.advance` beside it, for older runtimes).
 
 You never set up the rest:
 - **The click shield:** while a tour plays, stray viewer clicks can't change the app.

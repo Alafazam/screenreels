@@ -10,6 +10,7 @@ Select the smallest specialist set:
 - Use `screenreel-projector` for embedding, Studio, local flows, routing, selectors, validation, and Scene Play.
 - Use `screenreel-capture` for recording, selective re-capture, assembly, encoding, and footage verification.
 - Use `screenreel-demo-craft` for audience, narrative, talking points, scene boundaries, pacing, and determinism.
+- Use `screenreel-narrated-scenes` for voiced films where actions, captions, and camera moves must land on the narrator's words.
 
 For end-to-end work, apply Demo Craft first, Projector second, and Capture last. Keep the application-owned manifest as the shared source across all three.
 

@@ -44,20 +44,21 @@ Per-scene estimates show in Studio's scene table. For a real number, time it in 
 window — headless and backgrounded tabs throttle `requestAnimationFrame` and timers hard, so any
 measurement taken there is fiction.
 
-## Guided or automatic advance
+## Video, autoplay, or guided
 
-```js
-advance: 'auto'    // default — each finished scene rests for dwellMs, then the next one plays
-advance: 'guided'  // each finished scene waits until the viewer presses Next
+```json
+"defaults": { "playback": { "default": "autoplay" } }  // each finished scene rests for dwellMs, then the next one plays
+"defaults": { "playback": { "default": "guided" } }    // each info card waits until the viewer presses Next
+"defaults": { "playback": { "default": "video" } }     // hands-off, no info cards
 ```
 
-A flow can set its own mode with `"defaults": { "advance": "guided" }`; the mount option wins, so
-the same flow can run guided inside the product and automatic on a share link. In guided mode the
-Next button pulses while the tour is waiting, share links get a Next button too, and Next on the
-last scene of a `loop: false` flow completes the tour (`screenreel:complete`). Each wait also
-dispatches `screenreel:awaitingnext` with `{ projectId, flowId, sceneId }`. In guided mode each
-callout is also a step that waits for Next. See [Guided tours and onboarding](guided-tours.md) for
-the step card, the chooser, `cleanup`, and the click shield.
+Each mode can also set its own pace: `"guided": { "pace": 1.35 }` slows a guided run by a third
+without touching the sales demo's timing. In guided mode the Next button pulses while the tour is
+waiting, share links get a Next button too, and Next on the last scene of a `loop: false` flow
+completes the tour (`screenreel:complete`). Each wait also dispatches `screenreel:awaitingnext`
+with `{ projectId, flowId, sceneId }`. See [Playback modes](playback.md) for every setting and the
+precedence, and [Guided tours and onboarding](guided-tours.md) for the step card, the chooser,
+`cleanup`, and the click shield. The older `advance: 'auto' | 'guided'` still works.
 
 ## Dimming behind highlights
 

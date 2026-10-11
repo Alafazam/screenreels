@@ -79,6 +79,7 @@ class MemoryStorage {
 test('a new flow lets viewers choose; flows that declare nothing keep playing auto', () => {
   const store = new Store({ projectId: 'authoring-test', flow: { data: { schemaVersion: 1, flows: [] } }, baseHref: 'https://app.test/', storage: new MemoryStorage(), session: new MemoryStorage() });
   assert.equal(store.createBlank('Onboarding').defaults.advance, 'ask');
+  assert.deepEqual(store.createBlank('Onboarding').defaults.playback, { default: 'ask' });
   assert.equal(normalizeFlow({ id: 'legacy', name: 'Legacy', scenes: [] }, 0, 'https://app.test/').defaults.advance, undefined);
 });
 
