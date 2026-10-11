@@ -301,7 +301,8 @@ class Projector {
     this.progress.querySelector('.sr-progress-label').textContent = title ? `${labels.sceneOf(position + 1, total)} · ${title}` : labels.sceneOf(position + 1, total);
   }
   /* A card in the chooser layer — the start and end cards. Resolves when it times out or a button
-     is pressed, with that button's `data-card` value ('' for a timeout or a click on the card). */
+     is pressed, with that button's `data-card` value ('' for a timeout, Esc, or a click on the
+     card), or null when something else took over (start() or disable()), so its caller does nothing. */
   showCard(html, durationMs) {
     const layer = this.chooserLayer; if (!layer) return Promise.resolve('');
     layer.innerHTML = html; layer.hidden = false; layer.classList.add('sr-card-layer');
@@ -374,7 +375,7 @@ class Projector {
   disable(reason = 'api') {
     const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id; const origin = this.store.origin(); const mode = this.playMode(scene);
     document.removeEventListener('keydown', this.keyHandler); this.keyHandler = null;
-    this.resolveChooser?.(null); this.resolveCard?.('');
+    this.resolveChooser?.(null); this.resolveCard?.(null);
     this.pause(); this.restorePace(); this.startCardShown = false; this.undoTour(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); window.__screenreelCursor?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
     this.layer?.remove(); this.layer = null;
     if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason, mode });
@@ -477,7 +478,7 @@ class Projector {
     if (requested && requested !== playback.ASK && this.playback.modes && !this.playback.modes.includes(requested)) throw new Error(`ScreenReel start(): mode "${requested}" is not in this host's playback.modes (${this.playback.modes.join(', ')})`);
     const sceneCount = this.store.enabledScenes(flow).length;
     if (!Number.isInteger(position) || position < 0 || position >= sceneCount) throw new Error(`ScreenReel start(): position ${position} is outside the ${sceneCount} enabled scenes of "${flowId}"`);
-    this.pause(); await this.undoTour(); this.resolveCard?.('');
+    this.pause(); await this.undoTour(); this.resolveCard?.(null);
     this.store.setActive(flow.id); this.store.setPosition(position); this.store.setAdvanceChoice(null); this.startCardShown = false;
     this.store.setOrigin({ route: this.router.getRoute(), scrollX, scrollY });
     if (this.store.enabled()) this.render(); else this.enable();
@@ -524,6 +525,7 @@ class Projector {
     this.analytics.emit('flow_complete'); event('complete', { projectId: this.store.projectId, flowId, sceneId: scene?.id, position, sceneCount: scenes.length, mode });
     if (!settings.endCard) { if (this.options.disableOnComplete) this.disable('complete'); return this; }
     this.showEndCard().then((choice) => {
+      if (choice === null) return null;
       if (choice === 'replay') return this.start(flowId, { mode });
       if (choice === 'close' || this.options.disableOnComplete) this.disable('complete');
       return null;

@@ -595,8 +595,13 @@ try {
     result.videoStartCard = !!(await until(() => root()?.querySelector('.sr-start-card')))?.textContent.includes('Film');
     result.videoProgress = (await until(() => { const label = root()?.querySelector('.sr-progress:not([hidden]) .sr-progress-label')?.textContent; return label?.startsWith('Scene') && label; }));
     result.videoPill = [...root().querySelectorAll('.sr-pill [data-cmd]')].map((button) => button.dataset.cmd);
-    const endCard = await until(() => root()?.querySelector('.sr-end-card'));
+    let endCard = await until(() => root()?.querySelector('.sr-end-card'));
     result.videoEnd = endCard?.textContent.includes('Finished') && !!endCard.querySelector('[data-card="replay"]');
+    // Replay restarts in the same mode, and the ended run's card cannot close the new one.
+    started = once('start'); endCard.querySelector('[data-card="replay"]').click();
+    result.replayMode = (await started).mode;
+    result.replayStartCard = !!(await until(() => root()?.querySelector('.sr-start-card')));
+    endCard = await until(() => root()?.querySelector('.sr-end-card'));
     endCard.querySelector('[data-card="close"]').click();
     result.videoExit = (await exited).reason; result.videoCards = stopWatching();
 
@@ -640,7 +645,7 @@ try {
     return result;
   });
   assert.deepEqual(modes, {
-    videoStart: 'video', videoStartCard: true, videoProgress: 'Scene 1 of 2 · First', videoPill: ['play', 'exit'], videoEnd: true, videoExit: 'complete', videoCards: false,
+    videoStart: 'video', videoStartCard: true, videoProgress: 'Scene 1 of 2 · First', videoPill: ['play', 'exit'], videoEnd: true, replayMode: 'video', replayStartCard: true, videoExit: 'complete', videoCards: false,
     caption: 'CardOne', captionExit: 'complete', captionCards: false,
     autoCard: true, autoCardButtons: 0, autoPillText: ['Previous scene', 'Next scene'], autoExit: 'complete',
     guidedStartCard: false, guidedStep: '1 of 2', guidedPillHidden: true, guidedLast: 'Finish', guidedExit: 'complete',
