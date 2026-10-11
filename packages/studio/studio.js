@@ -30,19 +30,28 @@ const SCENE_TIMING_FIELDS = [
 /* Save-time checks read their bounds from the field specs above, so the form and validation cannot disagree. */
 const SCENE_TIMING_ERRORS = [['dwellMs', 'invalid scene time'], ['timeoutMs', 'invalid ready timeout'], ['settleMs', 'invalid settle time']];
 const BLOB_URL_REVOKE_MS = 500;      // give the download a beat to start before the object URL goes
-/* How a flow plays for its viewers (flow.defaults.advance). One flow serves both ways: info cards
-   wait for Next in Guided and hold for their autoplay time in Autoplay. A flow that declares none
-   plays auto, which is how flows behaved before playback was a choice. */
+/* How a flow plays for its viewers (flow.defaults.playback; docs/playback.md). One flow serves every
+   mode: info cards wait for Next in Guided, hold for their reading time in Autoplay, and are left out
+   of Video. A flow that declares none plays autoplay, which is how flows behaved before playback was
+   a choice. */
 const FLOW_PLAYBACK = [
-  { value: 'ask', label: 'Let viewers choose', help: 'They pick Guided or Autoplay when the tour starts.' },
+  { value: 'ask', label: 'Let viewers choose', help: 'They pick one of the modes you offer below when the tour starts.' },
   { value: 'guided', label: 'Guided', help: 'Viewers click through your info cards with Next.' },
-  { value: 'auto', label: 'Autoplay', help: 'The tour plays by itself; each info card stays up for its autoplay time.' },
+  { value: 'autoplay', label: 'Autoplay', help: 'The tour plays by itself; each info card stays up for its autoplay time.' },
+  { value: 'video', label: 'Video', help: 'Plays like a video: the cursor and actions, no info cards.' },
 ];
-const LEGACY_PLAYBACK = 'auto';
-const PREVIEW_MODES = [{ value: 'guided', label: 'Guided' }, { value: 'auto', label: 'Autoplay' }];
+const MODE_LABELS = { guided: 'Guided', autoplay: 'Autoplay', video: 'Video' };
+/* The order Studio lists modes in: the chooser's default pair first, then video. */
+const STUDIO_MODE_ORDER = ['guided', 'autoplay', 'video'];
+const CALLOUT_STYLE_LABELS = { step: 'Wait for Next', timed: 'Hold for reading time', caption: 'Caption only', off: 'Leave out' };
+/* The per-mode settings Flow settings edits; the rest (pill controls, pace, …) stay as the file has them. */
+const STUDIO_MODE_SETTINGS = [['startCard', 'Start card'], ['progress', 'Progress bar'], ['endCard', 'End card']];
+/* What Studio writes to `defaults.advance` beside `playback`, so an older runtime still plays the flow; video has no older name. */
+const OLDER_ADVANCE = { ask: 'ask', guided: 'guided', autoplay: 'auto', video: 'auto' };
+const PREVIEW_MODES = STUDIO_MODE_ORDER.map((value) => ({ value, label: MODE_LABELS[value] }));
 /* The preview card in Studio shows the viewer's controls; they do nothing here but show the layout. */
 const PREVIEW_CARD_LABELS = { skip: 'Skip tour', back: 'Back', next: 'Next', finish: 'Finish' };
-const flowPlayback = (flow) => flow?.defaults?.advance ?? LEGACY_PLAYBACK;
+const flowPlayback = (flow) => window.ScreenReelPlayback.flowConfig(flow).default ?? window.ScreenReelPlayback.FALLBACK_MODE;
 const ACTION_ICONS = { choice: 'right', highlight: 'spark', glow: 'spark', spotlight: 'spark', callout: 'notes', flash: 'spark', reel: 'spark', reveal: 'capture', countdown: 'clock', wait: 'clock', waitFor: 'clock', scrollIntoView: 'down', scroll: 'down', click: 'right', pointer: 'right', hover: 'right', focus: 'right', goto: 'right', type: 'notes', set: 'sliders', toggle: 'sliders', lever: 'sliders', drag: 'grip', call: 'studio' };
 const flowCounts = (flow) => ({ scenes: flow.scenes.length, enabled: flow.scenes.filter((scene) => scene.enabled !== false).length, actions: flow.scenes.reduce((total, scene) => total + scene.actions.length, 0) });
 function formatUpdated(flow) { if (flow.readonly) return 'Standard'; try { return new Date(flow.updatedAt).toLocaleDateString('en-GB'); } catch { return '—'; } }
@@ -92,19 +101,37 @@ class Studio {
       row.ondragstart = () => { this.dragIndex = index; row.classList.add('dragging'); }; row.ondragend = () => row.classList.remove('dragging'); row.ondragover = (e) => e.preventDefault(); row.ondrop = () => this.moveScene(this.dragIndex, index);
     });
   }
-  /* What a viewer experiences: how the tour advances, and the pause between scenes. The click shield
-     and cleanup are automatic, so the modal states them rather than offering settings for them. */
+  /* What a viewer experiences: how the tour plays (the default mode, the modes the chooser offers,
+     and a few settings per mode), and the pause between scenes. The click shield and cleanup are
+     automatic, so the modal states them rather than offering settings for them. */
   openFlowSettings() {
-    const current = flowPlayback(this.draft); const dwell = SCENE_TIMING_FIELDS.find((spec) => spec.key === 'dwellMs');
+    const playback = window.ScreenReelPlayback; const config = playback.flowConfig(this.draft);
+    const current = flowPlayback(this.draft); const offered = config.modes ?? playback.DEFAULT_MODES; const dwell = SCENE_TIMING_FIELDS.find((spec) => spec.key === 'dwellMs');
+    const effective = (mode, key) => config.overrides[mode]?.[key] ?? playback.PRESETS[mode][key];
     const options = FLOW_PLAYBACK.map((option) => `<label class="sr-playback-option"><input type="radio" name="sr-playback" value="${option.value}" ${option.value === current ? 'checked' : ''}><span><strong>${esc(option.label)}</strong><small>${esc(option.help)}</small></span></label>`).join('');
-    const modal = this.modal(`<h2>Flow settings</h2><p class="sr-modal-lead">How viewers experience this flow.</p><div class="sr-fields"><label class="sr-field wide"><span>Flow name</span><input data-flow-name value="${esc(this.draft.name)}"></label><fieldset class="sr-playback"><legend>How viewers play it</legend>${options}</fieldset>${this.fieldHtml({ ...dwell, label: 'Pause between scenes (ms)' }, this.draft.defaults?.dwellMs ?? '')}</div><p class="sr-modal-note">${icon('shield')} While a tour plays, viewers can't click the app by accident, and anything the tour changed is put back when it ends.</p><div class="sr-modal-actions"><button data-cancel>Cancel</button><button data-apply class="sr-primary">Save</button></div>`);
+    const offers = STUDIO_MODE_ORDER.map((mode) => `<label class="sr-playback-offer"><input type="checkbox" name="sr-playback-offer" value="${mode}" ${offered.includes(mode) ? 'checked' : ''}> ${esc(MODE_LABELS[mode])}</label>`).join('');
+    const rows = STUDIO_MODE_ORDER.map((mode) => `<tr data-mode-row="${mode}"><th scope="row">${esc(MODE_LABELS[mode])}</th><td><select data-mode-setting="callouts" aria-label="${esc(MODE_LABELS[mode])} info cards">${playback.CALLOUT_STYLES.map((style) => `<option value="${style}" ${effective(mode, 'callouts') === style ? 'selected' : ''}>${esc(CALLOUT_STYLE_LABELS[style])}</option>`).join('')}</select></td>${STUDIO_MODE_SETTINGS.map(([key, label]) => `<td><input type="checkbox" data-mode-setting="${key}" aria-label="${esc(MODE_LABELS[mode])} ${esc(label.toLowerCase())}" ${effective(mode, key) ? 'checked' : ''}></td>`).join('')}</tr>`).join('');
+    const table = `<details class="sr-playback-modes"><summary>Per-mode settings</summary><table><thead><tr><th></th><th>Info cards</th>${STUDIO_MODE_SETTINGS.map(([, label]) => `<th>${esc(label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></details>`;
+    const modal = this.modal(`<h2>Flow settings</h2><p class="sr-modal-lead">How viewers experience this flow.</p><div class="sr-fields"><label class="sr-field wide"><span>Flow name</span><input data-flow-name value="${esc(this.draft.name)}"></label><fieldset class="sr-playback"><legend>How viewers play it</legend>${options}</fieldset><fieldset class="sr-playback sr-playback-offers"><legend>Modes the chooser offers</legend>${offers}</fieldset>${table}${this.fieldHtml({ ...dwell, label: 'Pause between scenes (ms)' }, this.draft.defaults?.dwellMs ?? '')}</div><p class="sr-modal-note">${icon('shield')} While a tour plays, viewers can't click the app by accident, and anything the tour changed is put back when it ends.</p><div class="sr-modal-actions"><button data-cancel>Cancel</button><button data-apply class="sr-primary">Save</button></div>`);
     modal.querySelector('[data-cancel]').onclick = () => modal.remove();
     modal.querySelector('[data-apply]').onclick = () => {
       const name = modal.querySelector('[data-flow-name]').value.trim(); if (!name) return this.toast('Give this flow a name');
-      const advance = modal.querySelector('input[name="sr-playback"]:checked')?.value ?? current;
+      const chosen = modal.querySelector('input[name="sr-playback"]:checked')?.value ?? current;
+      const modes = STUDIO_MODE_ORDER.filter((mode) => modal.querySelector(`input[name="sr-playback-offer"][value="${mode}"]`).checked || mode === chosen);
+      if (!modes.length) return this.toast('Offer at least one mode');
       const dwellInput = modal.querySelector(`[data-key="${dwell.key}"]`).value; const dwellMs = dwellInput === '' ? undefined : Number(dwellInput);
       if (dwellMs !== undefined && (!Number.isFinite(dwellMs) || dwellMs < dwell.min || dwellMs > dwell.max)) return this.toast(`Pause between scenes must be ${dwell.min}–${dwell.max} ms`);
-      this.ensureEditable(); this.draft.name = name; this.draft.defaults = { ...(this.draft.defaults || {}), advance, dwellMs }; this.markDirty(); modal.remove(); this.render();
+      // Only what differs from a mode's preset is written; settings this modal does not edit are kept.
+      const next = { modes, default: chosen };
+      for (const mode of STUDIO_MODE_ORDER) {
+        const row = modal.querySelector(`[data-mode-row="${mode}"]`); const override = { ...(config.overrides[mode] || {}) };
+        for (const input of row.querySelectorAll('[data-mode-setting]')) {
+          const key = input.dataset.modeSetting; const value = input.type === 'checkbox' ? input.checked : input.value;
+          if (value === playback.PRESETS[mode][key]) delete override[key]; else override[key] = value;
+        }
+        if (Object.keys(override).length) next[mode] = override;
+      }
+      this.ensureEditable(); this.draft.name = name; this.draft.defaults = { ...(this.draft.defaults || {}), playback: next, advance: OLDER_ADVANCE[chosen], dwellMs }; this.markDirty(); modal.remove(); this.render();
     };
   }
   /* Flow-level {{variable}} declarations. v1 edits the JSON map directly (the field system has no
@@ -434,7 +461,17 @@ class Studio {
     ];
     return { rows: gestures.map((gesture) => [gesture.keys, gesture.long]), hint: gestures.map((gesture) => `${gesture.keys} ${gesture.short}`).join(' · ') };
   }
-  previewMode() { return this.previewModeChoice || (flowPlayback(this.draft) === 'auto' ? 'auto' : 'guided'); }
+  /* The mode Play scene previews: the author's pick, else the flow's default (the first offered mode for 'ask'). */
+  previewMode() {
+    if (this.previewModeChoice) return this.previewModeChoice;
+    const playback = window.ScreenReelPlayback; const chosen = flowPlayback(this.draft);
+    return chosen === playback.ASK ? (playback.flowConfig(this.draft).modes ?? playback.DEFAULT_MODES)[0] : chosen;
+  }
+  /* How info cards play in the previewed mode, with this host's and this flow's overrides. */
+  previewCallouts() {
+    const playback = window.ScreenReelPlayback;
+    return playback.resolveSettings(this.previewMode(), playback.flowConfig(this.draft), this.projector.playback).callouts;
+  }
   previewCardControls(index, onNext) {
     const { step, total } = window.ScreenReelCore.infoCardStep(this.draft.scenes.filter((item) => item.enabled !== false), this.sceneId, index);
     return { labels: { ...PREVIEW_CARD_LABELS, next: step === total ? PREVIEW_CARD_LABELS.finish : PREVIEW_CARD_LABELS.next }, step: `${step} of ${total}`, onSkip: onNext, onBack: step > 1 ? () => {} : null, onNext: onNext || (() => {}) };
@@ -639,7 +676,11 @@ class Studio {
     for (let index = 0; index < scene.actions.length; index++) {
       if (controller.signal.aborted) return;
       const action = scene.actions[index]; const actionWithoutWait = { ...action }; delete actionWithoutWait.afterMs; this.updateScenePlayback({ index, phase: 'action' });
-      const step = this.previewMode() === 'guided' && window.ScreenReelCore.isGuidedStep(action); let release = null; let next = null;
+      const callouts = window.ScreenReelCore.isGuidedStep(action) ? this.previewCallouts() : null;
+      // Video leaves cards out; its captions show the words with no card.
+      if (callouts === 'off') continue;
+      if (callouts === 'caption') { this.toast([action.title, action.text].filter(Boolean).join(' — ')); await window.ScreenReelCore.sleep(window.ScreenReelCore.cardHoldMs(action), controller.signal); continue; }
+      const step = callouts === 'step'; let release = null; let next = null;
       const advanced = step ? new Promise((resolve) => { next = resolve; controller.signal.addEventListener('abort', resolve, { once: true }); }) : null;
       const result = await window.ScreenReelCore.runAction(actionWithoutWait, { document: doc, window: win, signal: controller.signal, variables: window.ScreenReelCore.variableDefaults(this.draft?.variables), narrateAction: (text) => window.__screenreelNarrator?.speak(text), navigate: (route) => { this.frame.src = this.previewRoute(route); },
         // Guided preview plays a card exactly as a guided viewer gets it: it waits for Next.

@@ -133,6 +133,11 @@
 @media(max-width:980px){.sr-scene-toolbar{width:100%;margin-top:12px}.sr-flow-page .sr-page-title{align-items:flex-start}.sr-flow-toolbar{margin-bottom:0}}
 @media(max-width:1100px){.sr-editor-title{align-items:flex-start}.sr-editor-title .sr-toolbar{max-width:55%}.sr-editor-grid{grid-template-columns:minmax(0,1fr) 300px}}
 .sr-pace-hint{color:#71717a;font-size:11px}
+.sr-playback-offers{display:flex;flex-wrap:wrap;gap:8px 16px}.sr-playback-offers legend{width:100%}
+.sr-playback-offer{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:#18181b}.sr-playback-offer input{accent-color:var(--sr-accent,#7c3aed)}
+.sr-playback-modes{grid-column:1/-1;font-size:12px;color:#52525b}.sr-playback-modes summary{cursor:pointer;font-size:11px;font-weight:700}
+.sr-playback-modes table{width:100%;margin-top:8px;border-collapse:collapse}.sr-playback-modes th,.sr-playback-modes td{padding:4px 6px;text-align:left;font-weight:500}.sr-playback-modes thead th{font-size:11px;color:#71717a}
+.sr-playback-modes select{border:1px solid #d4d4d8;border-radius:6px;padding:3px 6px;background:#fff;color:#18181b;font:inherit}.sr-playback-modes input{accent-color:var(--sr-accent,#7c3aed)}
 .sr-modal-note{margin:0 0 14px;display:flex;align-items:center;gap:6px;color:#71717a;font-size:11px}
 /* Record primer. .sr-modal-actions is flex/flex-end, so the skip label needs margin-right:auto to
    sit opposite the buttons rather than crowding them. */

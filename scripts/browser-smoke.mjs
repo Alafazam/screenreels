@@ -670,7 +670,7 @@ try {
   assert.equal(await cardRow.locator('[data-card-needs]').count(), 1, 'an empty card is flagged');
   await cardRow.locator('[data-card-text]').fill('Apache 2.0, self-hosted, no account needed.');
   assert.equal(await cardRow.locator('[data-card-needs]').count(), 0);
-  await authorPage.waitForFunction(() => Object.entries(localStorage).some(([key, value]) => key.endsWith(':flows:v1') && value.includes('Apache 2.0, self-hosted') && value.includes('"advance":"guided"')), null, { timeout: 5000 });
+  await authorPage.waitForFunction(() => Object.entries(localStorage).some(([key, value]) => key.endsWith(':flows:v1') && value.includes('Apache 2.0, self-hosted') && value.includes('"advance":"guided"') && value.includes('"playback":{"modes":["guided","autoplay"],"default":"guided"}')), null, { timeout: 5000 });
   await authorPage.locator('[data-play-scene]').click();
   await authorFrame.locator('.sr-callout-next').waitFor({ timeout: 10000 });
   assert.match(await cardRow.locator('[data-action-status]').innerText(), /waiting for next/i);
@@ -681,6 +681,10 @@ try {
   await gestureTarget.click({ modifiers: [captureKey, 'Shift'] }); await authorPage.keyboard.up('Shift'); await authorPage.keyboard.up(captureKey);
   await authorPage.locator('.sr-action').nth(1).waitFor();
   assert.deepEqual(await authorPage.locator('.sr-action strong').allInnerTexts(), ['Info card', 'Info card'], '⇧⌘-click captures a second info card');
+  // Play scene previews any mode: Video leaves the info card out, so the scene completes with no card.
+  await authorPage.locator('[data-preview-mode="video"]').click(); await authorPage.getByText('Scene completed').waitFor({ state: 'hidden', timeout: 10000 });
+  await authorPage.locator('[data-play-scene]').click(); await authorPage.getByText('Scene completed').waitFor({ timeout: 10000 });
+  assert.equal(await authorFrame.locator('.sr-action-callout').count(), 0, 'video preview shows no info card');
   await authorPage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="autoplay"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a
