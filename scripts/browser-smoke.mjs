@@ -651,6 +651,50 @@ try {
     guidedStartCard: false, guidedStep: '1 of 2', guidedPillHidden: true, guidedLast: 'Finish', guidedExit: 'complete',
     offered: ['video', 'guided'], preselected: 'guided',
   });
+  // Timed steps (docs/playback.md#timed-steps-and-narration-audio): a timed card and its ring stay up
+  // for the whole step while its actions run, the page is not dimmed when the step has actions, a card
+  // over an element an action works on fades, and a gate action (no atMs) lets the step finish first.
+  const runTimed = (mode) => inlinePage.evaluate(async (playMode) => {
+    const spot = document.createElement('button'); spot.id = 'ts-spot'; spot.textContent = 'Spot'; spot.style.cssText = 'position:fixed;left:200px;top:200px;width:120px;height:40px';
+    // Clicking the spot opens a "dialog" whose button sits where the bottom-placed card lands.
+    spot.addEventListener('click', () => { if (document.getElementById('ts-dlg')) return; const dialog = document.createElement('button'); dialog.id = 'ts-dlg'; dialog.textContent = 'OK'; dialog.style.cssText = 'position:fixed;left:210px;top:250px;width:100px;height:30px'; document.body.appendChild(dialog); });
+    const other = document.createElement('div'); other.id = 'ts-other'; other.textContent = 'Other'; other.style.cssText = 'position:fixed;left:700px;top:400px;width:120px;height:40px';
+    const mountPoint = document.createElement('button'); mountPoint.id = 'ts-mount';
+    document.body.append(spot, other, mountPoint);
+    const flows = [{ id: 'timed', name: 'Timed', defaults: { dwellMs: 50, playback: { default: playMode, video: { callouts: 'timed' } } }, scenes: [{ id: 'ts-1', title: 'Timed', route: '/', actions: [
+      { type: 'callout', selector: '#ts-spot', title: 'Alpha', text: 'Alpha words', placement: 'bottom', highlight: true, stepMs: 1500 },
+      { type: 'click', selector: '#ts-spot', atMs: 0, afterMs: 100 },
+      { type: 'click', selector: '#ts-dlg', atMs: 500, afterMs: 500 },
+      { type: 'callout', selector: '#ts-other', title: 'Beta', text: 'Beta words', placement: 'bottom', highlight: true, stepMs: 900 },
+      { type: 'waitFor', selector: '#ts-spot' },
+      { type: 'callout', selector: '#ts-other', title: 'Gamma', text: 'Gamma words', placement: 'bottom', highlight: true, stepMs: 600 },
+    ] }] }];
+    const projector = await window.ScreenReel.mount(mountPoint, { projectId: `timed-${playMode}`, loop: false, narration: false, cursor: false, disableOnComplete: true, routesEqual: () => true, flow: { data: { schemaVersion: 1, flows } } });
+    const exited = new Promise((resolve) => addEventListener('screenreel:exit', (event) => { if (event.detail?.reason === 'complete') resolve(); }));
+    const samples = []; const started = performance.now();
+    const sampler = setInterval(() => {
+      const cards = [...document.querySelectorAll('.sr-action-callout')];
+      samples.push({ at: performance.now() - started, titles: cards.map((card) => card.querySelector('.sr-callout-title')?.textContent), opacity: cards.map((card) => card.style.opacity), pointer: cards.map((card) => getComputedStyle(card).pointerEvents), rings: document.querySelectorAll('.sr-glow-box').length, dims: document.querySelectorAll('.sr-dim-backdrop').length });
+    }, 30);
+    await projector.start('timed', { mode: playMode }); await exited; clearInterval(sampler);
+    projector.destroy(); spot.remove(); other.remove(); mountPoint.remove(); document.getElementById('ts-dlg')?.remove();
+    return samples;
+  }, mode);
+  // The samples where one card (by title) is up, and how long that lasted.
+  const span = (samples, name) => { const own = samples.filter((sample) => sample.titles.includes(name)); return { own, lastsMs: own.length ? own[own.length - 1].at - own[0].at : 0 }; };
+  /* Autoplay, and video once its flow turns cards on (`playback.video.callouts: 'timed'`): the same steps. */
+  for (const mode of ['autoplay', 'video']) {
+    const samples = await runTimed(mode);
+    const alpha = span(samples, 'Alpha'); const beta = span(samples, 'Beta');
+    assert.ok(alpha.lastsMs >= 1300, `${mode}: the timed card stays for its whole step while its actions run (${alpha.lastsMs}ms of 1500)`);
+    assert.ok(alpha.own.every((sample) => sample.rings === 1), `${mode}: the target ring stays with the card`);
+    assert.ok(alpha.own.every((sample) => sample.dims === 0), `${mode}: a step with actions does not dim the page`);
+    assert.ok(alpha.own.every((sample) => sample.pointer.every((value) => value === 'none')), `${mode}: the card never takes pointer events`);
+    assert.ok(alpha.own.some((sample) => sample.opacity.includes('0.35')), `${mode}: a card over an element an action works on fades`);
+    assert.ok(alpha.own.some((sample) => sample.opacity.includes('')), `${mode}: and is back to full strength when no action works under it`);
+    assert.ok(beta.lastsMs >= 700, `${mode}: a card with no actions stays for its whole step even with a gate action after it (${beta.lastsMs}ms of 900)`);
+    assert.ok(beta.own.every((sample) => sample.rings === 1 && sample.dims === 1), `${mode}: a step without actions keeps the dim and its ring`);
+  }
   await inlinePage.close();
   // Studio authoring of guided + autoplay tours: Flow settings ("Let viewers choose" for new flows),
   // an Info card from the toolbar titled from its element, words edited on the row and persisted,

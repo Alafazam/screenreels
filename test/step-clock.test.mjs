@@ -143,19 +143,43 @@ test('planSteps places each action on its card\'s timeline, and only after a car
     { type: 'click', selector: '#a', atMs: 100 },                 // before any card: not timed
     { type: 'callout', selector: '#b', stepMs: 4000 },
     { type: 'click', selector: '#c', atMs: 900 },
-    { type: 'highlight', selector: '#d' },                        // in the step, no atMs: runs in sequence
-    { type: 'callout', selector: '#e', holdMs: 2000 },            // an untimed card ends the timed step
+    { type: 'highlight', selector: '#d' },                        // no atMs: a gate, it ends the step
+    { type: 'callout', selector: '#e', holdMs: 2000 },            // an untimed card
     { type: 'click', selector: '#f', atMs: 300 },                 // atMs without a timed card: ignored
   ];
+  const none = { owner: -1, stepMs: null, atMs: null, stepActions: 0 };
   assert.deepEqual(planSteps(actions), [
-    { owner: -1, stepMs: null, atMs: null },
-    { owner: 1, stepMs: 4000, atMs: null },
-    { owner: 1, stepMs: 4000, atMs: 900 },
-    { owner: 1, stepMs: 4000, atMs: null },
-    { owner: -1, stepMs: null, atMs: null },
-    { owner: -1, stepMs: null, atMs: null },
+    none,
+    { owner: 1, stepMs: 4000, atMs: null, stepActions: 1 },
+    { owner: 1, stepMs: 4000, atMs: 900, stepActions: 1 },
+    none, none, none,
   ]);
   assert.deepEqual(planSteps(undefined), []);
+});
+
+test('an action without atMs after a timed card is a gate: it ends the step, and later atMs actions are not in it', () => {
+  // "It runs itself", then the next step's waitFor, then its card: the waitFor must not count as the first step's action.
+  const gated = planSteps([
+    { type: 'callout', selector: '#a', stepMs: 7000 },
+    { type: 'waitFor', selector: '#b' },
+    { type: 'callout', selector: '#c', stepMs: 1600 },
+    { type: 'click', selector: '#d', atMs: 0 },
+  ]);
+  assert.deepEqual(gated.map((place) => place.owner), [0, -1, 2, 2]);
+  assert.deepEqual(gated.map((place) => place.stepActions), [0, 0, 1, 1]);
+  const late = planSteps([{ type: 'callout', stepMs: 3000 }, { type: 'wait', ms: 10 }, { type: 'click', atMs: 500 }]);
+  assert.deepEqual(late.map((place) => place.owner), [0, -1, -1]);
+  assert.deepEqual(validateTimedSteps([{ type: 'callout', stepMs: 3000 }, { type: 'wait', ms: 10 }, { type: 'click', atMs: 500 }]),
+    [{ actionIndex: 2, message: 'atMs is ignored: action 2, which has no atMs, already ended the step' }]);
+});
+
+test('stepActions counts the actions with atMs a card\'s step has, and is 0 for a card that stands alone', () => {
+  const plan = planSteps([
+    { type: 'callout', stepMs: 1000 },
+    { type: 'callout', stepMs: 2000 }, { type: 'click', atMs: 0 }, { type: 'type', atMs: 400 },
+    { type: 'callout', holdMs: 1000 },
+  ]);
+  assert.deepEqual(plan.map((place) => place.stepActions), [0, 2, 2, 2, 0]);
 });
 
 test('a flow without stepMs has no timed actions at all', () => {

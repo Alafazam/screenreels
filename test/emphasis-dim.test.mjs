@@ -89,6 +89,36 @@ test('callout dims around its target', async () => {
   assert.equal(stub.backdrops()[0].removed, true);
 });
 
+test('ctx.noDim (a timed step with actions) removes every dim, even an action\'s own, spotlight\'s included', async () => {
+  for (const action of [
+    { type: 'highlight', selector: '.kpi', holdMs: 100, dim: 0.7 },
+    { type: 'callout', selector: '.kpi', text: 'Look here', holdMs: 100, highlight: true, dim: 0.7 },
+    { type: 'spotlight', selector: '.kpi', holdMs: 100 },
+  ]) {
+    const stub = stubDocument();
+    const result = await run(action, stub, { noDim: true });
+    assert.equal(result.ok, true);
+    assert.equal(stub.backdrops().length, 0, `${action.type} adds no dim`);
+    assert.ok(stub.appended().length > 0, `${action.type} still draws its ring or card`);
+  }
+});
+
+test('a card overlapping an element an action works on fades, and comes back when it no longer does', async () => {
+  const stub = stubDocument(); const card = []; const createElement = stub.doc.createElement;
+  stub.doc.createElement = () => { const node = createElement(); card.push(node); return node; };
+  let working = [{ getBoundingClientRect: () => ({ left: 0, top: 0, right: 5000, bottom: 5000, width: 5000, height: 5000 }), isConnected: true }];
+  const win = { ...stub.win, requestAnimationFrame: (fn) => setTimeout(fn, 5), cancelAnimationFrame: (id) => clearTimeout(id) };
+  const tip = () => card.find((node) => node.className === 'sr-action-callout');
+  let release = () => {}; // a timed card persists until its step ends, like the projector's
+  const running = runAction({ type: 'callout', selector: '.kpi', text: 'Look here' }, { document: stub.doc, window: win, actionTargets: () => working, persist: true, skipHold: true, retain: (fn) => { release = fn; } });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(tip().style.opacity, '0.35', 'covering an action target fades the card');
+  working = [];
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(tip().style.opacity, '', 'and it returns to full strength');
+  await running; release();
+});
+
 test('an invalid dim warns and falls back to the default', async () => {
   const stub = stubDocument(); const warnings = [];
   await run({ type: 'highlight', selector: '.kpi', holdMs: 100, dim: 'dark' }, stub, { warn: (message) => warnings.push(message) });

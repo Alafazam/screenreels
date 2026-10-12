@@ -207,7 +207,7 @@ file and the step plays with the same timing.
 | `stepMs` | a `callout` | The step's total length in ms, from the card showing. Makes the step timed. |
 | `narrationAudio` | a `callout` | URL of the step's narration file, resolved relative to the page like other assets. |
 | `narration` | a `callout` | The file's words: its transcript, and the text a speech engine says when there is no file. |
-| `atMs` | any action after a timed card, up to the next card | When the action runs, in ms from the card showing. |
+| `atMs` | any action after a timed card, up to the next card | When the action runs, in ms from the card showing. An action without `atMs` is not part of the step (see below). |
 
 ```json
 { "type": "callout", "selector": "[data-demo-id='new-cycle']", "title": "Start a cycle", "text": "Name it and start.",
@@ -218,14 +218,29 @@ file and the step plays with the same timing.
 
 **Autoplay and video** play the timeline:
 - The card showing starts the step's clock and, with sound on, its file from the start. The card
-  does not hold for `holdMs`: it stays up until the step's first action runs (with
-  `callouts: 'caption'`, its caption stays until the step ends; with `'off'` there is no card, but
-  the clock and the file still run).
+  does not hold for `holdMs`: it, and the ring around its target (`highlight: true`), stay up for
+  the **whole step** (until `stepMs`, or the next card), however many actions run meanwhile. With
+  `callouts: 'caption'` its caption stays until the step ends; with `'off'` there is no card, but
+  the clock and the file still run. (A flow that wants cards in video sets
+  `defaults.playback.video.callouts: 'timed'`.)
 - An action with `atMs` waits until the clock reaches it, then runs as usual. One that is already
-  late runs at once, and the next is still measured from the card, so lateness never adds up. An
-  action without `atMs` runs straight after the one before it.
+  late runs at once, and the next is still measured from the card, so lateness never adds up.
+- **A gate ends the step.** The first action after a timed card that has no `atMs` (a `waitFor`,
+  a `goto`, a plain `click`...) is not part of the step: the step plays out to its end first, and
+  then the action runs. Actions after it with `atMs` are ignored. Put a gate (say, a `waitFor` for
+  the next step's element) after the previous step's card and its actions, never between a card and
+  the actions that belong to it.
 - After the step's last action, the next card waits until `stepMs`, and for a file still playing
   until it ends, but never more than 1.5 s past `stepMs`.
+- **The page is not dimmed while a step with actions runs.** If the step has any `atMs` action, its
+  card and the actions' own highlights and spotlights draw no dim (`ctx.noDim` in the runtime), only
+  the ring and the card, so a dialog an action opens is neither covered nor darkened. A step with no
+  actions keeps the normal dim (the mode's `dim`) and, as ever, the card's own `dim` setting.
+- **The card never blocks the page.** A timed card has `pointer-events: none`, and the actions are
+  programmatic. A card that overlaps the bounding box of an element an action is working on (for
+  example a button in a dialog the step just opened) fades to 35% opacity while the action runs and
+  returns to full strength after it. It fades rather than moves, so it never jumps while being read;
+  the check runs every frame, so a dialog opening under the card is caught too.
 - A scene that ends on a timed step goes straight on to the next scene: only the scene's own
   `dwellMs` adds a rest (the flow's default dwell does not).
 - `stepMs` and `atMs` are wall-clock time. The host's `timeScale` and the mode's `pace` still slow
@@ -256,8 +271,9 @@ atMs` is how late an action ran. Outside a timed step all three are `null`. Paus
 timed step fires `screenreel:hold` with `{ held, stepMs, elapsedMs, paused, running }`.
 
 **Checking it.** `validateScene()` reports a card's `stepMs` that is not a positive number,
-`narrationAudio` on an action that is not a card, `atMs` with no timed card before it, `atMs` past its step's `stepMs`, and an `atMs` earlier
-than the action before it. Studio's pacer never stretches a timed step: its timeline is
+`narrationAudio` on an action that is not a card, `atMs` with no timed card before it or after the
+gate that ended the step, `atMs` past its step's `stepMs`, and an `atMs` earlier than the action
+before it. Studio's pacer never stretches a timed step: its timeline is
 authoritative.
 
 ## What merged, and what stayed separate

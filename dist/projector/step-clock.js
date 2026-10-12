@@ -41,16 +41,25 @@
     return stepMsOf(action) != null || atMsOf(action) != null;
   }
 
-  /* Each action's place on the timeline, by index: { owner, stepMs, atMs }. `owner` is the index of the
-     timed card whose step the action is in (the card itself included), or -1 outside a timed step.
-     `atMs` is kept only where it applies: on an action inside a timed step, after its card. */
+  /* Each action's place on the timeline, by index: { owner, stepMs, atMs, stepActions }. `owner` is the
+     index of the timed card whose step the action is in (the card itself included), or -1 outside a
+     timed step. An action is in a step only when it has `atMs`: the first action after the card
+     WITHOUT one (a waitFor, goto, call, a plain click...) is a gate that closes the step, so the
+     projector lets the step finish before running it, and nothing after it is in the step.
+     `stepActions` is how many actions the step has besides its card (0 for a card that stands alone):
+     the projector keeps the page undimmed while a step with actions runs. */
   function planSteps(actions) {
+    const list = actions || [];
     let owner = -1;
-    return (actions || []).map((action, index) => {
+    const places = list.map((action, index) => {
       if (isCallout(action)) owner = stepMsOf(action) != null ? index : -1;
+      else if (owner >= 0 && atMsOf(action) == null) owner = -1;
       const inStep = owner >= 0 && owner !== index;
-      return { owner, stepMs: owner >= 0 ? actions[owner].stepMs : null, atMs: inStep ? atMsOf(action) : null };
+      return { owner, stepMs: owner >= 0 ? list[owner].stepMs : null, atMs: inStep ? atMsOf(action) : null, stepActions: 0 };
     });
+    places.forEach((place, index) => { if (place.owner >= 0 && place.owner !== index) places[place.owner].stepActions += 1; });
+    places.forEach((place) => { if (place.owner >= 0) place.stepActions = places[place.owner].stepActions; });
+    return places;
   }
 
   /* Authoring mistakes in a scene's timeline, as [{ actionIndex, message }]. Errors make the timing
@@ -58,16 +67,19 @@
   function validateTimedSteps(actions) {
     const problems = [];
     const report = (actionIndex, message) => problems.push({ actionIndex, message });
-    let owner = null; let lastAt = -1;
+    let owner = null; let lastAt = -1; let gate = -1;
     (actions || []).forEach((action, index) => {
       // stepMs on other actions (a glow sequence's or a countdown's beat) is theirs, not a step's.
       if (isCallout(action) && action.stepMs != null && stepMsOf(action) == null) report(index, 'stepMs must be a positive number of milliseconds');
       if (action?.narrationAudio != null && !isCallout(action)) report(index, 'narrationAudio is only read on an info card (callout)');
       else if (action?.narrationAudio != null && (typeof action.narrationAudio !== 'string' || !action.narrationAudio.trim())) report(index, 'narrationAudio must be the URL of an audio file');
-      if (isCallout(action)) { owner = stepMsOf(action) != null ? action : null; lastAt = -1; }
+      if (isCallout(action)) { owner = stepMsOf(action) != null ? action : null; lastAt = -1; gate = -1; }
+      // The first action after a timed card without atMs closes the step (see planSteps).
+      else if (owner && atMsOf(action) == null) { owner = null; gate = index; }
       if (action?.atMs == null) return;
       if (atMsOf(action) == null) { report(index, 'atMs must be a number of milliseconds, 0 or more'); return; }
       if (isCallout(action)) { report(index, 'atMs is not read on an info card: the card starts its step'); return; }
+      if (!owner && gate >= 0) { report(index, `atMs is ignored: action ${gate + 1}, which has no atMs, already ended the step`); return; }
       if (!owner) { report(index, 'atMs is ignored: no earlier info card in this scene sets stepMs'); return; }
       if (action.atMs > owner.stepMs) report(index, `atMs ${action.atMs} is past the step's stepMs ${owner.stepMs}`);
       if (action.atMs < lastAt) report(index, `atMs ${action.atMs} is earlier than the action before it (${lastAt}); it will run late`);

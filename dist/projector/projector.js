@@ -668,8 +668,9 @@ class Projector {
       if (stopped()) break;
       const callout = window.ScreenReelCore.isGuidedStep(action);
       const place = timeline[actionIndex];
-      // A timed step ends (its stepMs, then its audio, capped) before the next card shows.
-      if (callout && this.timedStep) { await this.finishTimedStep(); if (stopped()) break; }
+      // A timed step ends (its stepMs, then its audio, capped) before the next card shows, and before
+      // an action with no atMs runs: that action is a gate (a waitFor, say) and is not part of the step.
+      if (this.timedStep && place.owner !== this.timedStep.index) { await this.finishTimedStep(); if (stopped()) break; }
       await this.whileHeld(); if (stopped()) break;
       const startsStep = timedMode && callout && place.owner === actionIndex;
       const inStep = !callout && this.timedStep?.index === place.owner;
@@ -682,13 +683,18 @@ class Projector {
          hold and waits for Next at once, so the card's buttons are never live while nothing is
          listening; everything else plays through. 'timed': it holds for its reading time. 'caption':
          its words show as a caption, no card. 'off': it is skipped. A card that starts a timed step
-         never holds: it stays up until the step's first action, and its caption until the step ends. */
+         never holds: it stays up until the step ends (with its caption), however many actions run meanwhile. */
       if (callout && settings.callouts === 'off') continue;
       if (callout && settings.callouts === 'caption') { if (startsStep) this.showTimedCaption(action); else await this.showCaption(action, this.controller.signal); continue; }
       const step = callout && settings.callouts === 'step';
       const holder = step ? this.stepReleases : startsStep ? this.timedReleases : this.retained;
-      // The step's card yields to the step's first action: it introduced the step, the action shows it.
-      if (inStep) this.releaseTimedCard();
+      /* A timed card (with its ring) stays up for the whole step, whatever its actions do: it goes at
+         the step's end (stopTimedStep) or when the next card starts. While the step's actions run the
+         page is not dimmed, so a dialog they open is not darkened, and a card over an element an
+         action works on fades (the runtime's actionTargets / onTarget hooks). */
+      const timedRun = (startsStep || inStep) ? this.timedStep : null;
+      const noDim = !!timedRun && place.stepActions > 0;
+      const actedOn = new Set();
       // A guided card plays its file while it waits for Next.
       if (step && action.narrationAudio) { this.stepAudio = { url: this.audioUrl(action.narrationAudio), clock: null }; this.playStepAudio(this.stepAudio.url); }
       this.raiseLayer(); // the previous action may have opened a host pop-up over the tour
@@ -717,6 +723,9 @@ class Projector {
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
         dim: settings.dim ? this.options.dim : false,
+        noDim: noDim || undefined,
+        actionTargets: startsStep ? () => [...(timedRun?.targets || [])] : undefined,
+        onTarget: inStep ? (el) => { actedOn.add(el); timedRun.targets.add(el); } : undefined,
         persist: step || startsStep, skipHold: step || startsStep, retain: (release) => holder.push(release),
         journal: (undo) => this.journal.push({ sceneId: scene.id, action: undo }),
         calloutControls: step ? this.calloutControls(scene, actionIndex) : undefined,
@@ -724,6 +733,7 @@ class Projector {
         announce: settings.notes ? (message) => this.toast(message) : undefined,
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
+      actedOn.forEach((el) => timedRun?.targets.delete(el));
       if (result.jumpTo && generation === this.playGeneration && this.store.playing()) {
         // Choice jump: positions index into enabledScenes, so resolve there — never raw flow.scenes.
         const enabled = this.store.enabledScenes();
@@ -766,13 +776,13 @@ class Projector {
     const delay = Number(scene.dwellMs ?? (endsTimed ? 0 : this.store.activeFlow().defaults?.dwellMs ?? DEFAULT_DWELL_MS)); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
   sceneHasAudio(scene) { return (scene?.actions || []).some((action) => window.ScreenReelCore.isGuidedStep(action) && action.narrationAudio); }
-  /* A timed step's state: { index, stepMs, clock, audioUrl, caption }. One at a time; a card that
+  /* A timed step's state: { index, stepMs, clock, audioUrl, caption, targets (elements its actions are working on) }. One at a time; a card that
      starts a step replaces the previous one, which finishTimedStep has already ended. */
   startTimedStep(action, index) {
     this.stopTimedStep();
     const clock = window.ScreenReelStepClock.createStepClock().start(action.stepMs);
     const audioUrl = this.audioUrl(action.narrationAudio);
-    this.timedStep = { index, stepMs: action.stepMs, clock, audioUrl, caption: false };
+    this.timedStep = { index, stepMs: action.stepMs, clock, audioUrl, caption: false, targets: new Set() };
     if (audioUrl) { this.stepAudio = { url: audioUrl, clock }; this.playStepAudio(audioUrl); }
   }
   showTimedCaption(action) {
