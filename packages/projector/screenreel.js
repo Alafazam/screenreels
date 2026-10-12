@@ -13,7 +13,7 @@
     const node = document.createElement('script'); node.src = assetUrl(name); node.onload = resolve; node.onerror = () => reject(new Error(`Unable to load ${name}`)); document.head.appendChild(node);
   });
   const ready = (async () => {
-    await loadScript('action-runtime.js'); await loadScript('playback.js'); await loadScript('flow-store.js'); await loadScript('cursor.js'); await loadScript('narrator.js');
+    await loadScript('action-runtime.js'); await loadScript('playback.js'); await loadScript('flow-store.js'); await loadScript('cursor.js'); await loadScript('narrator.js'); await loadScript('step-clock.js'); await loadScript('audio-narrator.js');
     const module = await import(assetUrl('projector.js'));
     const api = module.createPublicApi(assetBase, assetVersion); api.ready = ready; window.ScreenReel = api; return api;
   })();
