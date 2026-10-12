@@ -328,7 +328,7 @@
         "stepMs": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "On an info card (callout): the step's total length in ms from the moment the card shows. Makes the step timed; see docs/playback.md#timed-steps-and-narration-audio."
+          "description": "On an info card (callout): the step's total length in ms from the moment the card shows, which makes the step timed (see docs/playback.md#timed-steps-and-narration-audio). On a glow sequence or a countdown: the length of one beat."
         },
         "atMs": {
           "type": "number",

@@ -167,7 +167,7 @@ test('a flow without stepMs has no timed actions at all', () => {
 
 test('validateTimedSteps reports each timing mistake against its action', () => {
   const problems = validateTimedSteps([
-    { type: 'click', selector: '#x', stepMs: 1000 },
+    { type: 'glow', selector: '#x', sequence: true, stepMs: 1000 }, // a glow's own beat, not a step
     { type: 'callout', selector: '#a', stepMs: -5 },
     { type: 'click', selector: '#b', atMs: 200 },
     { type: 'callout', selector: '#c', stepMs: 2000, narrationAudio: '', atMs: 10 },
@@ -178,7 +178,6 @@ test('validateTimedSteps reports each timing mistake against its action', () => 
   ]);
   const messages = problems.map((problem) => `${problem.actionIndex}: ${problem.message}`);
   assert.deepEqual(messages, [
-    '0: stepMs is only read on an info card (callout)',
     '1: stepMs must be a positive number of milliseconds',
     '2: atMs is ignored: no earlier info card in this scene sets stepMs',
     '3: narrationAudio must be the URL of an audio file',

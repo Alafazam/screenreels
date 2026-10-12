@@ -255,8 +255,8 @@ action's offset, or `null`), and `elapsedMs` (the step clock when the action sta
 atMs` is how late an action ran. Outside a timed step all three are `null`. Pausing and resuming a
 timed step fires `screenreel:hold` with `{ held, stepMs, elapsedMs, paused, running }`.
 
-**Checking it.** `validateScene()` reports `stepMs` or `narrationAudio` on an action that is not a
-card, `atMs` with no timed card before it, `atMs` past its step's `stepMs`, and an `atMs` earlier
+**Checking it.** `validateScene()` reports a card's `stepMs` that is not a positive number,
+`narrationAudio` on an action that is not a card, `atMs` with no timed card before it, `atMs` past its step's `stepMs`, and an `atMs` earlier
 than the action before it. Studio's pacer never stretches a timed step: its timeline is
 authoritative.
 

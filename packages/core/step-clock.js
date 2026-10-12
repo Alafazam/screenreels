@@ -60,8 +60,8 @@
     const report = (actionIndex, message) => problems.push({ actionIndex, message });
     let owner = null; let lastAt = -1;
     (actions || []).forEach((action, index) => {
-      if (action?.stepMs != null && !isCallout(action)) report(index, 'stepMs is only read on an info card (callout)');
-      else if (action?.stepMs != null && stepMsOf(action) == null) report(index, 'stepMs must be a positive number of milliseconds');
+      // stepMs on other actions (a glow sequence's or a countdown's beat) is theirs, not a step's.
+      if (isCallout(action) && action.stepMs != null && stepMsOf(action) == null) report(index, 'stepMs must be a positive number of milliseconds');
       if (action?.narrationAudio != null && !isCallout(action)) report(index, 'narrationAudio is only read on an info card (callout)');
       else if (action?.narrationAudio != null && (typeof action.narrationAudio !== 'string' || !action.narrationAudio.trim())) report(index, 'narrationAudio must be the URL of an audio file');
       if (isCallout(action)) { owner = stepMsOf(action) != null ? action : null; lastAt = -1; }
