@@ -176,6 +176,17 @@ Then:
 - **Back**, for a viewer (guided, or any mode configured with `playback`), plays the previous
   scene. It does nothing on the first scene. A presenter's pill (the older look) pauses on it.
 
+**Pause and Play.** The pill's Play/Pause never ends the tour and the pill stays up. Inside a timed
+step it holds the step in place and Play continues it; anywhere else Pause stops the scene (its
+changes are undone) and Play plays that scene again from its start. The pill shows Pause as soon as
+Play is pressed, while the stopped scene's cleanup finishes. **Space** presses Play/Pause in any mode
+whose pill shows it (`video`, `autoplay`), whatever `keys` says, except while typing in a field, with
+a modifier held, on a chooser or start/end card, or on the tour's own focused button (which Space
+activates itself). One enabled projector per page takes the key.
+
+**The pill stays on top.** The projector shell (pill, progress bar, captions) is the top of the tour
+layer: rings, ripples, dims and info cards are drawn under it, so none of them cuts the controls.
+
 **The end:**
 - `guided`: **Finish** on the last card.
 - `video` and `autoplay`: the end card. **Replay** starts the flow again in the same mode.

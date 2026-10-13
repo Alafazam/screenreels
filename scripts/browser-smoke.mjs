@@ -695,6 +695,52 @@ try {
     assert.ok(beta.lastsMs >= 700, `${mode}: a card with no actions stays for its whole step even with a gate action after it (${beta.lastsMs}ms of 900)`);
     assert.ok(beta.own.every((sample) => sample.rings === 1 && sample.dims === 1), `${mode}: a step without actions keeps the dim and its ring`);
   }
+  /* The pill's controls in video: the shell sits above a ring drawn right over the pill; Space holds a
+     timed step and continues it; outside a step Space pauses (the bar stays) and plays again, the pill
+     showing Pause at once; Space typed in a field is left alone; the run still completes. */
+  await inlinePage.evaluate(async () => {
+    // The page's own presenter pill shows Play too, and the first enabled projector would take Space: off.
+    if (document.querySelector('#demo-button').getAttribute('aria-pressed') === 'true') document.querySelector('#demo-button').click();
+    const spot = document.createElement('div'); spot.id = 'pc-spot'; spot.style.cssText = 'position:fixed;left:calc(50% - 150px);bottom:4px;width:300px;height:56px';
+    const field = document.createElement('input'); field.id = 'pc-field'; field.style.cssText = 'position:fixed;left:20px;top:20px';
+    const mountPoint = document.createElement('button'); mountPoint.id = 'pc-mount';
+    document.body.append(spot, field, mountPoint);
+    window.__pc = { events: [] };
+    for (const name of ['hold', 'exit']) addEventListener(`screenreel:${name}`, (event) => { if (event.detail?.projectId === 'pill-controls') window.__pc.events.push({ name, held: event.detail.held, reason: event.detail.reason }); });
+    const flows = [{ id: 'pc', name: 'Pill controls', defaults: { dwellMs: 50, playback: { default: 'video', video: { callouts: 'timed', startCard: false, endCard: false } } }, scenes: [{ id: 'pc-1', route: '/', actions: [
+      { type: 'callout', selector: '#pc-spot', title: 'Ring', text: 'Ring words', placement: 'top', highlight: true, stepMs: 1200 },
+      { type: 'wait', ms: 1500 },
+    ] }] }];
+    window.__pc.projector = await window.ScreenReel.mount(mountPoint, { projectId: 'pill-controls', loop: false, narration: false, cursor: false, disableOnComplete: true, position: 'center', routesEqual: () => true, flow: { data: { schemaVersion: 1, flows } } });
+    window.__pc.projector.start('pc', { mode: 'video' });
+  });
+  const pcState = () => inlinePage.evaluate(() => {
+    const host = document.getElementById('screenreel-projector-pill-controls'); const play = host?.shadowRoot?.querySelector('.sr-pill [data-cmd="play"]');
+    const ring = document.querySelector('.sr-glow-box'); let onTop = null;
+    if (play && ring) { // what paints at the play button's centre if the ring took pointer events
+      const rect = play.getBoundingClientRect(); ring.style.pointerEvents = 'auto';
+      onTop = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === host ? 'pill' : 'ring'; ring.style.pointerEvents = '';
+    }
+    return { label: play?.getAttribute('aria-label') ?? null, ring: !!ring, onTop, events: window.__pc.events.map((event) => `${event.name}:${event.held ?? event.reason}`) };
+  });
+  await inlinePage.waitForFunction(() => document.querySelector('.sr-glow-box'));
+  const ringUp = await pcState();
+  assert.deepEqual([ringUp.label, ringUp.onTop], ['Pause', 'pill'], 'a ring over the pill never covers it');
+  await inlinePage.keyboard.press('Space');
+  assert.deepEqual(await pcState().then((state) => [state.label, state.events]), ['Play', ['hold:true']], 'Space holds a timed step');
+  await inlinePage.keyboard.press('Space');
+  assert.deepEqual(await pcState().then((state) => [state.label, state.events]), ['Pause', ['hold:true', 'hold:false']], 'and Space continues it');
+  await inlinePage.waitForFunction(() => !document.querySelector('.sr-glow-box')); // the step is over; the wait runs
+  await inlinePage.keyboard.press('Space');
+  assert.equal((await pcState()).label, 'Play', 'Space pauses outside a timed step, and the pill stays');
+  await inlinePage.focus('#pc-field'); await inlinePage.keyboard.press('Space');
+  assert.deepEqual([(await pcState()).label, await inlinePage.inputValue('#pc-field')], ['Play', ' '], 'Space typed in a field is left alone');
+  await inlinePage.evaluate(() => document.activeElement.blur());
+  await inlinePage.keyboard.press('Space');
+  assert.equal((await pcState()).label, 'Pause', 'Space plays again, and the pill shows it at once');
+  await inlinePage.waitForFunction(() => window.__pc.events.some((event) => event.name === 'exit'), null, { timeout: 10000 });
+  assert.deepEqual((await pcState()).events.at(-1), 'exit:complete', 'the paused and resumed run still completes');
+  await inlinePage.evaluate(() => { window.__pc.projector.destroy(); ['pc-spot', 'pc-field', 'pc-mount'].forEach((id) => document.getElementById(id)?.remove()); });
   await inlinePage.close();
   // Studio authoring of guided + autoplay tours: Flow settings ("Let viewers choose" for new flows),
   // an Info card from the toolbar titled from its element, words edited on the row and persisted,

@@ -50,10 +50,13 @@ const PRESENTER_ONLY_CONTROLS = new Set(['flow', 'notes', 'studio']);
 /* The tour layer's own box: full-screen and click-through, overriding the UA popover style (a
    centred, bordered, fit-content box). Inline, so a missing stylesheet cannot break it. */
 const LAYER_STYLE = 'position:fixed;inset:0;margin:0;padding:0;border:0;width:auto;height:auto;max-width:none;max-height:none;overflow:visible;background:transparent;color:inherit;pointer-events:none;';
-/* Stacking inside the tour layer, bottom to top: click shield < dim backdrop (runtime) < projector shell. */
+/* Stacking inside the tour layer, bottom to top: click shield < dim backdrop < rings, ripples, cards (runtime) < projector shell. */
 const SHIELD_Z_INDEX = 2147481990;
 /* Guided-tour keys, the ones a slide deck uses. */
 const GUIDED_KEYS = { ArrowRight: 'next', Enter: 'next', ArrowLeft: 'prev', Escape: 'exit' };
+/* The pill's Play/Pause key (handlePlayKey), and where it is typing rather than a command. */
+const PLAY_KEY = ' ';
+const TEXT_ENTRY_SELECTOR = 'input, textarea, select, [contenteditable]';
 /* Leaving a scene for one of these reasons cuts it short, so its changes are undone (see leaveScene). */
 const INTERRUPTING_REASONS = new Set(['pause', 'choice']);
 const HOST_CONTROL_SELECTOR = 'input, textarea, select, button, a, [contenteditable]';
@@ -457,6 +460,7 @@ class Projector {
   handleKey(keyEvent) {
     if (keyEvent.key === 'Escape' && this.resolveChooser) { keyEvent.preventDefault(); this.resolveChooser(null); return; }
     if (keyEvent.key === 'Escape' && this.resolveCard) { keyEvent.preventDefault(); this.resolveCard(''); return; }
+    if (keyEvent.key === PLAY_KEY) { this.handlePlayKey(keyEvent); return; }
     if (!this.store.playing() || !this.settings().keys) return;
     if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
     const command = GUIDED_KEYS[keyEvent.key]; if (!command) return;
@@ -466,6 +470,19 @@ class Projector {
     const inCard = !!origin?.closest?.('.sr-action-callout');
     if (command !== 'exit' && (inCard ? keyEvent.key === 'Enter' : origin?.closest?.(HOST_CONTROL_SELECTOR))) return;
     keyEvent.preventDefault(); this.command(command);
+  }
+  /* Space presses the pill's Play/Pause, in any mode whose pill shows it (video, autoplay), paused or
+     not, whatever `keys` says. Left alone: typing in a field, a modified key, a chooser or start/end
+     card on screen, and a button or link of the tour's own (it activates natively). A focused host
+     button would otherwise take the key, so it is the tour's while it runs. */
+  handlePlayKey(keyEvent) {
+    if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey || keyEvent.shiftKey) return;
+    if (this.resolveChooser || this.resolveCard || !this.visibleControls(this.store.share()).includes('play')) return;
+    const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
+    if (origin?.closest?.(TEXT_ENTRY_SELECTOR) || origin?.isContentEditable) return;
+    const ownControl = origin?.getRootNode?.() === this.shadow || !!origin?.closest?.(`#${window.ScreenReelCore.LAYER_ID}`);
+    if (ownControl && origin?.closest?.(HOST_CONTROL_SELECTOR)) return;
+    keyEvent.preventDefault(); this.command('play');
   }
   /* Overlays a scene handed over (see settleOverlays in the runtime) go when the scene is left. */
   releaseOverlays() {
@@ -620,10 +637,13 @@ class Projector {
   play() {
     if (this.held) { this.unhold(); return Promise.resolve(); }
     if (this.store.playing() && this.runningScene) { console.warn('[screenreel] play() ignored: a scene is already playing'); return Promise.resolve(); }
+    // The pill shows Pause at once: the paused scene's cleanup (playScene awaits it) can take seconds.
+    this.store.setPlaying(true); this.render();
     return this.playScene();
   }
   async playScene() {
     await this.leaving; // a previous scene's cleanup must finish before this one touches the app
+    if (!this.store.playing()) return; // paused again while that cleanup ran
     const { scene } = this.current(); if (!scene) return; const generation = ++this.playGeneration; clearTimeout(this.timer); this.timer = null; this.store.setPlaying(true); this.render();
     if (!this.routeMatches(scene)) {
       const sameDocument = await this.navigate(scene.route);

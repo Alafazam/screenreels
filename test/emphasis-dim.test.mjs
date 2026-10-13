@@ -201,3 +201,53 @@ test('an element hugging the bottom edge is scrolled into the comfort band befor
   await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
   assert.deepEqual(scrolls, ['center'], 'on screen but in the bottom 20% still scrolls');
 });
+
+test('the projector shell sits above every overlay the runtime draws, so no ring, ripple or card cuts the pill', async () => {
+  const stub = stubDocument(); let css = '';
+  stub.doc.head.prepend = (node) => { css = node.textContent; return node; };
+  await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
+  const overlayZ = [...css.matchAll(/z-index:(\d+)/g)].map((match) => Number(match[1]));
+  const shellCss = (await import('node:fs')).readFileSync(new URL('../packages/projector/screenreel.css', import.meta.url), 'utf8');
+  const shellZ = Number(/\.sr-shell\{[^}]*z-index:(\d+)/.exec(shellCss)[1]);
+  assert.ok(overlayZ.length > 3, 'the runtime styles were read');
+  assert.ok(overlayZ.every((z) => z < shellZ), `every overlay z (${Math.max(...overlayZ)} at most) must sit under the shell z ${shellZ}`);
+});
+
+test('a card follows its target when the host replaces it, and stays put when nothing replaces it', async () => {
+  const stub = stubDocument(); const created = []; const createElement = stub.doc.createElement;
+  stub.doc.createElement = () => { const node = createElement(); created.push(node); return node; };
+  const [first] = stub.targets; first.isConnected = true;
+  const replacement = { isConnected: true, getBoundingClientRect: () => ({ left: 600, top: 300, right: 700, bottom: 340, width: 100, height: 40 }), getClientRects: () => [1] };
+  let found = [first]; stub.doc.querySelectorAll = () => found;
+  const win = { ...stub.win, requestAnimationFrame: (fn) => setTimeout(fn, 5), cancelAnimationFrame: (id) => clearTimeout(id) };
+  const tip = () => created.find((node) => node.className === 'sr-action-callout');
+  const ring = () => created.find((node) => node.className === 'sr-glow-box');
+  let release = () => {};
+  const running = runAction({ type: 'callout', selector: '.kpi', text: 'Here', placement: 'bottom', highlight: true }, { document: stub.doc, window: win, persist: true, skipHold: true, retain: (fn) => { release = fn; } });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(tip().style.left, '10px', 'placed under the first target');
+    first.isConnected = false; found = [replacement];
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual([tip().style.left, ring().style.left], ['600px', '595px'], 'card and ring move to the replacement');
+    replacement.isConnected = false; found = [];
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(tip().style.left, '600px', 'with no replacement the card stays where it was, not in the corner');
+  } finally { await running; release(); } // stops the follow loop, which would otherwise keep the test alive
+});
+
+test('a click lands on the replacement when the host re-renders its target during the cursor move, and on nothing when there is none', async () => {
+  for (const replaced of [true, false]) {
+    const stub = stubDocument(); const warnings = []; const clicks = [];
+    const [first] = stub.targets; first.isConnected = true; first.click = () => clicks.push('detached');
+    const replacement = { ...stubDocument().targets[0], isConnected: true, click: () => clicks.push('replacement') };
+    let found = [first]; stub.doc.querySelectorAll = () => found;
+    const moveCursor = async () => { first.isConnected = false; found = replaced ? [replacement] : []; };
+    const result = await run({ type: 'click', selector: '.menu a' }, stub, { moveCursor, warn: (message) => warnings.push(message) });
+    if (replaced) assert.deepEqual([result.ok, clicks], [true, ['replacement']]);
+    else {
+      assert.deepEqual([result.ok, clicks], [false, []], 'a detached element is never clicked');
+      assert.match(warnings[0], /Selector not found: \.menu a/);
+    }
+  }
+});
