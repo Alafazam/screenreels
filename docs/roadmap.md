@@ -12,9 +12,10 @@ through the CLI, with a high-quality AI voice, and ships the audio with the flow
   no backend, so a live cloud voice would put an API key in every visitor's browser. Pre-rendered
   audio avoids that, sounds the same on every play, works offline, and can be reused for the
   captured video's voiceover.
-- **Flow shape:** each scene (and action with its own line) can reference a rendered audio file
-  next to its `narration` text. Projector plays the file instead of speaking the text, keeping
-  mute, pause, and scene-change behaviour; the text remains the fallback and the video script.
+- **Flow shape:** built for info cards: a card's `narrationAudio` file plays with its `stepMs`
+  timeline, and `narration` stays the text fallback and the video script (see
+  [Timed steps and narration audio](playback.md#timed-steps-and-narration-audio)). Still planned:
+  a file per scene and per non-card action, and generating the files (below).
 - **Authoring:** Studio gets a "Generate narration" step, and the CLI gets
   `screenreel voice render`. Both go through a pluggable voice provider, like Capture's existing
   `command` provider. Candidates: ElevenLabs (highest quality), OpenAI `gpt-4o-mini-tts`, Google

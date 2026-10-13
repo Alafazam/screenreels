@@ -26,6 +26,8 @@ const DEFAULT_LABELS = {
 /* playback.js must load first (the loader does). Fail with the real cause, not an opaque TypeError. */
 if (!window.ScreenReelPlayback) throw new Error('ScreenReel: playback.js is not loaded. Vendor the whole dist/projector folder and load screenreel.js.');
 const PILL_CONTROLS = window.ScreenReelPlayback.PILL_CONTROLS;
+/* step-clock.js times a step's actions (docs/playback.md#timed-steps-and-narration-audio); the loader loads it too. */
+if (!window.ScreenReelStepClock) throw new Error('ScreenReel: step-clock.js is not loaded. Vendor the whole dist/projector folder and load screenreel.js.');
 const SHARE_CONTROLS = ['count', 'play', 'sound', 'exit'];
 const GUIDED_SHARE_CONTROLS = ['count', 'prev', 'play', 'next', 'sound', 'exit'];
 const PILL_POSITIONS = ['right', 'center'];
@@ -48,10 +50,13 @@ const PRESENTER_ONLY_CONTROLS = new Set(['flow', 'notes', 'studio']);
 /* The tour layer's own box: full-screen and click-through, overriding the UA popover style (a
    centred, bordered, fit-content box). Inline, so a missing stylesheet cannot break it. */
 const LAYER_STYLE = 'position:fixed;inset:0;margin:0;padding:0;border:0;width:auto;height:auto;max-width:none;max-height:none;overflow:visible;background:transparent;color:inherit;pointer-events:none;';
-/* Stacking inside the tour layer, bottom to top: click shield < dim backdrop (runtime) < projector shell. */
+/* Stacking inside the tour layer, bottom to top: click shield < dim backdrop < rings, ripples, cards (runtime) < projector shell. */
 const SHIELD_Z_INDEX = 2147481990;
 /* Guided-tour keys, the ones a slide deck uses. */
 const GUIDED_KEYS = { ArrowRight: 'next', Enter: 'next', ArrowLeft: 'prev', Escape: 'exit' };
+/* The pill's Play/Pause key (handlePlayKey), and where it is typing rather than a command. */
+const PLAY_KEY = ' ';
+const TEXT_ENTRY_SELECTOR = 'input, textarea, select, [contenteditable]';
 /* Leaving a scene for one of these reasons cuts it short, so its changes are undone (see leaveScene). */
 const INTERRUPTING_REASONS = new Set(['pause', 'choice']);
 const HOST_CONTROL_SELECTOR = 'input, textarea, select, button, a, [contenteditable]';
@@ -71,7 +76,7 @@ class Projector {
   constructor(target, options, assetBase, assetVersion) {
     this.target = target; this.options = { activationQueryParam: 'demo', notesMode: 'reserve', loop: true, strict: false, timeScale: 1, cursor: 'dot', narration: true, shield: true, studio: true, position: 'right', ...options }; this.assetBase = options.assetBase || assetBase; this.assetVersion = assetVersion;
     this.usesDefaultNavigation = !options.router?.navigate; this.router = { ...defaultRouter(), ...(options.router || {}) }; this.controller = null; this.timer = null; this.playGeneration = 0; this.originalPadding = null; this.rootHost = null; this.shadow = null;
-    this.retained = []; this.stepReleases = []; this.stepWaiter = null; this.runningScene = null; this.runningSceneFinished = false; this.journal = []; this.leaving = Promise.resolve();
+    this.retained = []; this.stepReleases = []; this.stepWaiter = null; this.timedStep = null; this.timedReleases = []; this.held = null; this.stepAudio = null; this.runningScene = null; this.runningSceneFinished = false; this.journal = []; this.leaving = Promise.resolve();
     this.store = new window.ScreenReelStore.Store({ projectId: options.projectId, flow: options.flow, baseHref: location.href, legacyStorage: options.legacyStorage });
     this.playback = window.ScreenReelPlayback.mountConfig(options);
     window.ScreenReelPlayback.validateMountPlayback(options.playback).forEach((message) => console.warn(`[screenreel] ${message}`));
@@ -127,11 +132,44 @@ class Projector {
   /* Live narrator, or null when the host or the mode opted out, the browser has no speech engine,
      or the viewer muted it. Every call site treats null as "stay silent", so narration is additive. */
   narrator() {
-    if (this.options.narration === false || !this.settings().narration || this.store.muted()) return null;
+    if (this.options.narration === false || this.speechOff() || !this.settings().narration || this.store.muted()) return null;
     const narrator = window.__screenreelNarrator;
     if (!narrator?.available()) return null;
     return narrator.configure(this.options.narration === true ? {} : this.options.narration);
   }
+  /* Mount `narration: { speech: false }`: narration plays only from pre-recorded files (a card's
+     `narrationAudio`); the browser's speech engine is never used, so a step without a file is silent. */
+  speechOff() { const narration = this.options.narration; return typeof narration === 'object' && narration !== null && narration.speech === false; }
+  /* The audio-file narrator, or null when the host or the mode opted out of narration, the viewer
+     muted it, or the browser has no Audio. Like narrator(), null means "stay silent". */
+  audioNarrator() {
+    if (this.options.narration === false || !this.settings().narration || this.store.muted()) return null;
+    const audio = window.__screenreelAudioNarrator;
+    return audio?.available() ? audio : null;
+  }
+  flowHasAudio(flow = this.store.activeFlow()) {
+    return (flow?.scenes || []).some((scene) => (scene.actions || []).some((action) => window.ScreenReelCore.isGuidedStep(action) && action.narrationAudio));
+  }
+  /* A card's narrationAudio, resolved like the page's other assets: relative to the document. */
+  audioUrl(value) {
+    if (!value) return null;
+    try { return new URL(String(value), document.baseURI).href; } catch { console.warn(`[screenreel] narrationAudio is not a valid URL: ${value}`); return null; }
+  }
+  /* Play a step's narration file from `offsetMs`. Never awaited: the step's timeline does not wait
+     for audio. Blocked audio (the autoplay policy) is reported once, like blocked speech. */
+  playStepAudio(url, offsetMs = 0) {
+    const audio = this.audioNarrator(); if (!audio || !url) return;
+    audio.play(url, { offsetMs }).then(({ played, reason }) => {
+      if (played) { this.narrationBlocked = false; return; }
+      if (reason === 'blocked' && !this.narrationBlocked) {
+        this.narrationBlocked = true;
+        if (this.visibleControls(this.store.share()).includes('sound')) this.toast('Tap the speaker to turn on narration');
+        else console.info('[screenreel] The browser blocked narration audio until the viewer interacts with the page.');
+        this.render();
+      } else if (reason === 'error') console.warn(`[screenreel] narration audio failed to play: ${url}`);
+    });
+  }
+  stopStepAudio() { this.stepAudio = null; window.__screenreelAudioNarrator?.stop(); }
   /* Speak a scene's own line. Uses the interpolated text, so a personalized share link is heard
      saying the prospect's name and not "{{company}}". Silent scenes are a no-op. Per-action lines
      are spoken by the runtime as those actions run (see narrateAction in play()), so this
@@ -209,12 +247,15 @@ class Projector {
     /* The pill moves between scenes. Only while a guided card waits does its Next continue the step. */
     const nextLabel = waiting ? labels.nextStep : labels.nextScene;
     const text = (label) => settings.controlLabels ? `<span class="sr-pill-label">${esc(label)}</span>` : '';
-    const narrationAvailable = this.options.narration !== false && window.__screenreelNarrator?.available();
+    const showPause = playing && !this.held; // a held timed step shows Play: the viewer paused it
+    const speechAvailable = !this.speechOff() && window.__screenreelNarrator?.available();
+    const audioAvailable = window.__screenreelAudioNarrator?.available() && this.flowHasAudio(flow);
+    const narrationAvailable = this.options.narration !== false && (speechAvailable || audioAvailable);
     const buttons = {
       flow: `<select class="sr-flow" aria-label="Active demo flow">${this.store.allFlows().map((item) => `<option value="${esc(item.id)}"${item.id === flow.id ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select>`,
       count: `<span class="sr-count">${scenes.length ? position + 1 : 0}/${scenes.length}</span>`,
       prev: `<button data-cmd="prev" title="${esc(labels.previousScene)}" aria-label="${esc(labels.previousScene)}">${icon('left')}${text(labels.previousScene)}</button>`,
-      play: `<button data-cmd="play" class="sr-play" title="${esc(playing ? labels.pause : labels.play)}" aria-label="${esc(playing ? labels.pause : labels.play)}">${icon(playing ? 'pause' : 'play')}</button>`,
+      play: `<button data-cmd="play" class="sr-play" title="${esc(showPause ? labels.pause : labels.play)}" aria-label="${esc(showPause ? labels.pause : labels.play)}">${icon(showPause ? 'pause' : 'play')}</button>`,
       next: `<button data-cmd="next" class="${waiting ? 'sr-await-next' : ''}" title="${esc(nextLabel)}" aria-label="${esc(nextLabel)}">${text(nextLabel)}${icon('right')}</button>`,
       // Narration rides in both chromes: a share-link viewer needs it most, and a presenter talking
       // over the demo needs to silence it fast. Hidden when there is no engine.
@@ -333,11 +374,14 @@ class Projector {
   }
   /* Caption-style callouts (video's optional captions): the card's words with no card, for as long
      as the card would have stayed up. */
-  async showCaption(action, signal) {
-    if (!this.caption) return;
+  renderCaption(action) {
     const title = this.displayText(action.title); const body = this.displayText(action.text);
     this.caption.innerHTML = `${title ? `<strong>${esc(title)}</strong>` : ''}${body ? `<span>${esc(body)}</span>` : ''}`;
     this.caption.hidden = !(title || body);
+  }
+  async showCaption(action, signal) {
+    if (!this.caption) return;
+    this.renderCaption(action);
     try { await window.ScreenReelCore.sleep(window.ScreenReelCore.cardHoldMs(action), signal); } finally { if (this.caption) this.caption.hidden = true; }
   }
   renderNotes(scene) {
@@ -352,14 +396,20 @@ class Projector {
   }
   command(command) {
     // Next continues a guided step when one is waiting; otherwise it moves to the next scene.
-    if (command === 'prev') this.previous(); else if (command === 'next') { if (this.stepWaiter) this.stepWaiter(); else this.next(); } else if (command === 'play') this.store.playing() ? this.pause() : this.play();
+    if (command === 'prev') this.previous(); else if (command === 'next') { if (this.stepWaiter) this.stepWaiter(); else this.next(); } else if (command === 'play') { if (this.held) this.unhold(); else if (this.store.playing() && this.timedStep) this.hold(); else if (this.store.playing()) this.pause(); else this.play(); }
     else if (command === 'notes') { this.store.setNotesVisible(!this.store.notesVisible()); this.render(); }
     /* Unmuting is itself the user gesture the autoplay policy wants, so speak the current scene
        immediately — otherwise the viewer waits until the next scene to hear anything. */
     else if (command === 'sound') {
       const unmuting = this.store.muted(); this.store.setMuted(!unmuting);
-      if (unmuting) { this.narrationBlocked = false; this.render(); const { scene } = this.current(); if (scene && this.store.playing()) this.narrate(scene); }
-      else { window.__screenreelNarrator?.cancel(); this.render(); }
+      if (unmuting) {
+        this.narrationBlocked = false; this.render(); const { scene } = this.current();
+        // A step's file picks up where its clock is, so the words still land on their actions.
+        if (this.stepAudio && this.store.playing() && !this.held) this.playStepAudio(this.stepAudio.url, this.stepAudio.clock ? this.stepAudio.clock.elapsed() : 0);
+        else if (scene && this.store.playing() && !this.sceneHasAudio(scene)) this.narrate(scene);
+      }
+      // Muting silences the file; the step clock keeps running, so the timing is the same either way.
+      else { window.__screenreelNarrator?.cancel(); window.__screenreelAudioNarrator?.stop(); this.render(); }
     }
     /* `capture` is no longer offered by the pill: an unlabelled camera beside a labelled Studio
        button read as "record a video", which is what the CLI does — and captureCurrent() opens
@@ -381,7 +431,7 @@ class Projector {
     const wasEnabled = this.store.enabled(); const { scene, position } = this.current(); const flowId = this.store.activeFlow()?.id; const origin = this.store.origin(); const mode = this.playMode(scene);
     document.removeEventListener('keydown', this.keyHandler); this.keyHandler = null;
     this.resolveChooser?.(null); this.resolveCard?.(null);
-    this.pause(); this.restorePace(); this.startCardShown = false; this.undoTour(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); window.__screenreelCursor?.destroy(); window.__screenreelNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
+    this.pause(); this.restorePace(); this.startCardShown = false; this.undoTour(); this.store.setEnabled(false); this.store.clearRun(); this.reserveNotes(false); this.rootHost?.remove(); this.rootHost = null; this.shadow = null; this.pill = null; this.syncShield(); this.target.setAttribute('aria-pressed', 'false'); window.__screenreelCursor?.destroy(); window.__screenreelNarrator?.destroy(); window.__screenreelAudioNarrator?.destroy(); document.querySelectorAll('.sr-action-box,.sr-glow-box,.sr-dim-backdrop,.sr-action-callout,.sr-snippet,.sr-cursor-ring,.sr-choice-overlay').forEach((node) => node.remove()); event('modechange', { projectId: this.store.projectId, enabled: false });
     this.layer?.remove(); this.layer = null;
     if (wasEnabled) event('exit', { projectId: this.store.projectId, flowId, sceneId: scene?.id ?? null, position, reason, mode });
     if (wasEnabled && origin && this.options.restoreOnExit && (reason === 'user' || reason === 'complete')) this.restoreOrigin(origin);
@@ -410,6 +460,7 @@ class Projector {
   handleKey(keyEvent) {
     if (keyEvent.key === 'Escape' && this.resolveChooser) { keyEvent.preventDefault(); this.resolveChooser(null); return; }
     if (keyEvent.key === 'Escape' && this.resolveCard) { keyEvent.preventDefault(); this.resolveCard(''); return; }
+    if (keyEvent.key === PLAY_KEY) { this.handlePlayKey(keyEvent); return; }
     if (!this.store.playing() || !this.settings().keys) return;
     if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
     const command = GUIDED_KEYS[keyEvent.key]; if (!command) return;
@@ -420,9 +471,22 @@ class Projector {
     if (command !== 'exit' && (inCard ? keyEvent.key === 'Enter' : origin?.closest?.(HOST_CONTROL_SELECTOR))) return;
     keyEvent.preventDefault(); this.command(command);
   }
+  /* Space presses the pill's Play/Pause, in any mode whose pill shows it (video, autoplay), paused or
+     not, whatever `keys` says. Left alone: typing in a field, a modified key, a chooser or start/end
+     card on screen, and a button or link of the tour's own (it activates natively). A focused host
+     button would otherwise take the key, so it is the tour's while it runs. */
+  handlePlayKey(keyEvent) {
+    if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey || keyEvent.shiftKey) return;
+    if (this.resolveChooser || this.resolveCard || !this.visibleControls(this.store.share()).includes('play')) return;
+    const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
+    if (origin?.closest?.(TEXT_ENTRY_SELECTOR) || origin?.isContentEditable) return;
+    const ownControl = origin?.getRootNode?.() === this.shadow || !!origin?.closest?.(`#${window.ScreenReelCore.LAYER_ID}`);
+    if (ownControl && origin?.closest?.(HOST_CONTROL_SELECTOR)) return;
+    keyEvent.preventDefault(); this.command('play');
+  }
   /* Overlays a scene handed over (see settleOverlays in the runtime) go when the scene is left. */
   releaseOverlays() {
-    const releases = [...this.stepReleases, ...this.retained]; this.stepReleases = []; this.retained = [];
+    const releases = [...this.stepReleases, ...this.timedReleases, ...this.retained]; this.stepReleases = []; this.timedReleases = []; this.retained = [];
     releases.forEach((release) => release());
   }
   /* A guided callout mid-scene holds the scene until Next. Pause, Back, and Exit resolve it too; the
@@ -434,11 +498,12 @@ class Projector {
      tour undoes all of them. A scene that plays through keeps its changes, so the next scene can
      build on them. */
   /* Undo and cleanup actions run to completion, quietly: no cursor, no narration, no abort signal,
-     because a half-undone app is exactly the state they exist to prevent. */
+     because a half-undone app is exactly the state they exist to prevent. A target that is gone is
+     given up on quickly (core quietAction), so a scene change is not held up by a closed dialog. */
   quietContext() { return { document, window, resolveFunction: (name) => this.resolveFunction(name), strictFunctions: this.strictFunctions(), variables: this.variablesFor(), warn: (message) => console.warn('[screenreel]', message) }; }
   async runQuietly(actions, what) {
     for (const action of actions) {
-      const result = await window.ScreenReelCore.runAction({ ...action, afterMs: 0, note: undefined, narration: undefined }, this.quietContext());
+      const result = await window.ScreenReelCore.runAction(window.ScreenReelCore.quietAction(action), this.quietContext());
       if (!result.ok) console.warn(`[screenreel] ${what}: ${action.type} ${action.selector || ''} failed`);
     }
   }
@@ -451,7 +516,7 @@ class Projector {
      a choice jump, or navigation. A scene cut short undoes its journal; `scene.cleanup` always runs,
      as the author's explicit escape hatch. */
   async leaveScene(reason) {
-    this.releaseOverlays();
+    this.stopTimedStep(); this.releaseOverlays();
     const scene = this.runningScene; const finished = this.runningSceneFinished;
     this.runningScene = null; this.runningSceneFinished = false;
     if (!scene) return;
@@ -554,8 +619,10 @@ class Projector {
     if (!scene) return { ok: false, flowId: flow.id, sceneId: sceneId || null, route: null, sceneErrors: ['Scene not found'], actions: [] };
     const sceneErrors = []; if (!this.routeMatches(scene)) sceneErrors.push(`Current route does not match ${scene.route}`);
     if (scene.waitFor) { try { if (!document.querySelector(scene.waitFor)) sceneErrors.push(`waitFor has no matches: ${scene.waitFor}`); } catch { sceneErrors.push(`waitFor is invalid: ${scene.waitFor}`); } }
+    const timing = window.ScreenReelStepClock.validateTimedSteps(scene.actions);
     const actions = (scene.actions || []).map((action, actionIndex) => {
       const errors = window.ScreenReelCore.validate(action, document, location.href);
+      timing.filter((problem) => problem.actionIndex === actionIndex).forEach((problem) => errors.push(problem.message));
       if (action.type === 'call' && !this.resolveFunction(action.fn) && (this.strictFunctions() || typeof window[action.fn] !== 'function')) errors.push(`Function is not registered: ${action.fn}`);
       return { actionIndex, actionId: action.id, type: action.type, selector: action.selector, errors };
     });
@@ -569,11 +636,15 @@ class Projector {
   /* Public entry. A second play() while a scene is already running would start a parallel run —
      two narrators, every click doubled — so it is refused loudly instead. */
   play() {
+    if (this.held) { this.unhold(); return Promise.resolve(); }
     if (this.store.playing() && this.runningScene) { console.warn('[screenreel] play() ignored: a scene is already playing'); return Promise.resolve(); }
+    // The pill shows Pause at once: the paused scene's cleanup (playScene awaits it) can take seconds.
+    this.store.setPlaying(true); this.render();
     return this.playScene();
   }
   async playScene() {
     await this.leaving; // a previous scene's cleanup must finish before this one touches the app
+    if (!this.store.playing()) return; // paused again while that cleanup ran
     const { scene } = this.current(); if (!scene) return; const generation = ++this.playGeneration; clearTimeout(this.timer); this.timer = null; this.store.setPlaying(true); this.render();
     if (!this.routeMatches(scene)) {
       const sameDocument = await this.navigate(scene.route);
@@ -604,22 +675,49 @@ class Projector {
     if (generation !== this.playGeneration || !this.store.playing()) return;
     // Narration starts with the scene's actions and runs alongside them, not before: the viewer
     // should hear the description of the thing while watching it happen. Deliberately not awaited.
-    this.narrate(scene);
+    // A scene narrated by its cards' audio files is not also spoken: the two would talk over each other.
+    if (!this.sceneHasAudio(scene)) this.narrate(scene);
     const cursorOn = this.options.cursor !== false && settings.cursor;
+    /* Timed steps (docs/playback.md#timed-steps-and-narration-audio): a card with `stepMs` starts a
+       step clock, the step's actions with `atMs` run on it, and the next card waits for the step's
+       end. Autoplay and video play the timeline; a guided card waits for Next instead. */
+    const timeline = window.ScreenReelStepClock.planSteps(scene.actions);
+    const timedMode = settings.callouts !== 'step';
+    const stopped = () => generation !== this.playGeneration || !this.store.playing();
     for (let actionIndex = 0; actionIndex < (scene.actions || []).length; actionIndex++) {
       const action = scene.actions[actionIndex];
-      if (generation !== this.playGeneration || !this.store.playing()) break;
-      event('step', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, sceneIndex, sceneTitle: scene.title, actionIndex, total: (scene.actions || []).length, action });
+      if (stopped()) break;
+      const callout = window.ScreenReelCore.isGuidedStep(action);
+      const place = timeline[actionIndex];
+      // A timed step ends (its stepMs, then its audio, capped) before the next card shows, and before
+      // an action with no atMs runs: that action is a gate (a waitFor, say) and is not part of the step.
+      if (this.timedStep && place.owner !== this.timedStep.index) { await this.finishTimedStep(); if (stopped()) break; }
+      await this.whileHeld(); if (stopped()) break;
+      const startsStep = timedMode && callout && place.owner === actionIndex;
+      const inStep = !callout && this.timedStep?.index === place.owner;
+      if (startsStep) this.startTimedStep(action, actionIndex);
+      else if (inStep && place.atMs != null) { await this.timedStep.clock.waitUntil(place.atMs, this.controller.signal); if (stopped()) break; }
+      const clock = (startsStep || inStep) ? this.timedStep.clock.state() : null;
+      event('step', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, sceneIndex, sceneTitle: scene.title, actionIndex, total: (scene.actions || []).length, action, stepMs: clock?.stepMs ?? null, atMs: inStep ? place.atMs : null, elapsedMs: clock?.elapsedMs ?? null });
       let navigationSameDocument = false; let priorPosition = null;
       /* The mode's `callouts` setting decides how an info card plays. 'step' (guided): it skips its
          hold and waits for Next at once, so the card's buttons are never live while nothing is
          listening; everything else plays through. 'timed': it holds for its reading time. 'caption':
-         its words show as a caption, no card. 'off': it is skipped. */
-      const callout = window.ScreenReelCore.isGuidedStep(action);
+         its words show as a caption, no card. 'off': it is skipped. A card that starts a timed step
+         never holds: it stays up until the step ends (with its caption), however many actions run meanwhile. */
       if (callout && settings.callouts === 'off') continue;
-      if (callout && settings.callouts === 'caption') { await this.showCaption(action, this.controller.signal); continue; }
+      if (callout && settings.callouts === 'caption') { if (startsStep) this.showTimedCaption(action); else await this.showCaption(action, this.controller.signal); continue; }
       const step = callout && settings.callouts === 'step';
-      const holder = step ? this.stepReleases : this.retained;
+      const holder = step ? this.stepReleases : startsStep ? this.timedReleases : this.retained;
+      /* A timed card (with its ring) stays up for the whole step, whatever its actions do: it goes at
+         the step's end (stopTimedStep) or when the next card starts. While the step's actions run the
+         page is not dimmed, so a dialog they open is not darkened, and a card over an element an
+         action works on fades (the runtime's actionTargets / onTarget hooks). */
+      const timedRun = (startsStep || inStep) ? this.timedStep : null;
+      const noDim = !!timedRun && place.stepActions > 0;
+      const actedOn = new Set();
+      // A guided card plays its file while it waits for Next.
+      if (step && action.narrationAudio) { this.stepAudio = { url: this.audioUrl(action.narrationAudio), clock: null }; this.playStepAudio(this.stepAudio.url); }
       this.raiseLayer(); // the previous action may have opened a host pop-up over the tour
       // A toggle-style click is undone by the scene's own later click on the same element: journal that
       // pair now, and drop the entry once the pair has run for real.
@@ -636,7 +734,8 @@ class Projector {
         // An action's line REPLACES whatever is currently speaking (speak() cancels in flight):
         // a queue would drift behind the visuals, and the words must land on what is on screen.
         // narrator() is null when the viewer muted or the host opted out, so this stays silent.
-        narrateAction: (text) => { this.narrator()?.speak(text); },
+        // A card with its own audio file is not also spoken: its `narration` is the file's transcript.
+        narrateAction: (text) => { if (!(callout && action.narrationAudio)) this.narrator()?.speak(text); },
         navigate: async (route) => {
           // Navigation actions are terminal: persist the next scene before a hard navigation can unload this document.
           await this.leaveScene('navigate');
@@ -645,13 +744,17 @@ class Projector {
           try { navigationSameDocument = await this.navigate(route); } catch (error) { this.store.setPosition(priorPosition); this.render(); throw error; }
         },
         dim: settings.dim ? this.options.dim : false,
-        persist: step, skipHold: step, retain: (release) => holder.push(release),
+        noDim: noDim || undefined,
+        actionTargets: startsStep ? () => [...(timedRun?.targets || [])] : undefined,
+        onTarget: inStep ? (el) => { actedOn.add(el); timedRun.targets.add(el); } : undefined,
+        persist: step || startsStep, skipHold: step || startsStep, retain: (release) => holder.push(release),
         journal: (undo) => this.journal.push({ sceneId: scene.id, action: undo }),
         calloutControls: step ? this.calloutControls(scene, actionIndex) : undefined,
         // Notes are presenter captions (the mode's `notes`); a guided tour's card already carries the words.
         announce: settings.notes ? (message) => this.toast(message) : undefined,
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
+      actedOn.forEach((el) => timedRun?.targets.delete(el));
       if (result.jumpTo && generation === this.playGeneration && this.store.playing()) {
         // Choice jump: positions index into enabledScenes, so resolve there — never raw flow.scenes.
         const enabled = this.store.enabledScenes();
@@ -675,10 +778,13 @@ class Projector {
       if (step && result.ok && generation === this.playGeneration && this.store.playing()) {
         event('awaitingnext', { projectId: this.store.projectId, flowId: this.store.activeFlow().id, sceneId: scene.id, actionIndex });
         await this.waitForStep();
+        if (action.narrationAudio) this.stopStepAudio(); // Next (or Back, Skip) ends the card's audio
         const released = this.stepReleases; this.stepReleases = []; released.forEach((release) => release());
       }
     }
-    if (generation !== this.playGeneration || !this.store.playing()) return;
+    if (stopped()) return;
+    const endsTimed = !!this.timedStep;
+    if (endsTimed) { await this.finishTimedStep(); if (stopped()) return; }
     this.runningSceneFinished = true; // every action ran: leaving now is moving on, not cutting it short
     /* Hold the scene until narration finishes rather than cutting a sentence mid-word. Capture
        solves the same overrun by freezing the last frame (voice.overflow: 'extend'); a live
@@ -687,8 +793,68 @@ class Projector {
     await this.narrator()?.settle(Number(scene.narrationCapMs) || undefined);
     if (generation !== this.playGeneration || !this.store.playing()) return;
     this.analytics.emit('scene_complete');
-    const delay = Number(scene.dwellMs ?? this.store.activeFlow().defaults?.dwellMs ?? DEFAULT_DWELL_MS); this.timer = setTimeout(() => this.next(true, generation), delay);
+    // A scene that ends on a timed step has had its rest inside stepMs: only its own dwellMs adds to it.
+    const delay = Number(scene.dwellMs ?? (endsTimed ? 0 : this.store.activeFlow().defaults?.dwellMs ?? DEFAULT_DWELL_MS)); this.timer = setTimeout(() => this.next(true, generation), delay);
   }
+  sceneHasAudio(scene) { return (scene?.actions || []).some((action) => window.ScreenReelCore.isGuidedStep(action) && action.narrationAudio); }
+  /* A timed step's state: { index, stepMs, clock, audioUrl, caption, targets (elements its actions are working on) }. One at a time; a card that
+     starts a step replaces the previous one, which finishTimedStep has already ended. */
+  startTimedStep(action, index) {
+    this.stopTimedStep();
+    const clock = window.ScreenReelStepClock.createStepClock().start(action.stepMs);
+    const audioUrl = this.audioUrl(action.narrationAudio);
+    this.timedStep = { index, stepMs: action.stepMs, clock, audioUrl, caption: false, targets: new Set() };
+    if (audioUrl) { this.stepAudio = { url: audioUrl, clock }; this.playStepAudio(audioUrl); }
+  }
+  showTimedCaption(action) {
+    if (!this.caption || !this.timedStep) return;
+    this.renderCaption(action); this.timedStep.caption = true;
+  }
+  releaseTimedCard() { const releases = this.timedReleases; this.timedReleases = []; releases.forEach((release) => release()); }
+  /* The step's end: t0 + stepMs, then, if its audio still plays, until it ends, but never more than
+     AUDIO_OVERRUN_CAP_MS past stepMs. Both waits are on the step clock, so a pause holds them too. */
+  async finishTimedStep() {
+    const timed = this.timedStep; if (!timed) return;
+    const signal = this.controller?.signal;
+    await timed.clock.waitUntil(timed.stepMs, signal);
+    const audio = window.__screenreelAudioNarrator;
+    if (this.timedStep === timed && !signal?.aborted && timed.audioUrl && audio?.playing() && audio.url() === timed.audioUrl) {
+      await Promise.race([audio.settle(), timed.clock.waitUntil(timed.stepMs + window.ScreenReelStepClock.AUDIO_OVERRUN_CAP_MS, signal)]);
+    }
+    if (this.timedStep === timed) this.stopTimedStep();
+  }
+  /* Ends the running timed step at once: its clock (releasing every wait on it), its card, caption,
+     audio, and any hold. Called at a step's natural end and whenever the scene is left. */
+  stopTimedStep() {
+    const timed = this.timedStep; this.timedStep = null;
+    timed?.clock.stop();
+    if (timed?.caption && this.caption) this.caption.hidden = true;
+    this.releaseTimedCard(); this.stopStepAudio();
+    const held = this.held; this.held = null; held?.resolve();
+  }
+  /* The pill's pause inside a timed step holds the step in place instead of cutting the scene short:
+     the clock and the audio pause, an action already moving finishes, and the next one waits. Play
+     continues both from where they were. Anything else (Next, Back, Exit) ends the step as usual. */
+  hold() {
+    const timed = this.timedStep; if (!timed || this.held) return;
+    let resolve; const promise = new Promise((done) => { resolve = done; });
+    this.held = { promise, resolve };
+    timed.clock.pause(); window.__screenreelAudioNarrator?.pause();
+    event('hold', { projectId: this.store.projectId, flowId: this.store.activeFlow()?.id, held: true, ...timed.clock.state() });
+    this.render();
+  }
+  unhold() {
+    const held = this.held; if (!held) return;
+    this.held = null;
+    const timed = this.timedStep; timed?.clock.resume();
+    const audio = window.__screenreelAudioNarrator;
+    if (timed?.audioUrl && audio?.playing() && audio.url() === timed.audioUrl) audio.resume();
+    else if (timed?.audioUrl && this.stepAudio) this.playStepAudio(timed.audioUrl, timed.clock.elapsed()); // unmuted while held
+    held.resolve();
+    if (timed) event('hold', { projectId: this.store.projectId, flowId: this.store.activeFlow()?.id, held: false, ...timed.clock.state() });
+    this.render();
+  }
+  whileHeld() { return this.held ? this.held.promise : Promise.resolve(); }
   /* Introduce the control pill before the first action runs, so the viewer sees which flow is
      about to play and where the controls are. Resolves when the beat is over. */
   async introducePill() {
@@ -701,7 +867,7 @@ class Projector {
     // Held by reference: disable() (or opening Studio) during the beat drops this.pill to null.
     pill.dataset.intro = 'done';
   }
-  pause() { this.playGeneration++; this.stepWaiter?.(); this.leaving = this.leaveScene('pause').catch((error) => console.warn('[screenreel] scene cleanup failed', error)); this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; window.__screenreelCursor?.stopBob(); window.__screenreelNarrator?.cancel(); this.render(); return this; }
+  pause() { this.playGeneration++; this.stepWaiter?.(); this.leaving = this.leaveScene('pause').catch((error) => console.warn('[screenreel] scene cleanup failed', error)); this.store.setPlaying(false); this.controller?.abort(); clearTimeout(this.timer); this.timer = null; window.__screenreelCursor?.stopBob(); window.__screenreelNarrator?.cancel(); this.stopStepAudio(); this.render(); return this; }
   async next(autoPlay = false, expectedGeneration = null) {
     if (expectedGeneration != null && expectedGeneration !== this.playGeneration) return;
     // The last scene of a non-looping flow has nowhere to go: Next — the timer's or the viewer's — completes it.

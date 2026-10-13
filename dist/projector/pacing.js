@@ -26,6 +26,10 @@ const narratorApi = () => (typeof window === 'undefined' ? null : window.__scree
 export const estimateSpeechMs = (text) => Number(narratorApi()?.estimateMs?.(text)) || 0;
 const narrationSettleCapMs = () => Number(narratorApi()?.settleCapMs) || NARRATION_SETTLE_FALLBACK_MS;
 const definitionOf = (action) => (typeof window === 'undefined' ? null : window.ScreenReelCore?.definitionForAction(action) ?? null);
+/* The step-clock rules (packages/core/step-clock.js), loaded as a global like the registry. A timed
+   step's timeline is authoritative (it was copied from its audio), so nothing here stretches it. */
+const stepClock = () => globalThis.ScreenReelStepClock ?? null;
+const isTimedAction = (action) => Boolean(stepClock()?.isTimedAction(action));
 
 /* How long an action occupies the screen on its own, excluding afterMs (callers add it).
 
@@ -36,6 +40,9 @@ export function actionSelfMs(action, definition) {
   if (action.type === 'glow' && action.sequence) return num('stepMs', ESTIMATE_FALLBACKS.glowStepMs) * num('count', ESTIMATE_FALLBACKS.glowCount);
   // runCountdown plays `from…1` and then "Go", so a 3-count is four beats rather than one stepMs.
   if (action.type === 'countdown') return num('stepMs', ESTIMATE_FALLBACKS.countdownStepMs) * (Math.max(1, num('from', ESTIMATE_FALLBACKS.countdownFrom)) + 1);
+  // A timed card lasts its step (stepMs), whatever its reading time.
+  const stepMs = stepClock()?.stepMsOf(action);
+  if (stepMs != null) return stepMs;
   // An info card holds at least as long as it takes to read (ScreenReelCore.cardHoldMs).
   const cardHold = action.type === 'callout' && typeof window !== 'undefined' ? window.ScreenReelCore?.cardHoldMs?.(action) : 0;
   let ms = cardHold || num('holdMs', 0) || num('durMs', 0) || num('ms', 0) || num('stepMs', 0);
@@ -58,7 +65,7 @@ export function planPace(action, definition, speechMs) {
   const baseValue = Number(base[field] || 0);
   const windowMs = actionSelfMs(base, definition) + Number(base.afterMs || 0);
   const speech = Number(speechMs) || 0;
-  const deficit = speech > 0 && !PACE_SKIP_TYPES.has(action.type) ? speech + SPEECH_PAD_MS - windowMs : 0;
+  const deficit = speech > 0 && !PACE_SKIP_TYPES.has(action.type) && !isTimedAction(action) ? speech + SPEECH_PAD_MS - windowMs : 0;
   if (deficit <= 0) return { [field]: baseValue, pace: null, addedMs: 0, field, capped: false };
   const wanted = baseValue + Math.ceil(deficit / PACE_ROUND_MS) * PACE_ROUND_MS;
   const value = Math.max(baseValue, Math.min(PACE_MAX_MS, wanted));
@@ -77,7 +84,11 @@ export function planPace(action, definition, speechMs) {
 export function estimateSceneSeconds(scene, defaults, speechMs = estimateSpeechMs) {
   let ms = Number(scene.dwellMs ?? defaults?.dwellMs ?? 0) + Number(scene.settleMs ?? defaults?.settleMs ?? 0);
   let pending = Number(speechMs(scene.narration ?? scene.talkingPoints ?? '')) || 0;
-  for (const action of scene.actions || []) {
+  const timeline = stepClock()?.planSteps(scene.actions) ?? [];
+  for (const [index, action] of (scene.actions || []).entries()) {
+    // Inside a timed step every action runs on the step's clock: the card's stepMs already covers them.
+    const owner = timeline[index]?.owner ?? -1;
+    if (owner >= 0 && owner !== index) continue;
     const windowMs = actionSelfMs(action, definitionOf(action)) + Number(action.afterMs || 0);
     const line = String(action.narration ?? '').trim();
     if (line) pending = Number(speechMs(line)) || 0;

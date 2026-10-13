@@ -325,6 +325,21 @@
         "narration": {
           "type": "string"
         },
+        "stepMs": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "On an info card (callout): the step's total length in ms from the moment the card shows, which makes the step timed (see docs/playback.md#timed-steps-and-narration-audio). On a glow sequence or a countdown: the length of one beat."
+        },
+        "atMs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "On an action after a card with stepMs, up to the next card: when it runs, in ms from the card showing. Ignored in guided mode."
+        },
+        "narrationAudio": {
+          "type": "string",
+          "minLength": 1,
+          "description": "On an info card (callout): URL of a pre-recorded narration file, relative to the page. Plays when the card shows; the step clock, not the audio, keeps the timing."
+        },
         "pace": {
           "type": "object",
           "required": [

@@ -54,6 +54,8 @@
   const KEEP_FALLBACK_MS = 4000;       // how long a `keep` highlight ring lingers after its action
   /* Element readiness. */
   const ELEMENT_WAIT_TIMEOUT_MS = 8000, CURSOR_TARGET_WAIT_MS = 6000, WAIT_POLL_MS = 120;
+  /* Undo and cleanup (see quietAction): a target that is not there now went with its dialog or page. */
+  const QUIET_ELEMENT_WAIT_MS = 500;
   /* Geometry. */
   const BOX_PADDING_PX = 5;            // highlight ring and dim cut-out sit this far outside the target
   const REVEAL_MARGIN_PX = 24, REVEAL_MIN_WIDTH_PX = 640, REVEAL_ASPECT = 10 / 16;
@@ -85,6 +87,15 @@
     for (let later = index + 1; later < actions.length; later++) if (sameTarget(actions[later])) return later;
     return -1;
   }
+  /* An undo or cleanup action as the projector runs it (runQuietly): no pause after it, no note,
+     no narration, and a short wait for its target. Its target was on screen when the scene changed
+     it; one missing now went with its dialog or page, and waiting the full ELEMENT_WAIT_TIMEOUT_MS
+     for each such target held a scene change for seconds. An action's own timeoutMs, and a cleanup
+     waitFor (which waits on purpose), keep theirs. Pure, so it is unit-tested. */
+  function quietAction(action) {
+    const timeoutMs = action.timeoutMs || (actionType(action) === 'waitFor' ? undefined : QUIET_ELEMENT_WAIT_MS);
+    return { ...action, afterMs: 0, note: undefined, narration: undefined, timeoutMs };
+  }
   /* In a guided tour, info cards are the steps: each waits for Next. One home for the rule. */
   function isGuidedStep(action) { return actionType(action) === 'callout'; }
   /* "N of M" for a card: its position among the info cards of every enabled scene, in order. */
@@ -97,6 +108,7 @@
     return { step, total };
   }
   const CALLOUT_GAP_PX = 8;            // space between a callout and its target
+  const CALLOUT_AVOID_OPACITY = 0.35;  // a card over an element an action is working on fades to this (see runCallout)
   const CALLOUT_VIEWPORT_MARGIN_PX = 8; // a callout never comes closer than this to the viewport edge
   /* The side a callout tries first for `placement: 'auto'`, then the rest in order. */
   const CALLOUT_AUTO_ORDER = ['bottom', 'top', 'right', 'left'];
@@ -146,6 +158,9 @@
   }
   function queryAll(doc, selector) { try { return selector ? [...doc.querySelectorAll(selector)] : []; } catch { return []; } }
   function resolveElement(doc, action, selector = action.selector) { return queryAll(doc, selector)[Number(action.index) || 0] || null; }
+  /* `el` if it is still in the document, else the element the selector finds now (the host replaced
+     it), else `el` itself, still detached, for the caller to judge. */
+  function currentElement(doc, action, el) { return el.isConnected === false ? resolveElement(doc, action) || el : el; }
   async function waitFor(doc, selector, condition = 'appear', timeoutMs = ELEMENT_WAIT_TIMEOUT_MS, signal) {
     const started = Date.now();
     while (!signal?.aborted && Date.now() - started <= timeoutMs) {
@@ -159,7 +174,7 @@
   function ensureStyles(doc) {
     if (doc.getElementById('__screenreelActionStyles')) return;
     const style = doc.createElement('style'); style.id = '__screenreelActionStyles';
-    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:var(--sr-ring-radius,14px);border:3px solid var(--sr-ring-color,var(--sr-accent,#7c3aed));box-shadow:var(--sr-ring-shadow,0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48));transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:var(--sr-glow,conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e)) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483647;box-sizing:border-box;max-width:var(--sr-callout-width,300px);padding:12px 14px;border:var(--sr-callout-border,1px solid #e4e4e7);border-radius:var(--sr-callout-radius,10px);background:var(--sr-callout-bg,#fff);color:var(--sr-callout-fg,#18181b);font:500 var(--sr-callout-font-size,13px)/1.45 var(--sr-font-family,system-ui,sans-serif);box-shadow:var(--sr-callout-shadow,0 12px 32px rgba(15,23,42,.16));pointer-events:none}.sr-action-callout.sr-callout--interactive{pointer-events:auto}.sr-callout-title{margin:0 0 3px;font-weight:600;font-size:var(--sr-callout-title-size,14px);color:var(--sr-callout-title-fg,inherit)}.sr-callout-body{color:var(--sr-callout-body-fg,#52525b)}.sr-callout-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.sr-callout-actions button{padding:5px 12px;border:1px solid var(--sr-callout-button-border,#e4e4e7);border-radius:var(--sr-button-radius,7px);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer}.sr-callout-actions .sr-callout-next{border-color:var(--sr-accent,#7c3aed);background:var(--sr-accent,#7c3aed);color:var(--sr-accent-foreground,#fff)}.sr-callout-actions button:focus-visible{outline:2px solid var(--sr-accent,#7c3aed);outline-offset:2px}.sr-callout-step{margin-right:auto;align-self:center;color:var(--sr-callout-muted,#71717a);font-weight:500}.sr-callout-actions .sr-callout-skip{border-color:transparent;color:var(--sr-callout-muted,#71717a)}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--sr-ripple-color,var(--sr-accent,#7c3aed));pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:var(--sr-countdown-backdrop,transparent);backdrop-filter:var(--sr-countdown-backdrop-filter,none)}.sr-count-num{font:800 var(--sr-countdown-size,220px)/1 var(--sr-font-family,system-ui,sans-serif);letter-spacing:-.04em;color:var(--sr-countdown-color,rgba(63,63,70,.24));text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 var(--sr-font-family,system-ui,sans-serif);color:var(--sr-countdown-caption-color,rgba(63,63,70,.5))}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--sr-choice-backdrop,rgba(9,9,11,.52));pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 var(--sr-font-family,system-ui,sans-serif);color:var(--sr-choice-prompt-color,#fff);text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:var(--sr-choice-radius,14px);border:1px solid rgba(255,255,255,.16);background:var(--sr-choice-card-bg,#fff);color:var(--sr-choice-card-fg,#18181b);font:700 15px/1.35 var(--sr-font-family,system-ui,sans-serif);cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid var(--sr-accent,#7c3aed)}';
+    style.textContent = '@property --sr-angle{syntax:"<angle>";initial-value:0deg;inherits:false}.sr-action-box,.sr-glow-box{position:fixed;z-index:2147483000;pointer-events:none;border-radius:var(--sr-ring-radius,14px);border:3px solid var(--sr-ring-color,var(--sr-accent,#7c3aed));box-shadow:var(--sr-ring-shadow,0 0 0 2px rgba(255,255,255,.86),0 0 24px rgba(124,58,237,.48));transition:all .32s ease}.sr-dim-backdrop{position:fixed;z-index:2147481999;pointer-events:none;border-radius:14px;transition:all .32s ease;animation:sr-dim-in .24s ease both}@keyframes sr-dim-in{from{opacity:0}}.sr-glow-box{border-color:transparent;background:var(--sr-glow,conic-gradient(from var(--sr-angle),#ff5e5e,#ffb84d,#ffe74d,#6ef08c,#4dc9ff,#7c6ef0,#d05ef0,#ff5ec8,#ff5e5e)) border-box;-webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:sr-spin 2s linear infinite}@keyframes sr-spin{to{--sr-angle:360deg}}.sr-action-callout{position:fixed;z-index:2147483646;box-sizing:border-box;max-width:var(--sr-callout-width,300px);padding:12px 14px;border:var(--sr-callout-border,1px solid #e4e4e7);border-radius:var(--sr-callout-radius,10px);background:var(--sr-callout-bg,#fff);color:var(--sr-callout-fg,#18181b);font:500 var(--sr-callout-font-size,13px)/1.45 var(--sr-font-family,system-ui,sans-serif);box-shadow:var(--sr-callout-shadow,0 12px 32px rgba(15,23,42,.16));pointer-events:none}.sr-action-callout.sr-callout--interactive{pointer-events:auto}.sr-callout-title{margin:0 0 3px;font-weight:600;font-size:var(--sr-callout-title-size,14px);color:var(--sr-callout-title-fg,inherit)}.sr-callout-body{color:var(--sr-callout-body-fg,#52525b)}.sr-callout-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.sr-callout-actions button{padding:5px 12px;border:1px solid var(--sr-callout-button-border,#e4e4e7);border-radius:var(--sr-button-radius,7px);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer}.sr-callout-actions .sr-callout-next{border-color:var(--sr-accent,#7c3aed);background:var(--sr-accent,#7c3aed);color:var(--sr-accent-foreground,#fff)}.sr-callout-actions button:focus-visible{outline:2px solid var(--sr-accent,#7c3aed);outline-offset:2px}.sr-callout-step{margin-right:auto;align-self:center;color:var(--sr-callout-muted,#71717a);font-weight:500}.sr-callout-actions .sr-callout-skip{border-color:transparent;color:var(--sr-callout-muted,#71717a)}.sr-click-ripple{position:fixed;z-index:2147483100;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--sr-ripple-color,var(--sr-accent,#7c3aed));pointer-events:none;animation:sr-ripple .65s ease-out forwards}@keyframes sr-ripple{to{opacity:0;transform:scale(3.2)}}.sr-flash-on{background:rgba(124,58,237,.16);box-shadow:0 0 0 4px rgba(124,58,237,.28);border-radius:6px;transition:background .16s ease,box-shadow .16s ease}.sr-reel,.sr-reel-landed{display:inline-block;font-variant-numeric:tabular-nums}.sr-reel-landed{animation:sr-reel-pop .5s ease}@keyframes sr-reel-pop{0%{transform:scale(1)}32%{transform:scale(1.18)}100%{transform:scale(1)}}.sr-reveal{position:fixed;z-index:2147483050;object-fit:contain;background:#fff;border:1px solid rgba(9,9,11,.08);border-radius:14px;box-shadow:0 30px 80px rgba(9,9,11,.4);opacity:0;transform:scale(.94);transition:opacity .3s ease,transform .3s ease;pointer-events:none}.sr-reveal.show{opacity:1;transform:scale(1)}.sr-countdown-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;background:var(--sr-countdown-backdrop,transparent);backdrop-filter:var(--sr-countdown-backdrop-filter,none)}.sr-count-num{font:800 var(--sr-countdown-size,220px)/1 var(--sr-font-family,system-ui,sans-serif);letter-spacing:-.04em;color:var(--sr-countdown-color,rgba(63,63,70,.24));text-shadow:0 2px 34px rgba(255,255,255,.65)}.sr-count-num.pop{animation:sr-count-pop .72s ease both}.sr-count-cap{font:600 16px/1.3 var(--sr-font-family,system-ui,sans-serif);color:var(--sr-countdown-caption-color,rgba(63,63,70,.5))}@keyframes sr-count-pop{0%{transform:scale(.72);opacity:0}25%{opacity:1}45%{transform:scale(1);opacity:1}100%{transform:scale(1.16);opacity:0}}.sr-snippet{position:fixed;z-index:2147483060;width:340px;max-width:calc(100vw - 32px);padding:14px 15px;border-radius:14px;background:#fff;border:1px solid rgba(9,9,11,.1);box-shadow:0 18px 48px rgba(9,9,11,.18);opacity:0;transform:translateY(8px);transition:opacity .26s ease,transform .26s ease;pointer-events:none}.sr-snippet.show{opacity:1;transform:translateY(0)}.sr-snippet-label{margin:0 0 9px;font:700 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#7c3aed}.sr-snippet-code{margin:0;background:#fafafa;border:1px solid rgba(9,9,11,.08);border-radius:9px;padding:11px;font:500 11.5px/1.55 ui-monospace,Menlo,monospace;color:#3f3f46;white-space:pre;overflow:auto;max-height:220px}.sr-choice-overlay{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--sr-choice-backdrop,rgba(9,9,11,.52));pointer-events:auto;opacity:0;transition:opacity .24s ease}.sr-choice-overlay.show{opacity:1}.sr-choice-prompt{font:700 24px/1.3 var(--sr-font-family,system-ui,sans-serif);color:var(--sr-choice-prompt-color,#fff);text-shadow:0 2px 14px rgba(9,9,11,.5);max-width:640px;text-align:center;padding:0 20px}.sr-choice-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 20px}.sr-choice-card{min-width:180px;max-width:280px;padding:18px 22px;border-radius:var(--sr-choice-radius,14px);border:1px solid rgba(255,255,255,.16);background:var(--sr-choice-card-bg,#fff);color:var(--sr-choice-card-fg,#18181b);font:700 15px/1.35 var(--sr-font-family,system-ui,sans-serif);cursor:pointer;box-shadow:0 18px 48px rgba(9,9,11,.35);transition:transform .16s ease,box-shadow .16s ease}.sr-choice-card:hover,.sr-choice-card.picked{transform:translateY(-3px);box-shadow:0 24px 56px rgba(9,9,11,.45);outline:3px solid var(--sr-accent,#7c3aed)}';
     doc.head.prepend(style); // first in <head>, so a host's own rules win at equal specificity
   }
   /* Everything ScreenReel draws goes into one layer. The Projector makes it a top-layer popover so
@@ -167,13 +182,15 @@
      cannot cover the tour; without a Projector (Capture, a bare runtime) overlays go into <body>. */
   const LAYER_ID = '__screenreelLayer';
   function overlayParent(doc) { return doc.getElementById?.(LAYER_ID) || doc.body; }
-  function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
+  function placeBox(box, el, rect = el.getBoundingClientRect()) { Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
   /* Highlight, highlight sequence, and callout dim the rest of the page so the eye lands on the
-     target. Precedence: the action's own `dim`, then the host's context default (Projector's
+     target. `ctx.noDim` (the host's) switches all of it off, spotlight's included. Precedence: the
+     action's own `dim`, then the host's context default (Projector's
      `dim` mount option), then DEFAULT_EMPHASIS_DIM. `0` or `false` turns it off. Lighter than
      spotlight's 0.62 on purpose — spotlight is the "everything else goes away" action. */
   const DEFAULT_EMPHASIS_DIM = 0.45, MAX_DIM = 0.9;
   function dimLevel(action, ctx) {
+    if (ctx.noDim === true) return 0; // the host keeps the page clear (a timed step whose actions open dialogs)
     const value = action.dim ?? ctx.dim ?? DEFAULT_EMPHASIS_DIM;
     if (value === false) return 0;
     const level = Number(value);
@@ -236,6 +253,25 @@
     const outlive = action.keep === 'untilSceneEnd' || ctx.persist === true;
     if (outlive && ctx.retain && !ctx.signal?.aborted) ctx.retain(release); else release();
   }
+  /* A card that stays up while a step's actions run must not hide what they work on (a dialog's
+     buttons, a field being typed in). `ctx.actionTargets()` (the host's) lists the elements actions
+     are working on right now; a card overlapping one fades to CALLOUT_AVOID_OPACITY and returns when
+     it no longer does. Fading, not moving, so the card never jumps while the viewer reads it. It is
+     re-evaluated on every follow tick, so it also reacts to a dialog opening under the card. */
+  const rectsOverlap = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  function overlapsAny(tip, elements) {
+    const box = tip.getBoundingClientRect();
+    return elements.some((el) => {
+      if (!el || el === true || el === tip || el.isConnected === false) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rectsOverlap(box, rect);
+    });
+  }
+  function fadeOverActionTargets(tip, ctx) {
+    if (!ctx.actionTargets) return;
+    tip.style.transition = 'opacity .2s ease';
+    tip.style.opacity = overlapsAny(tip, ctx.actionTargets()) ? String(CALLOUT_AVOID_OPACITY) : '';
+  }
   function buildCallout(doc, action, controls) {
     const tip = doc.createElement('div'); tip.className = 'sr-action-callout';
     if (action.title) { const heading = doc.createElement('div'); heading.className = 'sr-callout-title'; heading.textContent = action.title; tip.appendChild(heading); }
@@ -261,10 +297,17 @@
     const controls = ctx.persist ? ctx.calloutControls : null;
     const tip = buildCallout(doc, action, controls); overlayParent(doc).appendChild(tip);
     const place = () => {
-      if (backdrop) placeBox(backdrop, el); if (ring) placeBox(ring, el);
+      // The host re-rendered the target (a menu that swaps its markup when it expands): follow its
+      // replacement. With none, the card stays where it was rather than jumping to a corner.
+      if (el.isConnected === false) { el = currentElement(doc, action, el); if (el.isConnected === false) return; }
+      // A target still on the page but hidden (0x0, e.g. a panel collapsed by the step's click) has no
+      // place to point at: card, ring and dim stay where they were rather than jumping to a corner.
+      const rect = el.getBoundingClientRect(); if (rect.width === 0 && rect.height === 0) return;
+      if (backdrop) placeBox(backdrop, el, rect); if (ring) placeBox(ring, el, rect);
       const measured = tip.getBoundingClientRect();
-      const { left, top, side } = placeCallout(el.getBoundingClientRect(), { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
+      const { left, top, side } = placeCallout(rect, { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
       Object.assign(tip.style, { left: `${left}px`, top: `${top}px` }); tip.dataset.side = side;
+      fadeOverActionTargets(tip, ctx);
     };
     place(); const stopFollowing = followTarget(win, place);
     if (controls?.focusNext) tip.querySelector?.('.sr-callout-next')?.focus?.({ preventScroll: true });
@@ -430,7 +473,7 @@
     ensureStyles(ctx.document); const box = ctx.document.createElement('div'); box.className = 'sr-glow-box'; overlayParent(ctx.document).appendChild(box);
     // The glow box cannot carry the dim shadow itself: its ring mask would clip the shadow away.
     const level = dimLevel(action, ctx); let backdrop = null; let current = null;
-    const place = (el) => { current = el; placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
+    const place = (el) => { current = el; ctx.onTarget?.(el); placeBox(box, el); if (!level) return; if (backdrop) placeBox(backdrop, el); else backdrop = createDimBackdrop(ctx.document, el, level); };
     const stopFollowing = followTarget(ctx.window, () => { if (current) place(current); });
     if (action.sequence) for (const el of elements) { await ensureInView(el, ctx); place(el); await sleep(action.stepMs || GLOW_FALLBACK_STEP_MS, ctx.signal); }
     else { await ensureInView(elements[0], ctx); place(elements[0]); await sleep(action.holdMs || DEFAULTS.highlight.holdMs, ctx.signal); }
@@ -508,6 +551,7 @@
     if (action.type === 'goto') { await ctx.navigate?.(action.url); return { ok: true, navigated: true }; }
     if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || (context.strictFunctions ? undefined : win[action.fn]); if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
+    if (el && el !== true) ctx.onTarget?.(el);
     if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
     // Automatic cleanup: note how to put this control back before changing it.
     if (el && el !== true && ctx.journal) { const inverse = inverseFor(action, el); if (inverse) ctx.journal(inverse); }
@@ -515,9 +559,9 @@
       /* The dim lives on the shared backdrop (layered under the presenter pill), not on the ring:
          a spread shadow on the ring box sat above the pill and darkened the presenter's controls.
          Spotlight exists to dim, so it ignores the host's highlight `dim` default. */
-      ensureStyles(doc); const backdrop = createDimBackdrop(doc, el, Number(action.dim) || DEFAULTS.spotlight.dim);
+      ensureStyles(doc); const backdrop = ctx.noDim === true ? null : createDimBackdrop(doc, el, Number(action.dim) || DEFAULTS.spotlight.dim);
       const box = doc.createElement('div'); box.className = 'sr-action-box'; placeBox(box, el); overlayParent(doc).appendChild(box);
-      const stopFollowing = followTarget(win, () => { placeBox(box, el); placeBox(backdrop, el); });
+      const stopFollowing = followTarget(win, () => { placeBox(box, el); if (backdrop) placeBox(backdrop, el); });
       await sleep(action.holdMs || DEFAULTS.spotlight.holdMs, ctx.signal); settleOverlays(action, ctx, [box, backdrop], stopFollowing);
     }
     else if (action.type === 'callout') await runCallout(action, ctx, el);
@@ -525,7 +569,13 @@
     else if (action.type === 'reel') await runReel(action, ctx, el);
     else if (action.type === 'reveal') await runReveal(action, ctx, el);
     else if (action.type === 'snippet') await runSnippet(action, ctx, el);
-    else if (action.type === 'click') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); ripple(doc, el); el.click(); }
+    else if (action.type === 'click') {
+      await ctx.moveCursor?.(el); await ctx.pressCursor?.();
+      // The cursor's travel gives the host time to re-render the target. A click on the detached copy
+      // does nothing useful, and on an <a> it is a full-page navigation that ends the tour.
+      el = currentElement(doc, action, el); if (el.isConnected === false) { ctx.warn(`Selector not found: ${action.selector} (the target left the page before the click)`); return { ok: false, error: 'selector' }; }
+      ripple(doc, el); el.click();
+    }
     else if (action.type === 'hover') { await ctx.moveCursor?.(el); ['pointerover', 'mouseover', 'mouseenter'].forEach((type) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== 'mouseenter', view: win }))); await sleep(action.holdMs || DEFAULTS.hover.holdMs, ctx.signal); }
     else if (action.type === 'focus') { await ctx.moveCursor?.(el); el.focus({ preventScroll: false }); }
     else if (action.type === 'type') { await ctx.moveCursor?.(el); el.focus(); if (action.clearFirst !== false) dispatchValue(el, ''); let value = action.clearFirst === false ? String(el.value || '') : ''; for (const char of String(action.text ?? action.value ?? '')) { value += char; el.value = value; el.dispatchEvent(new win.Event('input', { bubbles: true })); await sleep(action.charMs ?? DEFAULTS.type.charMs, ctx.signal); } el.dispatchEvent(new win.Event('change', { bubbles: true })); }
@@ -625,5 +675,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { inverseFor, pairedUndo, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { inverseFor, pairedUndo, quietAction, QUIET_ELEMENT_WAIT_MS, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);

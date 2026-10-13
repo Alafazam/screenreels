@@ -176,6 +176,17 @@ Then:
 - **Back**, for a viewer (guided, or any mode configured with `playback`), plays the previous
   scene. It does nothing on the first scene. A presenter's pill (the older look) pauses on it.
 
+**Pause and Play.** The pill's Play/Pause never ends the tour and the pill stays up. Inside a timed
+step it holds the step in place and Play continues it; anywhere else Pause stops the scene (its
+changes are undone) and Play plays that scene again from its start. The pill shows Pause as soon as
+Play is pressed, while the stopped scene's cleanup finishes. **Space** presses Play/Pause in any mode
+whose pill shows it (`video`, `autoplay`), whatever `keys` says, except while typing in a field, with
+a modifier held, on a chooser or start/end card, or on the tour's own focused button (which Space
+activates itself). One enabled projector per page takes the key.
+
+**The pill stays on top.** The projector shell (pill, progress bar, captions) is the top of the tour
+layer: rings, ripples, dims and info cards are drawn under it, so none of them cuts the controls.
+
 **The end:**
 - `guided`: **Finish** on the last card.
 - `video` and `autoplay`: the end card. **Replay** starts the flow again in the same mode.
@@ -193,6 +204,88 @@ Each ending is an event:
 | `screenreel:start` | `{ projectId, flowId, position, mode, source }`. `source` is `'start'`, `'chooser'`, `'host'`, `'flow'`, `'host-default'`, `'remembered'`, `'restricted'`, or `'fallback'`. |
 | `screenreel:complete` | `{ projectId, flowId, sceneId, position, sceneCount, mode }`. The last scene finished. |
 | `screenreel:exit` | `{ projectId, flowId, sceneId, position, reason, mode }`. `reason` is `'complete'` (the flow finished and the tour closed: the end card's Close, or `disableOnComplete` after Finish or the end card), `'user'` (Skip, ✕, Esc, closing the chooser), or `'api'`. |
+
+## Timed steps and narration audio
+
+A **step** is an info card (a `callout`) and the actions after it, up to the next card. Give the
+card a `stepMs` and the step is **timed**: its timing is a timeline stored in the flow, measured
+from the moment the card shows. Audio is optional. When a step has a narration file, the file was
+generated first and the timeline was copied from its word timestamps, so they match; remove the
+file and the step plays with the same timing.
+
+| Field | On | Meaning |
+|---|---|---|
+| `stepMs` | a `callout` | The step's total length in ms, from the card showing. Makes the step timed. |
+| `narrationAudio` | a `callout` | URL of the step's narration file, resolved relative to the page like other assets. |
+| `narration` | a `callout` | The file's words: its transcript, and the text a speech engine says when there is no file. |
+| `atMs` | any action after a timed card, up to the next card | When the action runs, in ms from the card showing. An action without `atMs` is not part of the step (see below). |
+
+```json
+{ "type": "callout", "selector": "[data-demo-id='new-cycle']", "title": "Start a cycle", "text": "Name it and start.",
+  "stepMs": 6200, "narrationAudio": "assets/guides/audio/run-cycle-03.mp3", "narration": "Start a new one. Name it…" },
+{ "type": "click", "selector": "[data-demo-id='new-cycle']", "atMs": 900 },
+{ "type": "type", "selector": "[data-demo-id='new-cycle-name']", "text": "SS-26 EOSS", "atMs": 2100 }
+```
+
+**Autoplay and video** play the timeline:
+- The card showing starts the step's clock and, with sound on, its file from the start. The card
+  does not hold for `holdMs`: it, and the ring around its target (`highlight: true`), stay up for
+  the **whole step** (until `stepMs`, or the next card), however many actions run meanwhile. With
+  `callouts: 'caption'` its caption stays until the step ends; with `'off'` there is no card, but
+  the clock and the file still run. (A flow that wants cards in video sets
+  `defaults.playback.video.callouts: 'timed'`.)
+- An action with `atMs` waits until the clock reaches it, then runs as usual. One that is already
+  late runs at once, and the next is still measured from the card, so lateness never adds up.
+- **A gate ends the step.** The first action after a timed card that has no `atMs` (a `waitFor`,
+  a `goto`, a plain `click`...) is not part of the step: the step plays out to its end first, and
+  then the action runs. Actions after it with `atMs` are ignored. Put a gate (say, a `waitFor` for
+  the next step's element) after the previous step's card and its actions, never between a card and
+  the actions that belong to it.
+- After the step's last action, the next card waits until `stepMs`, and for a file still playing
+  until it ends, but never more than 1.5 s past `stepMs`.
+- **The page is not dimmed while a step with actions runs.** If the step has any `atMs` action, its
+  card and the actions' own highlights and spotlights draw no dim (`ctx.noDim` in the runtime), only
+  the ring and the card, so a dialog an action opens is neither covered nor darkened. A step with no
+  actions keeps the normal dim (the mode's `dim`) and, as ever, the card's own `dim` setting.
+- **The card never blocks the page.** A timed card has `pointer-events: none`, and the actions are
+  programmatic. A card that overlaps the bounding box of an element an action is working on (for
+  example a button in a dialog the step just opened) fades to 35% opacity while the action runs and
+  returns to full strength after it. It fades rather than moves, so it never jumps while being read;
+  the check runs every frame, so a dialog opening under the card is caught too.
+- A scene that ends on a timed step goes straight on to the next scene: only the scene's own
+  `dwellMs` adds a rest (the flow's default dwell does not).
+- `stepMs` and `atMs` are wall-clock time. The host's `timeScale` and the mode's `pace` still slow
+  the actions themselves, never the timeline.
+
+**Controls:**
+- **Pause** on the pill inside a timed step pauses the clock and the file; **Play** continues both
+  from where they were. An action already moving finishes; the next one waits.
+- **Back** replays the previous scene, so its steps start again with the clock and file at 0.
+- **Mute** stops the file; the clock keeps running, so the timing is the same with or without
+  sound. Unmuting picks the file up at the clock's position.
+- **Exit** stops the file.
+
+**Guided:** a card plays its file while it waits for Next, and Next stops it. Actions run after Next
+as always; `atMs` is ignored.
+
+**Page readiness:** a scene's route, `waitFor` and `settleMs` all complete before its first action
+runs, so a step's clock never starts on a page that is still loading.
+
+**Sound without a speech engine.** The mount's `narration: { speech: false }` plays narration files
+only: no browser speech, so a step without a file is silent. `narration: false` still turns all
+narration off, files included. A scene with any narration file is never also spoken from its
+`narration` or `talkingPoints`.
+
+**Measuring drift.** `screenreel:step` carries the clock: `stepMs` (the step's length), `atMs` (the
+action's offset, or `null`), and `elapsedMs` (the step clock when the action starts). `elapsedMs -
+atMs` is how late an action ran. Outside a timed step all three are `null`. Pausing and resuming a
+timed step fires `screenreel:hold` with `{ held, stepMs, elapsedMs, paused, running }`.
+
+**Checking it.** `validateScene()` reports a card's `stepMs` that is not a positive number,
+`narrationAudio` on an action that is not a card, `atMs` with no timed card before it or after the
+gate that ended the step, `atMs` past its step's `stepMs`, and an `atMs` earlier than the action
+before it. Studio's pacer never stretches a timed step: its timeline is
+authoritative.
 
 ## What merged, and what stayed separate
 

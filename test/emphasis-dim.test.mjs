@@ -89,6 +89,36 @@ test('callout dims around its target', async () => {
   assert.equal(stub.backdrops()[0].removed, true);
 });
 
+test('ctx.noDim (a timed step with actions) removes every dim, even an action\'s own, spotlight\'s included', async () => {
+  for (const action of [
+    { type: 'highlight', selector: '.kpi', holdMs: 100, dim: 0.7 },
+    { type: 'callout', selector: '.kpi', text: 'Look here', holdMs: 100, highlight: true, dim: 0.7 },
+    { type: 'spotlight', selector: '.kpi', holdMs: 100 },
+  ]) {
+    const stub = stubDocument();
+    const result = await run(action, stub, { noDim: true });
+    assert.equal(result.ok, true);
+    assert.equal(stub.backdrops().length, 0, `${action.type} adds no dim`);
+    assert.ok(stub.appended().length > 0, `${action.type} still draws its ring or card`);
+  }
+});
+
+test('a card overlapping an element an action works on fades, and comes back when it no longer does', async () => {
+  const stub = stubDocument(); const card = []; const createElement = stub.doc.createElement;
+  stub.doc.createElement = () => { const node = createElement(); card.push(node); return node; };
+  let working = [{ getBoundingClientRect: () => ({ left: 0, top: 0, right: 5000, bottom: 5000, width: 5000, height: 5000 }), isConnected: true }];
+  const win = { ...stub.win, requestAnimationFrame: (fn) => setTimeout(fn, 5), cancelAnimationFrame: (id) => clearTimeout(id) };
+  const tip = () => card.find((node) => node.className === 'sr-action-callout');
+  let release = () => {}; // a timed card persists until its step ends, like the projector's
+  const running = runAction({ type: 'callout', selector: '.kpi', text: 'Look here' }, { document: stub.doc, window: win, actionTargets: () => working, persist: true, skipHold: true, retain: (fn) => { release = fn; } });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(tip().style.opacity, '0.35', 'covering an action target fades the card');
+  working = [];
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(tip().style.opacity, '', 'and it returns to full strength');
+  await running; release();
+});
+
 test('an invalid dim warns and falls back to the default', async () => {
   const stub = stubDocument(); const warnings = [];
   await run({ type: 'highlight', selector: '.kpi', holdMs: 100, dim: 'dark' }, stub, { warn: (message) => warnings.push(message) });
@@ -170,4 +200,75 @@ test('an element hugging the bottom edge is scrolled into the comfort band befor
   target.scrollIntoView = (options) => scrolls.push(options.block);
   await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
   assert.deepEqual(scrolls, ['center'], 'on screen but in the bottom 20% still scrolls');
+});
+
+test('the projector shell sits above every overlay the runtime draws, so no ring, ripple or card cuts the pill', async () => {
+  const stub = stubDocument(); let css = '';
+  stub.doc.head.prepend = (node) => { css = node.textContent; return node; };
+  await run({ type: 'highlight', selector: '.kpi', holdMs: 100 }, stub);
+  const overlayZ = [...css.matchAll(/z-index:(\d+)/g)].map((match) => Number(match[1]));
+  const shellCss = (await import('node:fs')).readFileSync(new URL('../packages/projector/screenreel.css', import.meta.url), 'utf8');
+  const shellZ = Number(/\.sr-shell\{[^}]*z-index:(\d+)/.exec(shellCss)[1]);
+  assert.ok(overlayZ.length > 3, 'the runtime styles were read');
+  assert.ok(overlayZ.every((z) => z < shellZ), `every overlay z (${Math.max(...overlayZ)} at most) must sit under the shell z ${shellZ}`);
+});
+
+test('a card follows its target when the host replaces it, and stays put when nothing replaces it', async () => {
+  const stub = stubDocument(); const created = []; const createElement = stub.doc.createElement;
+  stub.doc.createElement = () => { const node = createElement(); created.push(node); return node; };
+  const [first] = stub.targets; first.isConnected = true;
+  const replacement = { isConnected: true, getBoundingClientRect: () => ({ left: 600, top: 300, right: 700, bottom: 340, width: 100, height: 40 }), getClientRects: () => [1] };
+  let found = [first]; stub.doc.querySelectorAll = () => found;
+  const win = { ...stub.win, requestAnimationFrame: (fn) => setTimeout(fn, 5), cancelAnimationFrame: (id) => clearTimeout(id) };
+  const tip = () => created.find((node) => node.className === 'sr-action-callout');
+  const ring = () => created.find((node) => node.className === 'sr-glow-box');
+  let release = () => {};
+  const running = runAction({ type: 'callout', selector: '.kpi', text: 'Here', placement: 'bottom', highlight: true }, { document: stub.doc, window: win, persist: true, skipHold: true, retain: (fn) => { release = fn; } });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(tip().style.left, '10px', 'placed under the first target');
+    first.isConnected = false; found = [replacement];
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual([tip().style.left, ring().style.left], ['600px', '595px'], 'card and ring move to the replacement');
+    replacement.isConnected = false; found = [];
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(tip().style.left, '600px', 'with no replacement the card stays where it was, not in the corner');
+  } finally { await running; release(); } // stops the follow loop, which would otherwise keep the test alive
+});
+
+test('a click lands on the replacement when the host re-renders its target during the cursor move, and on nothing when there is none', async () => {
+  for (const replaced of [true, false]) {
+    const stub = stubDocument(); const warnings = []; const clicks = [];
+    const [first] = stub.targets; first.isConnected = true; first.click = () => clicks.push('detached');
+    const replacement = { ...stubDocument().targets[0], isConnected: true, click: () => clicks.push('replacement') };
+    let found = [first]; stub.doc.querySelectorAll = () => found;
+    const moveCursor = async () => { first.isConnected = false; found = replaced ? [replacement] : []; };
+    const result = await run({ type: 'click', selector: '.menu a' }, stub, { moveCursor, warn: (message) => warnings.push(message) });
+    if (replaced) assert.deepEqual([result.ok, clicks], [true, ['replacement']]);
+    else {
+      assert.deepEqual([result.ok, clicks], [false, []], 'a detached element is never clicked');
+      assert.match(warnings[0], /Selector not found: \.menu a/);
+    }
+  }
+});
+
+test('a card, ring and dim stay put when their target is still on the page but hidden (0x0)', async () => {
+  const stub = stubDocument(); const created = []; const createElement = stub.doc.createElement;
+  stub.doc.createElement = () => { const node = createElement(); created.push(node); return node; };
+  const [target] = stub.targets; target.isConnected = true;
+  let rect = { left: 600, top: 300, right: 700, bottom: 340, width: 100, height: 40 };
+  target.getBoundingClientRect = () => rect;
+  const win = { ...stub.win, requestAnimationFrame: (fn) => setTimeout(fn, 5), cancelAnimationFrame: (id) => clearTimeout(id) };
+  const find = (className) => created.find((node) => node.className === className);
+  const where = () => ['sr-action-callout', 'sr-glow-box', 'sr-dim-backdrop'].map((className) => [find(className).style.left, find(className).style.top]);
+  let release = () => {};
+  const running = runAction({ type: 'callout', selector: '.kpi', text: 'Here', placement: 'bottom', highlight: true }, { document: stub.doc, window: win, persist: true, skipHold: true, retain: (fn) => { release = fn; } });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const placed = where();
+    assert.deepEqual(placed.map(([left]) => left), ['600px', '595px', '595px'], 'card, ring and dim are placed on the target');
+    rect = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; // collapsed by the step's click
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual(where(), placed, 'a hidden target leaves everything where it was, not in the corner');
+  } finally { await running; release(); }
 });
