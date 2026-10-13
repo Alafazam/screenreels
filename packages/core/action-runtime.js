@@ -182,7 +182,7 @@
      cannot cover the tour; without a Projector (Capture, a bare runtime) overlays go into <body>. */
   const LAYER_ID = '__screenreelLayer';
   function overlayParent(doc) { return doc.getElementById?.(LAYER_ID) || doc.body; }
-  function placeBox(box, el) { const rect = el.getBoundingClientRect(); Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
+  function placeBox(box, el, rect = el.getBoundingClientRect()) { Object.assign(box.style, { left: `${rect.left - BOX_PADDING_PX}px`, top: `${rect.top - BOX_PADDING_PX}px`, width: `${rect.width + BOX_PADDING_PX * 2}px`, height: `${rect.height + BOX_PADDING_PX * 2}px` }); }
   /* Highlight, highlight sequence, and callout dim the rest of the page so the eye lands on the
      target. `ctx.noDim` (the host's) switches all of it off, spotlight's included. Precedence: the
      action's own `dim`, then the host's context default (Projector's
@@ -300,9 +300,12 @@
       // The host re-rendered the target (a menu that swaps its markup when it expands): follow its
       // replacement. With none, the card stays where it was rather than jumping to a corner.
       if (el.isConnected === false) { el = currentElement(doc, action, el); if (el.isConnected === false) return; }
-      if (backdrop) placeBox(backdrop, el); if (ring) placeBox(ring, el);
+      // A target still on the page but hidden (0x0, e.g. a panel collapsed by the step's click) has no
+      // place to point at: card, ring and dim stay where they were rather than jumping to a corner.
+      const rect = el.getBoundingClientRect(); if (rect.width === 0 && rect.height === 0) return;
+      if (backdrop) placeBox(backdrop, el, rect); if (ring) placeBox(ring, el, rect);
       const measured = tip.getBoundingClientRect();
-      const { left, top, side } = placeCallout(el.getBoundingClientRect(), { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
+      const { left, top, side } = placeCallout(rect, { width: measured.width, height: measured.height }, { width: win.innerWidth, height: win.innerHeight }, action.placement);
       Object.assign(tip.style, { left: `${left}px`, top: `${top}px` }); tip.dataset.side = side;
       fadeOverActionTargets(tip, ctx);
     };

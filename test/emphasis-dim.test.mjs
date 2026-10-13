@@ -251,3 +251,24 @@ test('a click lands on the replacement when the host re-renders its target durin
     }
   }
 });
+
+test('a card, ring and dim stay put when their target is still on the page but hidden (0x0)', async () => {
+  const stub = stubDocument(); const created = []; const createElement = stub.doc.createElement;
+  stub.doc.createElement = () => { const node = createElement(); created.push(node); return node; };
+  const [target] = stub.targets; target.isConnected = true;
+  let rect = { left: 600, top: 300, right: 700, bottom: 340, width: 100, height: 40 };
+  target.getBoundingClientRect = () => rect;
+  const win = { ...stub.win, requestAnimationFrame: (fn) => setTimeout(fn, 5), cancelAnimationFrame: (id) => clearTimeout(id) };
+  const find = (className) => created.find((node) => node.className === className);
+  const where = () => ['sr-action-callout', 'sr-glow-box', 'sr-dim-backdrop'].map((className) => [find(className).style.left, find(className).style.top]);
+  let release = () => {};
+  const running = runAction({ type: 'callout', selector: '.kpi', text: 'Here', placement: 'bottom', highlight: true }, { document: stub.doc, window: win, persist: true, skipHold: true, retain: (fn) => { release = fn; } });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const placed = where();
+    assert.deepEqual(placed.map(([left]) => left), ['600px', '595px', '595px'], 'card, ring and dim are placed on the target');
+    rect = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; // collapsed by the step's click
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual(where(), placed, 'a hidden target leaves everything where it was, not in the corner');
+  } finally { await running; release(); }
+});
