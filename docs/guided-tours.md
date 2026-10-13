@@ -80,6 +80,11 @@ When those are undone:
 - **Closing or finishing the tour** undoes everything, newest first.
 - **A scene that plays through** keeps its changes, so the next scene can build on them.
 
+An undo whose control is gone (its dialog closed, its page left) is skipped after a short wait
+(`QUIET_ELEMENT_WAIT_MS`, 500 ms), with a `Selector not found` warning, instead of the full 8 s an
+action waits for its target. Cleanup actions wait the same short time, unless they set their own
+`timeoutMs`; a cleanup `waitFor` keeps its usual wait.
+
 For anything else, add `cleanup` actions. Studio's **Add undo** does this for a click:
 
 ```json

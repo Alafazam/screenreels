@@ -498,11 +498,12 @@ class Projector {
      tour undoes all of them. A scene that plays through keeps its changes, so the next scene can
      build on them. */
   /* Undo and cleanup actions run to completion, quietly: no cursor, no narration, no abort signal,
-     because a half-undone app is exactly the state they exist to prevent. */
+     because a half-undone app is exactly the state they exist to prevent. A target that is gone is
+     given up on quickly (core quietAction), so a scene change is not held up by a closed dialog. */
   quietContext() { return { document, window, resolveFunction: (name) => this.resolveFunction(name), strictFunctions: this.strictFunctions(), variables: this.variablesFor(), warn: (message) => console.warn('[screenreel]', message) }; }
   async runQuietly(actions, what) {
     for (const action of actions) {
-      const result = await window.ScreenReelCore.runAction({ ...action, afterMs: 0, note: undefined, narration: undefined }, this.quietContext());
+      const result = await window.ScreenReelCore.runAction(window.ScreenReelCore.quietAction(action), this.quietContext());
       if (!result.ok) console.warn(`[screenreel] ${what}: ${action.type} ${action.selector || ''} failed`);
     }
   }

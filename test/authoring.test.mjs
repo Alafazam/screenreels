@@ -4,7 +4,7 @@ import '../packages/core/action-runtime.js';
 import '../packages/core/flow-store.js';
 import { cardFieldsFor, CARD_TITLE_PREFILL_CHARS } from '../packages/studio/recorder.js';
 
-const { inverseFor, pairedUndo, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, getDefinition, validate } = globalThis.ScreenReelCore;
+const { inverseFor, pairedUndo, quietAction, QUIET_ELEMENT_WAIT_MS, ELEMENT_WAIT_TIMEOUT_MS, runAction, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, getDefinition, validate } = globalThis.ScreenReelCore;
 const { Store, normalizeFlow } = globalThis.ScreenReelStore;
 
 test('inverseFor restores form controls as plain set/toggle actions and leaves other actions alone', () => {
@@ -14,6 +14,26 @@ test('inverseFor restores form controls as plain set/toggle actions and leaves o
   assert.deepEqual(inverseFor({ type: 'lever', selector: '#pace', to: 3 }, { value: '2' }), { type: 'set', selector: '#pace', value: '2' });
   assert.deepEqual(inverseFor({ type: 'toggle', selector: '#notes', checked: true }, { checked: false }), { type: 'toggle', selector: '#notes', checked: false });
   for (const type of ['click', 'highlight', 'callout', 'goto', 'scroll']) assert.equal(inverseFor({ type, selector: '#x' }, {}), null, type);
+});
+
+test('quietAction runs an undo or cleanup action plainly, with a short wait for its target', () => {
+  assert(QUIET_ELEMENT_WAIT_MS < ELEMENT_WAIT_TIMEOUT_MS);
+  assert.deepEqual(quietAction({ type: 'set', selector: '#name', value: 'Old', afterMs: 400, note: 'n', narration: 'x' }), {
+    type: 'set', selector: '#name', value: 'Old', afterMs: 0, note: undefined, narration: undefined, timeoutMs: QUIET_ELEMENT_WAIT_MS,
+  });
+  assert.equal(quietAction({ type: 'click', selector: '#close', timeoutMs: 3000 }).timeoutMs, 3000, "an action's own timeoutMs is kept");
+  assert.equal(quietAction({ type: 'waitFor', selector: '#gone', condition: 'disappear' }).timeoutMs, undefined, 'a cleanup waitFor keeps its default wait');
+});
+
+test('an undo whose target has gone gives up after the short wait', async () => {
+  const doc = { querySelectorAll: () => [] };
+  const warnings = [];
+  const started = Date.now();
+  const result = await runAction(quietAction({ type: 'set', selector: '#closed-dialog input', value: 'Old' }), { document: doc, window: {}, warn: (message) => warnings.push(message) });
+  const waitedMs = Date.now() - started;
+  assert.deepEqual(result, { ok: false, error: 'selector' });
+  assert.deepEqual(warnings, ['Selector not found: #closed-dialog input']);
+  assert(waitedMs < ELEMENT_WAIT_TIMEOUT_MS / 2, `gave up after ${waitedMs} ms`);
 });
 
 test('pairedUndo finds the later click on the same element, and only that', () => {

@@ -54,6 +54,8 @@
   const KEEP_FALLBACK_MS = 4000;       // how long a `keep` highlight ring lingers after its action
   /* Element readiness. */
   const ELEMENT_WAIT_TIMEOUT_MS = 8000, CURSOR_TARGET_WAIT_MS = 6000, WAIT_POLL_MS = 120;
+  /* Undo and cleanup (see quietAction): a target that is not there now went with its dialog or page. */
+  const QUIET_ELEMENT_WAIT_MS = 500;
   /* Geometry. */
   const BOX_PADDING_PX = 5;            // highlight ring and dim cut-out sit this far outside the target
   const REVEAL_MARGIN_PX = 24, REVEAL_MIN_WIDTH_PX = 640, REVEAL_ASPECT = 10 / 16;
@@ -84,6 +86,15 @@
     const sameTarget = (other) => actionType(other) === 'click' && other.selector === action.selector && (other.index ?? 0) === (action.index ?? 0);
     for (let later = index + 1; later < actions.length; later++) if (sameTarget(actions[later])) return later;
     return -1;
+  }
+  /* An undo or cleanup action as the projector runs it (runQuietly): no pause after it, no note,
+     no narration, and a short wait for its target. Its target was on screen when the scene changed
+     it; one missing now went with its dialog or page, and waiting the full ELEMENT_WAIT_TIMEOUT_MS
+     for each such target held a scene change for seconds. An action's own timeoutMs, and a cleanup
+     waitFor (which waits on purpose), keep theirs. Pure, so it is unit-tested. */
+  function quietAction(action) {
+    const timeoutMs = action.timeoutMs || (actionType(action) === 'waitFor' ? undefined : QUIET_ELEMENT_WAIT_MS);
+    return { ...action, afterMs: 0, note: undefined, narration: undefined, timeoutMs };
   }
   /* In a guided tour, info cards are the steps: each waits for Next. One home for the rule. */
   function isGuidedStep(action) { return actionType(action) === 'callout'; }
@@ -661,5 +672,5 @@
   }
   function inspectDocument(doc) { return [...doc.querySelectorAll(`${interactiveSelector},[data-demo-id],[data-action]`)].slice(0, INSPECT_LIMIT).map((el) => ({ selector: selectorFor(el), tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: String(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, INSPECT_TEXT_LIMIT), interactive: !!el.closest(interactiveSelector) })).filter((item) => item.selector); }
 
-  root.ScreenReelCore = { inverseFor, pairedUndo, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
+  root.ScreenReelCore = { inverseFor, pairedUndo, quietAction, QUIET_ELEMENT_WAIT_MS, cardReadingMs, cardHoldMs, isGuidedStep, infoCardStep, LAYER_ID, overlayParent, placeCallout, ELEMENT_WAIT_TIMEOUT_MS, AFTER_MS_MAX, definitions, recipes, supportedTypes, aliases, actionType, getDefinition: (id) => byId.get(id) || null, definitionForAction, normalizeRoute, runAction, validate, validateFlowGraph, fingerprintFor, sceneNarration, actionNarration, narrationScript, sleep, setTimeScale, timeScale: () => timeScale, interpolate, variableDefaults, resolveActionVariables, waitFor, resolvePickerTarget, selectorFor, selectorForCollection, inspectDocument };
 })(globalThis);
