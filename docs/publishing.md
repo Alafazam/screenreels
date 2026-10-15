@@ -57,3 +57,7 @@ You cannot publish the same version number twice, even after an unpublish, and n
 ## Dry run
 
 On GitHub, open **Actions → Publish to npm → Run workflow**. A manual run does every step, then runs `npm publish --dry-run`, which prints the package contents and sends nothing to the registry.
+
+If the version in `package.json` is already on npm (which is true on `main` between releases), `npm publish --dry-run` would fail. In that case the run uses `npm pack --dry-run` instead, and shows a notice that says so. Bump the version first to dry-run the publish itself.
+
+A dry run does not sign in to npm, so it does not validate the trusted publisher. Only a real publish from the workflow does that.
