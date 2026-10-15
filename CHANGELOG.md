@@ -11,6 +11,7 @@
 - Prepared the npm package (`docs/publishing.md`):
   - **Smaller package:** `files` keeps only what the CLI loads at run time. The examples, build scripts and the duplicate `packages/projector` and `packages/studio` sources (already in `dist/projector`) are no longer packed.
   - **FFmpeg is optional:** `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe` move from `dependencies` to optional peer dependencies. Capture finds each binary from `FFMPEG_PATH` / `FFPROBE_PATH`, then the installer package, then `PATH`, and stops with a clear message when none is found. **Breaking for capture users:** an install that used to get FFmpeg from `screenreel` must now add the two installer packages, put FFmpeg on `PATH`, or set the env vars.
+  - **Third-party notices:** the package now ships `THIRD_PARTY_NOTICES.txt` with the full Lucide license (ISC, and MIT for the icons derived from Feather), and `NOTICE` points to it.
   - **Publish workflow:** `.github/workflows/publish.yml` publishes with npm trusted publishing and provenance when a GitHub release is published, and does a dry run when started by hand.
 
 - Added playback modes (`docs/playback.md`). A flow plays in one of three modes:

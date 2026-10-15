@@ -27,7 +27,8 @@
     "templates/",
     "skills/",
     "CHANGELOG.md",
-    "NOTICE"
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.txt"
   ],
   "engines": {
     "node": ">=20"

@@ -110,7 +110,7 @@ See [Pacing and the cursor](docs/pacing-and-cursor.md).
 
 Projector accepts a same-origin or CORS-enabled JSON URL, an inline object through `ScreenReel.mount`, or JSON stored in a `<script type="application/json">` referenced with `flow-data`.
 
-Legacy `{ defaults, scenes }`, Increff-style `{ version, steps }`, `fill`, and existing Capture actions remain supported.
+Legacy `{ defaults, scenes }`, step-list `{ version, steps }`, `fill`, and existing Capture actions remain supported.
 
 `waitFor` delays all scene actions until its selector is visible. `timeoutMs` defaults to `8000`; `settleMs` adds an optional render buffer after readiness. In `strict` mode, a failed action pauses playback and emits `screenreel:validation`. `loop` defaults to `true` for 0.2.x compatibility; set it to `false` to stop on the final enabled scene and receive `screenreel:complete`.
 
@@ -276,7 +276,7 @@ The repository ships an intent router and focused skills for Projector, Capture,
 
 Studio's **Copy AI context** command copies the current scene, actions, validation failures, and stable targets as JSON for use in Codex, Claude, Cursor, or another assistant.
 
-For an existing demo runtime, pass `legacyStorage` to copy old local/session keys once without deleting them. See `docs-increff-migration.md` for the current Increff adapter contract.
+For an existing demo runtime, pass `legacyStorage` to copy old local/session keys once without deleting them. `ScreenReelLegacyStorage` in `dist/projector/screenreel.d.ts` lists the keys it accepts.
 
 ## Local data and security
 
