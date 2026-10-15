@@ -31,23 +31,24 @@ const SCENE_TIMING_FIELDS = [
 const SCENE_TIMING_ERRORS = [['dwellMs', 'invalid scene time'], ['timeoutMs', 'invalid ready timeout'], ['settleMs', 'invalid settle time']];
 const BLOB_URL_REVOKE_MS = 500;      // give the download a beat to start before the object URL goes
 /* How a flow plays for its viewers (flow.defaults.playback; docs/playback.md). One flow serves every
-   mode: info cards wait for Next in Guided, hold for their reading time in Autoplay, and are left out
-   of Video. A flow that declares none plays autoplay, which is how flows behaved before playback was
+   mode: info cards wait for Next in Guided, hold for their reading time in Autoplay and Video, and
+   show as captions in Clean video. A flow that declares none plays autoplay, which is how flows behaved before playback was
    a choice. */
 const FLOW_PLAYBACK = [
   { value: 'ask', label: 'Let viewers choose', help: 'They pick one of the modes you offer below when the tour starts.' },
   { value: 'guided', label: 'Guided', help: 'Viewers click through your info cards with Next.' },
   { value: 'autoplay', label: 'Autoplay', help: 'The tour plays by itself; each info card stays up for its autoplay time.' },
-  { value: 'video', label: 'Video', help: 'Plays like a video: the cursor and actions, no info cards.' },
+  { value: 'video', label: 'Video', help: 'Plays like a video: the cursor, the actions and the info cards, each held for its reading time.' },
+  { value: 'clean', label: 'Clean video', help: 'Plays like a video with no info cards: their words show as captions.' },
 ];
-const MODE_LABELS = { guided: 'Guided', autoplay: 'Autoplay', video: 'Video' };
-/* The order Studio lists modes in: the chooser's default pair first, then video. */
-const STUDIO_MODE_ORDER = ['guided', 'autoplay', 'video'];
+const MODE_LABELS = { guided: 'Guided', autoplay: 'Autoplay', video: 'Video', clean: 'Clean video' };
+/* The order Studio lists modes in: the chooser's default pair first, then video and clean video. */
+const STUDIO_MODE_ORDER = ['guided', 'autoplay', 'video', 'clean'];
 const CALLOUT_STYLE_LABELS = { step: 'Wait for Next', timed: 'Hold for reading time', caption: 'Caption only', off: 'Leave out' };
 /* The per-mode settings Flow settings edits; the rest (pill controls, pace, …) stay as the file has them. */
 const STUDIO_MODE_SETTINGS = [['startCard', 'Start card'], ['progress', 'Progress bar'], ['endCard', 'End card']];
-/* What Studio writes to `defaults.advance` beside `playback`, so an older runtime still plays the flow; video has no older name. */
-const OLDER_ADVANCE = { ask: 'ask', guided: 'guided', autoplay: 'auto', video: 'auto' };
+/* What Studio writes to `defaults.advance` beside `playback`, so an older runtime still plays the flow; video and clean have no older name. */
+const OLDER_ADVANCE = { ask: 'ask', guided: 'guided', autoplay: 'auto', video: 'auto', clean: 'auto' };
 const PREVIEW_MODES = STUDIO_MODE_ORDER.map((value) => ({ value, label: MODE_LABELS[value] }));
 /* The preview card in Studio shows the viewer's controls; they do nothing here but show the layout. */
 const PREVIEW_CARD_LABELS = { skip: 'Skip tour', back: 'Back', next: 'Next', finish: 'Finish' };
@@ -683,7 +684,7 @@ class Studio {
       if (controller.signal.aborted) return;
       const action = scene.actions[index]; const actionWithoutWait = { ...action }; delete actionWithoutWait.afterMs; this.updateScenePlayback({ index, phase: 'action' });
       const callouts = window.ScreenReelCore.isGuidedStep(action) ? this.previewCallouts() : null;
-      // Video leaves cards out; its captions show the words with no card.
+      // 'off' leaves cards out; 'caption' (clean video) shows the words with no card.
       if (callouts === 'off') continue;
       if (callouts === 'caption') { this.toast([action.title, action.text].filter(Boolean).join(' — ')); await window.ScreenReelCore.sleep(window.ScreenReelCore.cardHoldMs(action), controller.signal); continue; }
       const step = callouts === 'step'; let release = null; let next = null;

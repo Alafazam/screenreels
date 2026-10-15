@@ -36,7 +36,7 @@ See [Playback modes](playback.md) for every option, the presets, and the precede
 options (`chooser: true`, mount and flow `advance`, `controls: { guided, auto }`) keep working, and
 map onto that model. See [Playback modes](playback.md#migrating-from-the-older-options) for how.
 In Studio, **Flow settings** sets all of this (see
-[Recording a scene](recording.md#info-cards-one-flow-guided-autoplay-and-video)).
+[Recording a scene](recording.md#info-cards-one-flow-guided-autoplay-video-and-clean-video)).
 
 ## How guided mode plays
 
@@ -112,7 +112,7 @@ it off with `shield: false`.
 
 | | |
 |---|---|
-| `projector.start(flowId, { position, mode })` | Start or restart a flow. `mode` is `'video'`, `'autoplay'`, `'guided'`, or `'ask'` (`'auto'` still works). Throws on an unknown flow, position, or mode, or a mode the host's `playback.modes` excludes. |
+| `projector.start(flowId, { position, mode })` | Start or restart a flow. `mode` is `'video'`, `'clean'`, `'autoplay'`, `'guided'`, or `'ask'` (`'auto'` still works). Throws on an unknown flow, position, or mode, or a mode the host's `playback.modes` excludes. |
 | `screenreel:start` | `{ projectId, flowId, position, mode, source }`. The run began, in this mode. |
 | `screenreel:awaitingnext` | `{ projectId, flowId, sceneId, actionIndex? }`. The tour is waiting for Next. |
 | `screenreel:exit` | `{ projectId, flowId, sceneId, position, reason }`. `reason` is `'user'` (pill, Skip, Esc, chooser close), `'complete'` (`disableOnComplete`, or the end card's Close), or `'api'` (a host call). Carries the run's `mode`. |

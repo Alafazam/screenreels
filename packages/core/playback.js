@@ -4,12 +4,15 @@
 (function initScreenReelPlayback(root) {
   if (root.ScreenReelPlayback) return;
 
-  /* The modes a flow can play in, and 'ask', which shows a chooser among the ones it offers. */
-  const MODES = ['video', 'autoplay', 'guided'];
+  /* The modes a flow can play in, and 'ask', which shows a chooser among the ones it offers.
+     'clean' (Clean video) is a video with no info cards: their words show as captions. It is last,
+     so the order of the older three stays the same in messages and in the schema. */
+  const MODES = ['video', 'autoplay', 'guided', 'clean'];
   const ASK = 'ask';
   /* Older names. `advance: 'auto'` was Autoplay before the modes had names. */
   const MODE_ALIASES = { auto: 'autoplay' };
-  /* What the chooser offers when nothing says otherwise: the two modes there were before video. */
+  /* What the chooser offers when nothing says otherwise: the two modes there were before video.
+     It does not grow when a mode is added, so a host or flow that lists no modes sees no change. */
   const DEFAULT_MODES = ['guided', 'autoplay'];
   /* What a run plays when nothing picks a mode, as before the model existed. */
   const FALLBACK_MODE = 'autoplay';
@@ -42,13 +45,17 @@
   /* Each mode is a preset of the settings above. A host (mount `playback`) or a flow
      (`defaults.playback`) overrides any of them per mode. */
   const PRESETS = Object.freeze({
-    video: Object.freeze({ callouts: 'off', controls: ['play', 'sound', 'exit'], controlLabels: false, progress: true, startCard: true, endCard: true, notes: false, narration: true, cursor: true, dim: true, shield: true, keys: false, pace: null }),
+    video: Object.freeze({ callouts: 'timed', controls: ['play', 'sound', 'exit'], controlLabels: false, progress: true, startCard: true, endCard: true, notes: false, narration: true, cursor: true, dim: true, shield: true, keys: false, pace: null }),
     autoplay: Object.freeze({ callouts: 'timed', controls: ['count', 'prev', 'play', 'next', 'sound', 'exit'], controlLabels: true, progress: true, startCard: true, endCard: true, notes: true, narration: true, cursor: true, dim: true, shield: true, keys: false, pace: null }),
+    clean: Object.freeze({ callouts: 'caption', controls: ['play', 'sound', 'exit'], controlLabels: false, progress: true, startCard: true, endCard: true, notes: false, narration: true, cursor: true, dim: true, shield: true, keys: false, pace: null }),
     guided: Object.freeze({ callouts: 'step', controls: [], controlLabels: false, progress: false, startCard: false, endCard: false, notes: false, narration: true, cursor: true, dim: true, shield: true, keys: true, pace: null }),
   });
   /* A run configured only by the pre-model options (no `playback` on the mount or the flow) keeps
      exactly how it looked before: the presenter/share pill, no cards, no progress bar. */
   const LEGACY_LOOK = Object.freeze({ controls: null, controlLabels: false, progress: false, startCard: false, endCard: false });
+
+  /* Modes with no older `advance` name: Studio writes 'auto' (autoplay) beside them for older runtimes. */
+  const NO_OLDER_NAME = ['video', 'clean'];
 
   const FLOW_KEYS = ['modes', 'default', ...MODES];
   const MOUNT_KEYS = [...FLOW_KEYS, 'force', 'remember'];
@@ -203,8 +210,8 @@
     const config = flowConfig(flow);
     if (isObject(defaults.playback) && defaults.playback.default !== undefined && defaults.advance !== undefined) {
       const advance = modeName(defaults.advance, { allowAsk: true }); const chosen = modeName(defaults.playback.default, { allowAsk: true });
-      // Studio writes both so older runtimes still play the flow; video has no older name, so autoplay stands in.
-      const agrees = advance === chosen || (chosen === 'video' && advance === 'autoplay');
+      // Studio writes both so older runtimes still play the flow; video and clean have no older name, so autoplay stands in.
+      const agrees = advance === chosen || (NO_OLDER_NAME.includes(chosen) && advance === 'autoplay');
       if (!agrees) warnings.push(`defaults.advance "${defaults.advance}" disagrees with defaults.playback.default "${defaults.playback.default}"; playback wins`);
     }
     const enabled = (flow?.scenes || []).filter((scene) => scene.enabled !== false);
