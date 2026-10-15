@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Prepared the npm package (`docs/publishing.md`):
   - **Smaller package:** `files` keeps only what the CLI loads at run time. The examples, build scripts and the duplicate `packages/projector` and `packages/studio` sources (already in `dist/projector`) are no longer packed.
