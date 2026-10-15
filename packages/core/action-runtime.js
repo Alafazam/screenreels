@@ -131,7 +131,10 @@
     return timeScale;
   }
   const scaled = (ms) => Math.round(Math.max(0, Number(ms) || 0) * timeScale);
+  /* An aborted signal ends the wait at once. A signal that is already aborted does not fire
+     'abort' again, so without the first check every later sleep of a stopped run would wait in full. */
   const sleep = (ms, signal) => new Promise((resolve) => {
+    if (signal?.aborted) { resolve(); return; }
     const timer = setTimeout(resolve, scaled(ms));
     signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
   });
@@ -493,7 +496,7 @@
     const sx = sourceRect.left + (action.offsetX ?? sourceRect.width / 2); const sy = sourceRect.top + (action.offsetY ?? Math.min(DRAG_GRAB_MAX_OFFSET_Y_PX, sourceRect.height / 2)); const dx = targetRect ? targetRect.left + targetRect.width / 2 - sx : Number(action.dx) || 0; const dy = targetRect ? targetRect.top + targetRect.height / 2 - sy : Number(action.dy) || 0;
     const Pointer = ctx.window.PointerEvent || ctx.window.MouseEvent; const Mouse = ctx.window.MouseEvent; const event = (type, Ctor, x, y, pressed) => new Ctor(type, { bubbles: true, cancelable: true, composed: true, view: ctx.window, clientX: x, clientY: y, button: 0, buttons: pressed ? 1 : 0, pointerId: 1, isPrimary: true, pointerType: 'mouse' });
     await ctx.moveCursor?.(el); el.dispatchEvent(event('pointerdown', Pointer, sx, sy, true)); el.dispatchEvent(event('mousedown', Mouse, sx, sy, true)); const started = performance.now(); const duration = Number(action.durMs) || DEFAULTS.drag.durMs;
-    await new Promise((resolve) => { const frame = (now) => { const p = Math.min(1, (now - started) / duration); const x = sx + dx * p; const y = sy + dy * p; ctx.window.dispatchEvent(event('pointermove', Pointer, x, y, true)); ctx.window.dispatchEvent(event('mousemove', Mouse, x, y, true)); ctx.window.__screenreelCursor?.moveToPoint?.(x, y, 1); if (!ctx.signal?.aborted && p < 1) ctx.window.requestAnimationFrame(frame); else { ctx.window.dispatchEvent(event('pointerup', Pointer, x, y, false)); ctx.window.dispatchEvent(event('mouseup', Mouse, x, y, false)); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
+    await new Promise((resolve) => { const frame = (now) => { const p = Math.min(1, (now - started) / duration); const x = sx + dx * p; const y = sy + dy * p; ctx.window.dispatchEvent(event('pointermove', Pointer, x, y, true)); ctx.window.dispatchEvent(event('mousemove', Mouse, x, y, true)); if (!ctx.signal?.aborted) ctx.window.__screenreelCursor?.moveToPoint?.(x, y, 1); if (!ctx.signal?.aborted && p < 1) ctx.window.requestAnimationFrame(frame); else { ctx.window.dispatchEvent(event('pointerup', Pointer, x, y, false)); ctx.window.dispatchEvent(event('mouseup', Mouse, x, y, false)); resolve(); } }; ctx.window.requestAnimationFrame(frame); });
   }
   /* Flow variables. {{name}} placeholders resolve against ctx.variables in DISPLAY/VALUE fields
      only — the allowlist below. Selectors, function names, and goto urls are deliberately
@@ -535,8 +538,14 @@
     if (unresolved.size && warn) warn(`Unresolved demo variable(s): ${[...unresolved].join(', ')}`);
     return resolved;
   }
+  /* What an action that its host stopped part way returns (see `stopped` in runAction). */
+  const abortedResult = () => ({ ok: false, error: 'aborted' });
   async function runAction(source, context = {}) {
     const action = resolveActionVariables({ ...source, type: actionType(source) }, context.variables, context.warn); const doc = context.document || root.document; const win = context.window || doc?.defaultView || root; const ctx = { ...context, document: doc, window: win, warn: context.warn || ((message) => console.warn('[screenreel]', message)) };
+    /* The host aborts ctx.signal when the run stops (Esc, close, pause, next). Every wait ends at
+       once then, and the checks below stop the action before its next change to the page: no click,
+       no keystroke, no new overlay after the tour has gone. */
+    const stopped = () => ctx.signal?.aborted === true;
     if (!doc) return { ok: false, error: 'document' };
     if (action.note && ctx.announce) ctx.announce(action.note);
     /* An action's own line is spoken as the action starts and deliberately not awaited: narration
@@ -549,10 +558,11 @@
     if (action.type === 'waitFor') { const found = await waitFor(doc, action.selector, action.condition || 'visible', action.timeoutMs || DEFAULTS['wait-for'].timeoutMs, ctx.signal); if (!found) return { ok: false, error: 'timeout' }; if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
     if (action.type === 'highlight' || action.type === 'glow') { const ok = await runGlow(action, ctx); if (!ok) ctx.warn(`Selector not found: ${action.selector}`); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok }; }
     if (action.type === 'goto') { await ctx.navigate?.(action.url); return { ok: true, navigated: true }; }
-    if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); } const fn = context.resolveFunction?.(action.fn) || (context.strictFunctions ? undefined : win[action.fn]); if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
-    let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
+    if (action.type === 'call') { if (!/^[A-Za-z_$][\w$]*$/.test(action.fn || '')) return { ok: false, error: 'function' }; if (action.cursorTo) { const target = await waitFor(doc, action.cursorTo, 'appear', CURSOR_TARGET_WAIT_MS, ctx.signal); if (target && target !== true) await ctx.moveCursor?.(target); if (stopped()) return abortedResult(); } const fn = context.resolveFunction?.(action.fn) || (context.strictFunctions ? undefined : win[action.fn]); if (typeof fn !== 'function') return { ok: false, error: 'function' }; await fn(...(Array.isArray(action.args) ? action.args : [])); if (action.afterMs) await sleep(action.afterMs, ctx.signal); return { ok: true }; }
+    let el = action.selector ? resolveElement(doc, action) : null; if (action.selector && !el) el = await waitFor(doc, action.selector, 'appear', action.timeoutMs || ELEMENT_WAIT_TIMEOUT_MS, ctx.signal); if (stopped()) return abortedResult(); if (action.selector && (!el || el === true)) { ctx.warn(`Selector not found: ${action.selector}`); return { ok: false, error: 'selector' }; }
     if (el && el !== true) ctx.onTarget?.(el);
     if (el && el !== true && action.type !== 'scrollIntoView' && action.type !== 'scroll') await ensureInView(el, ctx);
+    if (stopped()) return abortedResult();
     // Automatic cleanup: note how to put this control back before changing it.
     if (el && el !== true && ctx.journal) { const inverse = inverseFor(action, el); if (inverse) ctx.journal(inverse); }
     if (action.type === 'spotlight') {
@@ -570,20 +580,20 @@
     else if (action.type === 'reveal') await runReveal(action, ctx, el);
     else if (action.type === 'snippet') await runSnippet(action, ctx, el);
     else if (action.type === 'click') {
-      await ctx.moveCursor?.(el); await ctx.pressCursor?.();
+      await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); await ctx.pressCursor?.(); if (stopped()) return abortedResult();
       // The cursor's travel gives the host time to re-render the target. A click on the detached copy
       // does nothing useful, and on an <a> it is a full-page navigation that ends the tour.
       el = currentElement(doc, action, el); if (el.isConnected === false) { ctx.warn(`Selector not found: ${action.selector} (the target left the page before the click)`); return { ok: false, error: 'selector' }; }
       ripple(doc, el); el.click();
     }
-    else if (action.type === 'hover') { await ctx.moveCursor?.(el); ['pointerover', 'mouseover', 'mouseenter'].forEach((type) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== 'mouseenter', view: win }))); await sleep(action.holdMs || DEFAULTS.hover.holdMs, ctx.signal); }
-    else if (action.type === 'focus') { await ctx.moveCursor?.(el); el.focus({ preventScroll: false }); }
-    else if (action.type === 'type') { await ctx.moveCursor?.(el); el.focus(); if (action.clearFirst !== false) dispatchValue(el, ''); let value = action.clearFirst === false ? String(el.value || '') : ''; for (const char of String(action.text ?? action.value ?? '')) { value += char; el.value = value; el.dispatchEvent(new win.Event('input', { bubbles: true })); await sleep(action.charMs ?? DEFAULTS.type.charMs, ctx.signal); } el.dispatchEvent(new win.Event('change', { bubbles: true })); }
-    else if (action.type === 'set') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); dispatchValue(el, action.value ?? ''); }
-    else if (action.type === 'toggle') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); if (!!el.checked !== !!action.checked) el.click(); }
+    else if (action.type === 'hover') { await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); ['pointerover', 'mouseover', 'mouseenter'].forEach((type) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== 'mouseenter', view: win }))); await sleep(action.holdMs || DEFAULTS.hover.holdMs, ctx.signal); }
+    else if (action.type === 'focus') { await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); el.focus({ preventScroll: false }); }
+    else if (action.type === 'type') { await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); el.focus(); if (action.clearFirst !== false) dispatchValue(el, ''); let value = action.clearFirst === false ? String(el.value || '') : ''; for (const char of String(action.text ?? action.value ?? '')) { if (stopped()) return abortedResult(); value += char; el.value = value; el.dispatchEvent(new win.Event('input', { bubbles: true })); await sleep(action.charMs ?? DEFAULTS.type.charMs, ctx.signal); } el.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    else if (action.type === 'set') { await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); await ctx.pressCursor?.(); if (stopped()) return abortedResult(); dispatchValue(el, action.value ?? ''); }
+    else if (action.type === 'toggle') { await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); await ctx.pressCursor?.(); if (stopped()) return abortedResult(); if (!!el.checked !== !!action.checked) el.click(); }
     else if (action.type === 'lever') await animateLever(el, action.to, action.durMs, ctx);
     else if (action.type === 'drag') await runDrag(action, ctx, el);
-    else if (action.type === 'pointer') { await ctx.moveCursor?.(el); await ctx.pressCursor?.(); ripple(doc, el); const rect = el.getBoundingClientRect(); const Pointer = win.PointerEvent || win.MouseEvent; const opts = { bubbles: true, cancelable: true, composed: true, view: win, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, button: 0, pointerId: 1, isPrimary: true, pointerType: 'mouse' }; el.dispatchEvent(new Pointer('pointerdown', { ...opts, buttons: 1 })); el.dispatchEvent(new Pointer('pointerup', opts)); }
+    else if (action.type === 'pointer') { await ctx.moveCursor?.(el); if (stopped()) return abortedResult(); await ctx.pressCursor?.(); if (stopped()) return abortedResult(); ripple(doc, el); const rect = el.getBoundingClientRect(); const Pointer = win.PointerEvent || win.MouseEvent; const opts = { bubbles: true, cancelable: true, composed: true, view: win, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, button: 0, pointerId: 1, isPrimary: true, pointerType: 'mouse' }; el.dispatchEvent(new Pointer('pointerdown', { ...opts, buttons: 1 })); el.dispatchEvent(new Pointer('pointerup', opts)); }
     else if (action.type === 'scrollIntoView') { el.scrollIntoView({ behavior: 'smooth', block: action.block || 'center' }); await waitForScrollEnd(ctx); }
     else if (action.type === 'scroll') { const box = el || doc.scrollingElement; let top = box.scrollTop; let left = box.scrollLeft; if (action.mode === 'relative') { const direction = ['up', 'left'].includes(action.direction) ? -1 : 1; const horizontal = ['left', 'right'].includes(action.direction); const basis = action.unit === 'pixels' ? 1 : action.unit === 'pagePercent' ? (horizontal ? box.scrollWidth : box.scrollHeight) / 100 : (horizontal ? win.innerWidth : win.innerHeight) / 100; if (horizontal) left += direction * Number(action.amount || 0) * basis; else top += direction * Number(action.amount || 0) * basis; } else if (action.mode === 'edge') { if (action.edge === 'bottom') top = box.scrollHeight; else if (action.edge === 'right') left = box.scrollWidth; else if (action.edge === 'left') left = 0; else top = 0; } else { top = action.top ?? top; left = action.left ?? left; } box.scrollTo({ top, left, behavior: 'smooth' }); await waitForScrollEnd(ctx, box); }
     else return { ok: false, error: 'unsupported' };

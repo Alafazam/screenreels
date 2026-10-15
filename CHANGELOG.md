@@ -2,10 +2,17 @@
 
 ## 0.4.0
 
+- Fixed: **Esc** did nothing in `video` and `autoplay` (their `keys` is `false`), and did nothing in any mode while paused. Esc now ends the tour in every mode, playing or paused, with reason `'user'`, also from a host field and from the start or end card. A key the host already handled (`preventDefault()`), a modified key, and keys inside Studio are left alone. `keys` now covers only →, Enter and ← (`docs/playback.md#esc-and-exit`).
+- Fixed: exiting (✕, Esc, Skip) while the cursor moved or the tour typed left the cursor on the page, and the action went on after the exit: the cursor re-appeared on the next frame, the click was sent, and the rest of the text was typed into the field. Three causes, three fixes:
+  - `cursor.js`: `destroy()` now ends every move, arrival ring and staggered ping that started before it; before, each animation frame re-created the pointer node.
+  - `action-runtime.js`: `sleep()` with a signal that is already aborted now returns at once (an aborted signal does not fire `abort` again, so each later sleep waited in full). `runAction` stops at its next step once `ctx.signal` aborts and returns `{ ok: false, error: 'aborted' }`: no click, keystroke, press, value change or overlay after that.
+  - `projector.js`: the play loop stops after an action that the exit stopped, before it reports a failure or runs more actions.
+
 - Prepared the npm package (`docs/publishing.md`):
   - **Smaller package:** `files` keeps only what the CLI loads at run time. The examples, build scripts and the duplicate `packages/projector` and `packages/studio` sources (already in `dist/projector`) are no longer packed.
   - **FFmpeg is optional:** `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe` move from `dependencies` to optional peer dependencies. Capture finds each binary from `FFMPEG_PATH` / `FFPROBE_PATH`, then the installer package, then `PATH`, and stops with a clear message when none is found. **Breaking for capture users:** an install that used to get FFmpeg from `screenreel` must now add the two installer packages, put FFmpeg on `PATH`, or set the env vars.
   - **Publish workflow:** `.github/workflows/publish.yml` publishes with npm trusted publishing and provenance when a GitHub release is published, and does a dry run when started by hand.
+
 - Added playback modes (`docs/playback.md`). A flow plays in one of three modes:
   - **`video`:** hands-off, no info cards (or `callouts: 'caption'` for their words only).
   - **`autoplay`:** hands-off, info cards held for their reading time.

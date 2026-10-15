@@ -40,6 +40,7 @@ function loadCursor({ innerWidth = 800, innerHeight = 600, reducedMotion = false
   new Function('root', 'performance', source.replace(/\}\)\(globalThis\);\s*$/, '})(root);'))(fakeRoot, fakePerformance);
   return {
     cursor: fakeRoot.__screenreelCursor,
+    mounted, // pointer and ring nodes on the fake page
     now: () => clock,
     /* Advances the fake clock to `now` and fires exactly the one frame callback queued for it. */
     step(now) { clock = now; const cb = rafQueue.shift(); if (cb) cb(now); },
@@ -163,4 +164,41 @@ test('reduced motion skips arcing and overshoot, jumping straight to the target'
   const start = cursor.position();
   cursor.moveToPoint(start.x + 500, start.y, 400);
   assert.deepEqual(cursor.position(), { x: start.x + 500, y: start.y });
+});
+
+/* Runs the queued frames, lets the promises they settle start their next tween, and repeats: a
+   move that ignores destroy() would draw again in one of these rounds (a bounded loop, so it fails
+   rather than hangs). */
+async function drain(run, rounds = 5) {
+  for (let round = 0; round < rounds; round++) { run(); await new Promise((resolve) => setImmediate(resolve)); }
+}
+
+test('destroy() mid-move ends the move: no later frame puts the pointer back', async () => {
+  const { cursor, mounted, step, run } = loadCursor();
+  cursor.moveToPoint(700, 500, 400); // long enough to overshoot: two tweens
+  step(100);
+  assert.equal(mounted.size, 1, 'the move drew the pointer');
+  cursor.destroy();
+  assert.equal(mounted.size, 0);
+  await drain(run); // the frames still queued, and the overshoot correction after them
+  assert.equal(mounted.size, 0, 'a frame after destroy() re-created the pointer');
+});
+
+test('destroy() during moveTo() skips its arrival rings', async () => {
+  const { cursor, mounted, step, run } = loadCursor();
+  const target = { getBoundingClientRect: () => ({ left: 600, top: 400, width: 20, height: 20 }) };
+  cursor.moveTo(target, 300);
+  step(50);
+  cursor.destroy();
+  await drain(run);
+  await new Promise((resolve) => setTimeout(resolve, 300)); // past the staggered rings
+  assert.equal(mounted.size, 0, 'a ring or the pointer was drawn after destroy()');
+});
+
+test('after destroy() a new move draws the pointer again (the next tour)', () => {
+  const { cursor, mounted, step } = loadCursor();
+  cursor.moveToPoint(500, 300, 200); step(50);
+  cursor.destroy();
+  cursor.moveToPoint(600, 300, 200); step(100);
+  assert.equal(mounted.size, 1);
 });

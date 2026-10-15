@@ -90,7 +90,7 @@ Each mode sets every one of these. Override any of them per mode.
 | `cursor` | boolean | Show the agent cursor. |
 | `dim` | boolean | Dim the page behind highlights and cards. |
 | `shield` | boolean | Block stray viewer clicks on the app while it plays. |
-| `keys` | boolean | → or Enter for Next, ← for Back, Esc to exit. |
+| `keys` | boolean | → or Enter for Next, ← for Back. Esc is not a `keys` key: it exits in every mode (see [Esc and Exit](#esc-and-exit)). |
 | `pace` | number, or `null` | The run's time scale (`1.5` is a third slower). `null` keeps the host's `timeScale`. |
 
 ### The presets
@@ -183,6 +183,19 @@ Play is pressed, while the stopped scene's cleanup finishes. **Space** presses P
 whose pill shows it (`video`, `autoplay`), whatever `keys` says, except while typing in a field, with
 a modifier held, on a chooser or start/end card, or on the tour's own focused button (which Space
 activates itself). One enabled projector per page takes the key.
+
+<a id="esc-and-exit"></a>**Esc and Exit.** **Esc** ends the tour in every mode (`video`, `autoplay`, `guided`), while it
+plays or is paused, with reason `'user'`, the same as the pill's ✕ and a card's Skip. It works when
+the focus is in a host field the tour types in, and on the start and end cards. On the chooser it
+closes the chooser, which also ends the tour. Esc is left alone when the host already handled it
+(a dialog or menu that closes on Esc calls `preventDefault()`: the first Esc closes it, the next one
+ends the tour), with a modifier held, and inside Studio.
+
+An exit leaves nothing behind. The action that runs at that moment stops at its next step: the
+cursor stops where it is and is removed, a click is not sent, typing stops, and no ring, dim, card
+or ripple is drawn after the exit. The click shield and the tour layer go, and the tour's changes
+are undone as usual. A stopped action returns `{ ok: false, error: 'aborted' }`; the play loop
+treats it as the end of the run, not as a failed action.
 
 **The pill stays on top.** The projector shell (pill, progress bar, captions) is the top of the tour
 layer: rings, ripples, dims and info cards are drawn under it, so none of them cuts the controls.

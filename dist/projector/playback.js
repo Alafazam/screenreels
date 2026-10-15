@@ -35,7 +35,7 @@
     cursor: { type: 'boolean', help: 'Show the agent cursor.' },
     dim: { type: 'boolean', help: 'Dim the page behind highlights and cards.' },
     shield: { type: 'boolean', help: 'Block stray viewer clicks on the app while it plays.' },
-    keys: { type: 'boolean', help: '→/Enter next, ← back, Esc exit.' },
+    keys: { type: 'boolean', help: '→/Enter next, ← back. (Esc exits in every mode.)' },
     pace: { type: 'pace', help: 'Time scale for this mode (1 = authored timing, 1.5 = slower). null keeps the host\'s.' },
   };
 

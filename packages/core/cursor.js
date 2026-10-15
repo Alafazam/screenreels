@@ -66,6 +66,10 @@
   let y = (root.innerHeight || 0) / 2;
   let bobTimer = null;
   let bobOffset = 0;
+  /* destroy() bumps the generation. A move, ring or arrival that began before it stops instead of
+     drawing again, so a tour that exits mid-move leaves no pointer behind. */
+  let generation = 0;
+  const current = (started) => started === generation;
 
   function ensureStyles() {
     const doc = root.document;
@@ -116,13 +120,15 @@
   /* Concentric arrival rings: the "you are here" cue. */
   function ping(count = RING_COUNT) {
     if (reducedMotion()) return;
+    const started = generation;
     for (let index = 0; index < count; index++) {
       if (index === 0) emitRing(false);
-      else setTimeout(() => emitRing(false), RING_STAGGER_MS * index);
+      else setTimeout(() => { if (current(started)) emitRing(false); }, RING_STAGGER_MS * index);
     }
   }
 
-  function tween(targetX, targetY, ms) {
+  function tween(targetX, targetY, ms, started = generation) {
+    if (!current(started)) return Promise.resolve();
     if (reducedMotion() || !ms) {
       x = targetX; y = targetY; ensure(); paint();
       return Promise.resolve();
@@ -154,6 +160,7 @@
     return new Promise((resolve) => {
       const start = performance.now();
       const frame = (now) => {
+        if (!current(started)) { resolve(); return; }
         const t = Math.min(1, (now - start) / ms);
         const eased = easeInOutQuad(t);
         if (arced) {
@@ -180,17 +187,17 @@
      the settle reads as a deliberate arrival rather than a robotic snap onto the target. Short
      moves, straight-line motion, and reduced-motion all skip straight to a plain tween. */
   const easeInOutQuad = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-  async function tweenWithOvershoot(toX, toY, ms) {
+  async function tweenWithOvershoot(toX, toY, ms, started = generation) {
     const distance = Math.hypot(toX - x, toY - y);
     if (motion === 'arc' && distance > OVERSHOOT_MIN_DISTANCE_PX && !reducedMotion()) {
       const overshootPx = Math.min(OVERSHOOT_MAX_PX, distance * OVERSHOOT_DISTANCE_RATIO);
       const dirX = (toX - x) / distance;
       const dirY = (toY - y) / distance;
-      await tween(toX + dirX * overshootPx, toY + dirY * overshootPx, ms);
-      await tween(toX, toY, OVERSHOOT_RETURN_MS);
+      await tween(toX + dirX * overshootPx, toY + dirY * overshootPx, ms, started);
+      await tween(toX, toY, OVERSHOOT_RETURN_MS, started);
       return;
     }
-    await tween(toX, toY, ms);
+    await tween(toX, toY, ms, started);
   }
 
   root.__screenreelCursor = {
@@ -216,21 +223,24 @@
 
     /* Travel to an element's centre, announce arrival with rings, then settle. */
     async moveTo(target, ms) {
+      const started = generation;
       ensure();
       const rect = target?.getBoundingClientRect?.();
       if (!rect) return this;
       const toX = rect.left + rect.width / 2;
       const toY = rect.top + rect.height / 2;
       const distance = Math.hypot(toX - x, toY - y);
-      await tweenWithOvershoot(toX, toY, ms || travelMs(distance));
+      await tweenWithOvershoot(toX, toY, ms || travelMs(distance), started);
+      if (!current(started)) return this;
       ping();
       await wait(SETTLE_MS);
       return this;
     },
 
     async moveToPoint(pointX, pointY, ms) {
+      const started = generation;
       ensure();
-      await tweenWithOvershoot(pointX, pointY, ms == null ? travelMs(Math.hypot(pointX - x, pointY - y)) : ms);
+      await tweenWithOvershoot(pointX, pointY, ms == null ? travelMs(Math.hypot(pointX - x, pointY - y)) : ms, started);
       return this;
     },
 
@@ -268,6 +278,7 @@
       return this;
     },
     destroy() {
+      generation++;
       this.stopBob();
       node?.remove();
       node = null;

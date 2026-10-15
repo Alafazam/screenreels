@@ -549,6 +549,59 @@ try {
     afterFinish: { name: 'Original', checked: false, dark: false },
     asks: true,
   });
+  /* Esc and ✕ end the tour in every mode, and an exit mid-action leaves nothing behind: no cursor,
+     no click shield, no overlay, no click sent, no typing after it (docs/playback.md#esc-and-exit). */
+  const exits = await inlinePage.evaluate(async () => {
+    const wrap = document.createElement('div'); document.body.appendChild(wrap);
+    wrap.innerHTML = '<input id="ex-name" value="Original" style="position:fixed;left:40px;top:600px"><button id="ex-far" style="position:fixed;right:40px;top:80px">Far</button>';
+    let clicks = 0; document.getElementById('ex-far').onclick = () => { clicks++; };
+    const name = document.getElementById('ex-name');
+    const flows = [
+      { id: 'exits', name: 'Exits', scenes: [{ id: 'e1', route: '/', actions: [{ type: 'click', selector: '#ex-far' }, { type: 'type', selector: '#ex-name', text: 'Typed after the exit?', charMs: 80 }, { type: 'spotlight', selector: '#ex-name', holdMs: 4000 }] }] },
+      { id: 'paused', name: 'Paused', scenes: [{ id: 'p1', route: '/', actions: [{ type: 'wait', ms: 4000 }] }] },
+    ];
+    const target = document.createElement('button'); target.id = 'ex-demo'; document.body.appendChild(target);
+    const projector = await window.ScreenReel.mount(target, { projectId: 'exit-example', loop: false, narration: false, cursor: 'dot', routesEqual: () => true, flow: { data: { schemaVersion: 1, flows } } });
+    const once = (eventName, test = () => true) => new Promise((resolve) => { const handler = (event) => { if (!test(event.detail)) return; removeEventListener(`screenreel:${eventName}`, handler); resolve(event.detail); }; addEventListener(`screenreel:${eventName}`, handler); });
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const until = async (check) => { for (let tries = 0; tries < 200 && !check(); tries++) await wait(10); return check(); };
+    const leftovers = () => [...document.querySelectorAll('#__screenreelCursor,#__screenreelLayer,.sr-click-shield,.sr-cursor-ring,.sr-glow-box,.sr-action-box,.sr-dim-backdrop,.sr-action-callout,.sr-click-ripple')].map((node) => node.id || node.className);
+    const press = (how) => {
+      if (how === 'esc') (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }));
+      else document.querySelector('#screenreel-projector-exit-example').shadowRoot.querySelector('button[data-cmd="exit"]').click();
+    };
+    const result = {};
+    for (const mode of ['video', 'autoplay', 'guided']) for (const moment of ['move', 'type']) for (const how of ['esc', 'close']) {
+      if (mode === 'guided' && how === 'close') continue; // a guided pill has no ✕: its card's Skip is the button (onboarding above)
+      clicks = 0; name.value = 'Original';
+      const stepIndex = moment === 'move' ? 0 : 1;
+      const reached = once('step', (detail) => detail.flowId === 'exits' && detail.actionIndex === stepIndex);
+      await projector.start('exits', { mode }); await reached;
+      if (moment === 'move') await until(() => document.getElementById('__screenreelCursor')); else await until(() => name.value.length >= 3);
+      await wait(30); clicks = 0; // the type moment comes after the click ran; count only what follows the exit
+      const exited = once('exit'); press(how);
+      const detail = await Promise.race([exited, wait(1500).then(() => null)]);
+      const valueAtExit = name.value; await wait(1000);
+      result[`${mode}/${moment}/${how}`] = { reason: detail?.reason ?? 'no exit', leftovers: leftovers(), clicks, typingStopped: name.value === valueAtExit, restored: name.value === 'Original' };
+    }
+    // Paused (Space), Esc still ends the tour.
+    await projector.start('paused', { mode: 'autoplay' }); await wait(300); projector.pause();
+    const exited = once('exit'); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    result.pausedEsc = (await Promise.race([exited, wait(1500).then(() => null)]))?.reason ?? 'no exit';
+    // A host that handled Esc itself (a dialog or menu closing) keeps the tour.
+    await projector.start('paused', { mode: 'autoplay' }); await wait(300);
+    const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }); handled.preventDefault(); document.body.dispatchEvent(handled);
+    result.hostHandledEscKeepsTour = projector.store.enabled();
+    projector.destroy(); wrap.remove(); target.remove();
+    return result;
+  });
+  const clean = { reason: 'user', leftovers: [], clicks: 0, typingStopped: true, restored: true };
+  assert.deepEqual(exits, {
+    'video/move/esc': clean, 'video/move/close': clean, 'video/type/esc': clean, 'video/type/close': clean,
+    'autoplay/move/esc': clean, 'autoplay/move/close': clean, 'autoplay/type/esc': clean, 'autoplay/type/close': clean,
+    'guided/move/esc': clean, 'guided/type/esc': clean,
+    pausedEsc: 'user', hostHandledEscKeepsTour: true,
+  });
   // Choice branching: clicking a card jumps playback to the target scene's enabled index.
   const choiceMounted = await inlinePage.evaluate(async () => {
     const target = document.createElement('button'); target.id = 'choice-demo'; document.body.appendChild(target);
