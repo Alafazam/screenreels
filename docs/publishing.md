@@ -13,7 +13,7 @@ The `files` list in `package.json` keeps only what the CLI loads at run time:
 | `dist/projector/` | `screenreel projector install` copies this folder. |
 | `templates/` | `screenreel init`. |
 | `skills/` | AI tools that read the skills from `node_modules/screenreel/skills/`. |
-| `CHANGELOG.md`, `NOTICE` | Release notes and the Apache-2.0 notice. npm adds `README.md`, `LICENSE` and `package.json` itself. |
+| `CHANGELOG.md`, `NOTICE`, `THIRD_PARTY_NOTICES.txt` | Release notes, the Apache-2.0 notice, and the license text of the bundled Lucide icons. npm adds `README.md`, `LICENSE` and `package.json` itself. |
 
 The examples, build scripts, tests and docs stay in the repository. To see the exact contents before a release, run:
 

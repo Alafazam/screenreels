@@ -62,8 +62,8 @@ Never commit, publish, or write to a real tenant during this loop unless the use
 
 ## Worked example
 
-The reference film is a product launch for Increff's planning system. Scene S10, "Start the cycle",
+The reference film is a product launch for a planning application. Scene S10, "Start the cycle",
 continues from S09 (replayed off camera), opens a dialog in setup, and then in the take: the agent
 clicks **Start cycle** on "starts", fires `step` on "algorithm" and "waits" so the prototype's story
 mode advances, frames the dialog and then every workflow stage with `focus` keys, and returns to
-`wide` on "your". Its spec is `ms-planning-brain/ui/ai-pitch-video/launch/scenes/S10.json`.
+`wide` on "your". Its spec is `launch/scenes/S10.json` in that application's repository.
