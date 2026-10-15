@@ -178,8 +178,18 @@ test('keep: untilSceneEnd and persist hand overlays to the host instead of remov
 test('an interrupted persisting action cleans up at once rather than handing overlays over', async () => {
   const stub = stubDocument(); const controller = new AbortController(); const releases = [];
   const pending = run({ type: 'callout', selector: '.kpi', text: 'Hi', holdMs: 100000 }, stub, { persist: true, retain: (release) => releases.push(release), signal: controller.signal });
+  await new Promise((resolve) => setTimeout(resolve, 0)); // the card is up and holding
+  assert.equal(stub.backdrops().length, 1);
   controller.abort(); await pending;
   assert.equal(releases.length, 0); assert.equal(stub.backdrops()[0].removed, true);
+});
+
+test('an action interrupted before its overlays show draws none (an exit while it scrolls into view)', async () => {
+  const stub = stubDocument(); const controller = new AbortController();
+  const pending = run({ type: 'callout', selector: '.kpi', text: 'Hi', holdMs: 100000 }, stub, { persist: true, retain: () => {}, signal: controller.signal });
+  controller.abort(); const result = await pending;
+  assert.deepEqual(result, { ok: false, error: 'aborted' });
+  assert.equal(stub.backdrops().length, 0); assert.equal(byClass(stub, 'sr-action-callout').length, 0);
 });
 
 test('a persisting callout shows Back and Next controls wired to the host', async () => {

@@ -260,7 +260,7 @@
         },
         "keys": {
           "type": "boolean",
-          "description": "→/Enter next, ← back, Esc exit."
+          "description": "→/Enter next, ← back. (Esc exits in every mode.)"
         },
         "pace": {
           "oneOf": [

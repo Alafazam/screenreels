@@ -53,7 +53,7 @@ const LAYER_STYLE = 'position:fixed;inset:0;margin:0;padding:0;border:0;width:au
 /* Stacking inside the tour layer, bottom to top: click shield < dim backdrop < rings, ripples, cards (runtime) < projector shell. */
 const SHIELD_Z_INDEX = 2147481990;
 /* Guided-tour keys, the ones a slide deck uses. */
-const GUIDED_KEYS = { ArrowRight: 'next', Enter: 'next', ArrowLeft: 'prev', Escape: 'exit' };
+const GUIDED_KEYS = { ArrowRight: 'next', Enter: 'next', ArrowLeft: 'prev' };
 /* The pill's Play/Pause key (handlePlayKey), and where it is typing rather than a command. */
 const PLAY_KEY = ' ';
 const TEXT_ENTRY_SELECTOR = 'input, textarea, select, [contenteditable]';
@@ -347,7 +347,7 @@ class Projector {
     this.progress.querySelector('.sr-progress-label').textContent = title ? `${labels.sceneOf(position + 1, total)} · ${title}` : labels.sceneOf(position + 1, total);
   }
   /* A card in the chooser layer — the start and end cards. Resolves when it times out or a button
-     is pressed, with that button's `data-card` value ('' for a timeout, Esc, or a click on the
+     is pressed, with that button's `data-card` value ('' for a timeout or a click on the
      card), or null when something else took over (start() or disable()), so its caller does nothing. */
   showCard(html, durationMs, scale = window.ScreenReelCore.timeScale()) {
     const layer = this.chooserLayer; if (!layer) return Promise.resolve('');
@@ -456,20 +456,30 @@ class Projector {
     if (document.readyState === 'complete') restore(); else addEventListener('load', restore, { once: true });
   }
   /* Guided tours are paced by the viewer (a mode's `keys` setting). Keys typed into the host's own controls — or the
-     projector's buttons, found through the shadow boundary — are left alone. */
+     projector's buttons, found through the shadow boundary — are left alone. Esc is not a pacing key: see handleEscape. */
   handleKey(keyEvent) {
-    if (keyEvent.key === 'Escape' && this.resolveChooser) { keyEvent.preventDefault(); this.resolveChooser(null); return; }
-    if (keyEvent.key === 'Escape' && this.resolveCard) { keyEvent.preventDefault(); this.resolveCard(''); return; }
+    if (keyEvent.key === 'Escape') { this.handleEscape(keyEvent); return; }
     if (keyEvent.key === PLAY_KEY) { this.handlePlayKey(keyEvent); return; }
     if (!this.store.playing() || !this.settings().keys) return;
     if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
     const command = GUIDED_KEYS[keyEvent.key]; if (!command) return;
     const origin = keyEvent.composedPath?.()[0] || keyEvent.target;
-    // Esc always closes the tour. From the tour's own card, arrows work too, but Enter is left to
-    // the focused button's native click so it cannot fire twice.
+    // From the tour's own card, arrows work too, but Enter is left to the focused button's native
+    // click so it cannot fire twice.
     const inCard = !!origin?.closest?.('.sr-action-callout');
-    if (command !== 'exit' && (inCard ? keyEvent.key === 'Enter' : origin?.closest?.(HOST_CONTROL_SELECTOR))) return;
+    if (inCard ? keyEvent.key === 'Enter' : origin?.closest?.(HOST_CONTROL_SELECTOR)) return;
     keyEvent.preventDefault(); this.command(command);
+  }
+  /* Esc ends the tour (reason 'user') in every mode, playing or paused, also from a host field the
+     tour is typing in and from the start or end card. The chooser closes the same way (start()
+     then ends the tour). Left alone: a key the host already handled (a dialog or menu that closes
+     on Esc calls preventDefault, so the first Esc closes it and the next one ends the tour), a
+     modified key, and a key pressed inside Studio, which owns Esc for its own modals. */
+  handleEscape(keyEvent) {
+    if (this.resolveChooser) { keyEvent.preventDefault(); this.resolveChooser(null); return; }
+    if (keyEvent.defaultPrevented || keyEvent.metaKey || keyEvent.ctrlKey || keyEvent.altKey) return;
+    if (keyEvent.composedPath?.().some((node) => node?.classList?.contains?.('sr-studio'))) return;
+    keyEvent.preventDefault(); this.disable('user');
   }
   /* Space presses the pill's Play/Pause, in any mode whose pill shows it (video, autoplay), paused or
      not, whatever `keys` says. Left alone: typing in a field, a modified key, a chooser or start/end
@@ -755,6 +765,7 @@ class Projector {
         warn: (message) => { console.warn('[screenreel]', message); this.toast(message); },
       });
       actedOn.forEach((el) => timedRun?.targets.delete(el));
+      if (stopped()) break; // exit, pause or next during the action: it stopped part way (error 'aborted')
       if (result.jumpTo && generation === this.playGeneration && this.store.playing()) {
         // Choice jump: positions index into enabledScenes, so resolve there — never raw flow.scenes.
         const enabled = this.store.enabledScenes();
