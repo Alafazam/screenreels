@@ -16,6 +16,7 @@ are the "how do I actually do this" walkthroughs, in the order you'd meet them.
 | **[Playback modes](playback.md)** | How do I play one guide as a video, another as a click-through, and let the viewer choose for a third? What do Next and Back do? |
 | **[Guided tours and onboarding](guided-tours.md)** | How do I let the viewer click Next through a tour, and keep them from breaking the app mid-flow? |
 | **[Narrated scenes](narrated-scenes.md)** | How do I make each click land on the narrator's word in a voiced film? ([feature proposal](proposals/narrated-scenes-feature.md)) |
+| **[Publishing to npm](publishing.md)** | How do I release a new version of the `screenreel` package? |
 | **[Roadmap](roadmap.md)** | What is planned but not built yet, such as pre-recorded AI-voice narration? |
 
 ## Before you start

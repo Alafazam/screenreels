@@ -21,13 +21,13 @@
   "files": [
     "bin/",
     "lib/",
-    "packages/",
-    "dist/",
-    "scripts/",
-    "examples/",
+    "packages/core/",
+    "packages/capture/",
+    "dist/projector/",
     "templates/",
     "skills/",
-    "README.md"
+    "CHANGELOG.md",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"
@@ -41,9 +41,23 @@
   },
   "homepage": "https://alafazam.com/screenreels/",
   "dependencies": {
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
     "playwright-core": "^1.56.1"
+  },
+  "peerDependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2"
+  },
+  "peerDependenciesMeta": {
+    "@ffmpeg-installer/ffmpeg": {
+      "optional": true
+    },
+    "@ffprobe-installer/ffprobe": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2"
   },
   "keywords": [
     "demo",
