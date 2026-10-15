@@ -1,0 +1,52 @@
+name: Publish to npm
+
+# A published GitHub release publishes the package. Run the workflow by hand for a dry run:
+# it does every step but sends nothing to the registry. Setup and the first manual publish
+# are in docs/publishing.md.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # OIDC token for npm trusted publishing and provenance. No NPM_TOKEN secret is used.
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing (OIDC) needs a newer npm than the one Node 22 bundles.
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # dist/ is committed; a diff here means the release commit did not rebuild dist.
+      - run: git diff --exit-code dist/
+      - run: pnpm test
+      - name: Check the release tag matches package.json
+        if: github.event_name == 'release'
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "Release tag $GITHUB_REF_NAME does not match package.json version ($expected)."
+            exit 1
+          fi
+      - name: Dry run
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --dry-run
+      - name: Publish
+        if: github.event_name == 'release'
+        run: npm publish --provenance --access public

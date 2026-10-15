@@ -211,12 +211,16 @@ Full walkthrough: **[docs/doctor-and-ci.md](docs/doctor-and-ci.md)**.
 
 ## Capture
 
-Install from GitHub or a local tarball, then scaffold a capture configuration:
+Install the package and an FFmpeg build, then scaffold a capture configuration:
 
 ```bash
-npm install --save-dev "git+ssh://git@github.com/Alafazam/screenreels.git"
+npm install --save-dev screenreel @ffmpeg-installer/ffmpeg @ffprobe-installer/ffprobe
 npx screenreel init
 ```
+
+The two FFmpeg installer packages are optional peer dependencies. Capture finds each binary in this order: the `FFMPEG_PATH` / `FFPROBE_PATH` env var, the installer package, then `ffmpeg` / `ffprobe` on `PATH`. If you already have FFmpeg, install only `screenreel`. If capture finds no binary, it stops and tells you the three ways to supply one. Projector and the `flow` commands do not need FFmpeg. The installers' platform packages run an install script that sets the executable bit. If your npm blocks install scripts and capture then reports "permission denied", approve them with `npm approve-scripts <package>`.
+
+To install an unreleased version, use the GitHub URL in place of `screenreel`: `"git+ssh://git@github.com/Alafazam/screenreels.git"`.
 
 Set `baseUrl`, authentication hooks, output paths, and the shared flow file in `screenreel.config.mjs`. Start the application before recording.
 
@@ -243,7 +247,7 @@ voice: {
 
 Every stitched part carries the same AAC 48 kHz stereo shape (silence on title cards and unnarrated scenes), so the concat stays in sync; assemble refuses to stitch if any part's audio shape is wrong. A cloud engine drops in through `command` (e.g. an `openai speech`-style CLI) or a custom `synthesize` — the choice, and the API key, stay yours.
 
-Capture uses local Chrome or `CHROME_PATH`. FFmpeg and ffprobe ship with the source installation. Projector's downloadable browser artifact contains none of these Node dependencies.
+Capture uses local Chrome or `CHROME_PATH`. FFmpeg and ffprobe come from the sources listed under [Capture](#capture). Projector's downloadable browser artifact contains none of these Node dependencies.
 
 ## Examples
 
@@ -296,6 +300,8 @@ The build generates browser assets, JSON Schema, TypeScript declarations, and sk
 `.github/workflows/pages.yml` publishes `_site/` to [alafazam.com/screenreels](https://alafazam.com/screenreels/) on every push to `main`. `build:pages` fingerprints `app.js`, `fixtures.js`, and the projector runtime with a content hash, so any change to those bytes produces a new `?v=` URL and the CDN cannot serve a stale copy. The runtime key covers the whole `dist/projector` directory because the loader copies its own query onto every asset it pulls in.
 
 The browser smoke test loads `_site/index.html` as well as `examples/`, since the deployed artifact has different asset paths and its page scripts share one global scope.
+
+`.github/workflows/publish.yml` publishes the npm package when a GitHub release is published. Steps and the one-time setup are in [docs/publishing.md](docs/publishing.md).
 
 ## License
 

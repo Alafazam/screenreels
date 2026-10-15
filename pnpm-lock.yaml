@@ -8,15 +8,16 @@ importers:
 
   .:
     dependencies:
+      playwright-core:
+        specifier: ^1.56.1
+        version: 1.63.0
+    devDependencies:
       '@ffmpeg-installer/ffmpeg':
         specifier: ^1.1.0
         version: 1.1.0
       '@ffprobe-installer/ffprobe':
         specifier: ^2.1.2
         version: 2.1.2
-      playwright-core:
-        specifier: ^1.56.1
-        version: 1.63.0
 
   packages/capture: {}
 
