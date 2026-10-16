@@ -1,0 +1,95 @@
+{
+  "hash": "8083fca8",
+  "text": "That was ScreenReel, playing itself. Read every line on GitHub, and put it in your own product.",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "trimmedMs": 0,
+  "durationMs": 6165,
+  "words": [
+    {
+      "w": "That",
+      "s": 0,
+      "e": 0.244
+    },
+    {
+      "w": "was",
+      "s": 0.302,
+      "e": 0.418
+    },
+    {
+      "w": "ScreenReel,",
+      "s": 0.464,
+      "e": 1.138
+    },
+    {
+      "w": "playing",
+      "s": 1.196,
+      "e": 1.521
+    },
+    {
+      "w": "itself.",
+      "s": 1.567,
+      "e": 2.183
+    },
+    {
+      "w": "Read",
+      "s": 2.694,
+      "e": 2.914
+    },
+    {
+      "w": "every",
+      "s": 2.995,
+      "e": 3.262
+    },
+    {
+      "w": "line",
+      "s": 3.32,
+      "e": 3.576
+    },
+    {
+      "w": "on",
+      "s": 3.611,
+      "e": 3.692
+    },
+    {
+      "w": "GitHub,",
+      "s": 3.762,
+      "e": 4.261
+    },
+    {
+      "w": "and",
+      "s": 4.296,
+      "e": 4.435
+    },
+    {
+      "w": "put",
+      "s": 4.493,
+      "e": 4.656
+    },
+    {
+      "w": "it",
+      "s": 4.69,
+      "e": 4.76
+    },
+    {
+      "w": "in",
+      "s": 4.807,
+      "e": 4.876
+    },
+    {
+      "w": "your",
+      "s": 4.934,
+      "e": 5.05
+    },
+    {
+      "w": "own",
+      "s": 5.108,
+      "e": 5.248
+    },
+    {
+      "w": "product.",
+      "s": 5.306,
+      "e": 6.13
+    }
+  ]
+}

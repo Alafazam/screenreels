@@ -1,0 +1,95 @@
+{
+  "hash": "7a3c0beb",
+  "text": "All three come from the same JSON file, which you review and version next to your code.",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "trimmedMs": 0,
+  "durationMs": 5277,
+  "words": [
+    {
+      "w": "All",
+      "s": 0,
+      "e": 0.267
+    },
+    {
+      "w": "three",
+      "s": 0.337,
+      "e": 0.604
+    },
+    {
+      "w": "come",
+      "s": 0.662,
+      "e": 0.848
+    },
+    {
+      "w": "from",
+      "s": 0.871,
+      "e": 1.01
+    },
+    {
+      "w": "the",
+      "s": 1.057,
+      "e": 1.126
+    },
+    {
+      "w": "same",
+      "s": 1.184,
+      "e": 1.463
+    },
+    {
+      "w": "JSON",
+      "s": 1.521,
+      "e": 1.834
+    },
+    {
+      "w": "file,",
+      "s": 1.892,
+      "e": 2.322
+    },
+    {
+      "w": "which",
+      "s": 2.473,
+      "e": 2.659
+    },
+    {
+      "w": "you",
+      "s": 2.694,
+      "e": 2.763
+    },
+    {
+      "w": "review",
+      "s": 2.821,
+      "e": 3.146
+    },
+    {
+      "w": "and",
+      "s": 3.262,
+      "e": 3.379
+    },
+    {
+      "w": "version",
+      "s": 3.425,
+      "e": 3.762
+    },
+    {
+      "w": "next",
+      "s": 3.831,
+      "e": 4.063
+    },
+    {
+      "w": "to",
+      "s": 4.098,
+      "e": 4.156
+    },
+    {
+      "w": "your",
+      "s": 4.214,
+      "e": 4.319
+    },
+    {
+      "w": "code.",
+      "s": 4.377,
+      "e": 5.248
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "hash": "a2e68297",
+  "text": "ScreenReel is a free, open-source demo recorder. Apache 2.0, no account, no backend, and nothing hosted for you to trust.",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "trimmedMs": 0,
+  "durationMs": 8725,
+  "words": [
+    {
+      "w": "ScreenReel",
+      "s": 0,
+      "e": 0.557
+    },
+    {
+      "w": "is",
+      "s": 0.604,
+      "e": 0.685
+    },
+    {
+      "w": "a",
+      "s": 0.731,
+      "e": 0.755
+    },
+    {
+      "w": "free,",
+      "s": 0.824,
+      "e": 1.126
+    },
+    {
+      "w": "open-source",
+      "s": 1.184,
+      "e": 1.741
+    },
+    {
+      "w": "demo",
+      "s": 1.776,
+      "e": 2.009
+    },
+    {
+      "w": "recorder.",
+      "s": 2.078,
+      "e": 2.659
+    },
+    {
+      "w": "Apache",
+      "s": 2.984,
+      "e": 3.448
+    },
+    {
+      "w": "2.0,",
+      "s": 3.518,
+      "e": 4.365
+    },
+    {
+      "w": "no",
+      "s": 4.481,
+      "e": 4.609
+    },
+    {
+      "w": "account,",
+      "s": 4.667,
+      "e": 5.085
+    },
+    {
+      "w": "no",
+      "s": 5.155,
+      "e": 5.271
+    },
+    {
+      "w": "backend,",
+      "s": 5.341,
+      "e": 5.968
+    },
+    {
+      "w": "and",
+      "s": 6.246,
+      "e": 6.397
+    },
+    {
+      "w": "nothing",
+      "s": 6.478,
+      "e": 6.757
+    },
+    {
+      "w": "hosted",
+      "s": 6.815,
+      "e": 7.129
+    },
+    {
+      "w": "for",
+      "s": 7.175,
+      "e": 7.268
+    },
+    {
+      "w": "you",
+      "s": 7.314,
+      "e": 7.396
+    },
+    {
+      "w": "to",
+      "s": 7.442,
+      "e": 7.488
+    },
+    {
+      "w": "trust.",
+      "s": 7.546,
+      "e": 8.684
+    }
+  ]
+}
