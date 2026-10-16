@@ -11,3 +11,5 @@
 .repo-product-stack{position:relative}.repo-product-stack::before,.repo-product-stack::after{content:"";position:absolute;left:-20px;width:20px;border-top:2px dotted #7c3aed}.repo-product-stack::before{top:28%}.repo-product-stack::after{top:68%}
 @media(max-width:760px){.repo-product-stack::before,.repo-product-stack::after{display:none}}
 @media(prefers-reduced-motion:reduce){.landing-page *{scroll-behavior:auto!important}}
+footer .voice-credit{max-width:520px}footer .voice-credit a{color:inherit}
+.landing-install code{overflow-wrap:anywhere}.landing-install p .inline-code{display:inline;padding:1px 6px;border-radius:5px;background:#f1f1f4;color:#141519;font-size:.9em;line-height:inherit}

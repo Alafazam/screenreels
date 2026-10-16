@@ -166,6 +166,23 @@ voice: {
 }
 ```
 
+## Pre-recorded narration files for the live tour
+
+For a better voice than the browser's, generate a file per info card ahead of time and commit it:
+the card's `narrationAudio` plays with its `stepMs` timeline (see
+[Timed steps and narration audio](playback.md#timed-steps-and-narration-audio)). Mount with
+`narration: { speech: false }` so only the files play.
+
+This repository's landing tour does it with `scripts/voice-render.mjs` and ElevenLabs. The script
+reads each card's `narration` as the line, generates it with word timestamps, and writes the card's
+`stepMs` and its actions' `atMs` from the words. It works for any flow: give it a voice plan that
+names the flow, the voice, and which action lands on which word, as in
+`examples/action-showcase/audio/landing/voice-plan.json`. It reads the key from
+`ELEVENLABS_API_KEY`, checks the account's character quota first, and generates only changed lines.
+`--dry-run` shows what it would generate without calling the API.
+
+Capture does not play these files yet: a captured video still uses the voice provider below.
+
 ## When narration is longer than its clip
 
 A 12-second script over an 8-second scene has to give somewhere:

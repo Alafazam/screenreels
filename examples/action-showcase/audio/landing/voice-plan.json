@@ -1,0 +1,34 @@
+{
+  "flowFile": "../../screenreel.demo.json",
+  "flow": "guided-tour",
+  "audioDir": "audio/landing",
+  "voiceName": "Matilda",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "outputFormat": "mp3_44100_128",
+  "voiceSettings": { "stability": 0.5, "similarity_boost": 0.75, "style": 0, "use_speaker_boost": true },
+  "timing": { "leadMs": 300, "tailMs": 700, "actionLeadMs": 450 },
+  "steps": [
+    { "file": "1a", "card": "open-source-badge-callout" },
+    { "file": "1b", "card": "open-source-hook-callout", "anchors": [{ "action": "demo-lab-pointer", "word": "build" }] },
+    { "file": "2", "card": "author-the-story-callout", "anchors": [
+      { "action": "name-type", "word": "names" },
+      { "action": "audience-set", "word": "audience" },
+      { "action": "notes-toggle", "word": "notes" },
+      { "action": "pacing-lever", "word": "pace" }
+    ] },
+    { "file": "3", "card": "emphasise-real-elements-callout", "anchors": [
+      { "action": "scene-drag", "word": "drag" },
+      { "action": "scene-highlight", "word": "point" },
+      { "action": "generate-pointer", "word": "generate" }
+    ] },
+    { "file": "4a", "card": "one-flow-three-outputs-callout", "anchors": [
+      { "action": "live-highlight", "word": "live" },
+      { "action": "link-highlight", "word": "link" },
+      { "action": "video-highlight", "word": "video" }
+    ] },
+    { "file": "4b", "card": "readable-flow-callout" },
+    { "file": "5", "card": "repair-before-it-breaks-callout" },
+    { "file": "6", "card": "own-the-stack-callout", "anchors": [{ "action": "github-pointer", "word": "github" }] }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "hash": "d8836ad3",
+  "text": "Record a walkthrough once, keep it as a file in your repository, and play it inside your own product. Let's build one.",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "trimmedMs": 0,
+  "durationMs": 7602,
+  "words": [
+    {
+      "w": "Record",
+      "s": 0,
+      "e": 0.383
+    },
+    {
+      "w": "a",
+      "s": 0.418,
+      "e": 0.441
+    },
+    {
+      "w": "walkthrough",
+      "s": 0.499,
+      "e": 0.94
+    },
+    {
+      "w": "once,",
+      "s": 0.987,
+      "e": 1.405
+    },
+    {
+      "w": "keep",
+      "s": 1.649,
+      "e": 1.869
+    },
+    {
+      "w": "it",
+      "s": 1.904,
+      "e": 1.974
+    },
+    {
+      "w": "as",
+      "s": 2.009,
+      "e": 2.09
+    },
+    {
+      "w": "a",
+      "s": 2.136,
+      "e": 2.159
+    },
+    {
+      "w": "file",
+      "s": 2.218,
+      "e": 2.531
+    },
+    {
+      "w": "in",
+      "s": 2.554,
+      "e": 2.612
+    },
+    {
+      "w": "your",
+      "s": 2.659,
+      "e": 2.763
+    },
+    {
+      "w": "repository,",
+      "s": 2.81,
+      "e": 3.669
+    },
+    {
+      "w": "and",
+      "s": 3.785,
+      "e": 3.936
+    },
+    {
+      "w": "play",
+      "s": 3.994,
+      "e": 4.203
+    },
+    {
+      "w": "it",
+      "s": 4.249,
+      "e": 4.319
+    },
+    {
+      "w": "inside",
+      "s": 4.377,
+      "e": 4.737
+    },
+    {
+      "w": "your",
+      "s": 4.772,
+      "e": 4.888
+    },
+    {
+      "w": "own",
+      "s": 4.934,
+      "e": 5.062
+    },
+    {
+      "w": "product.",
+      "s": 5.12,
+      "e": 5.735
+    },
+    {
+      "w": "Let's",
+      "s": 6.177,
+      "e": 6.432
+    },
+    {
+      "w": "build",
+      "s": 6.478,
+      "e": 6.687
+    },
+    {
+      "w": "one.",
+      "s": 6.757,
+      "e": 7.57
+    }
+  ]
+}

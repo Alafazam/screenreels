@@ -6,14 +6,27 @@ This is the deterministic six-scene, approximately 90-second dogfood script for 
 
 | Scene | Route and title | Intended gestures | Expected actions | Target | Narration | Visible state |
 |---|---|---|---|---:|---|---|
-| 1 | Landing / Open-source product demos | Highlight badge and statement; point to Demo Lab | highlight, spotlight, pointer, goto | 12s | “ScreenReel is an open-source demo recorder that ships with your product. No account, backend, or hosted workspace.” | Open-source positioning and live-demo CTA |
-| 2 | `demo-lab.html` / Shape the story | Type name; choose audience; toggle notes; move pacing | type, set, toggle, lever | 17s | “Open Studio, press record, and use your app normally. Typing, selects, toggles, sliders, clicks, and navigation become editable actions.” | Demo brief acknowledges each change |
-| 3 | `demo-lab.html` / Emphasise real elements | Drag scene 03 above scene 02; highlight scene and spotlight preview | drag, highlight, spotlight, pointer, goto | 14s | “When a moment needs emphasis, point at the real element and capture a highlight or spotlight. Your demo remains a readable flow in the repository.” | Reordered scene list and visible preview |
-| 4 | `demo-lab-output.html` / Three useful outputs | Walk live, share, and video cards; highlight readable flow | glow sequence, highlight | 17s | “That one flow now plays live inside the product, opens as a self-playing link, and renders to video. Projector, Studio, and Capture share the same source.” | Three output cards and readable JSON |
-| 5 | `demo-lab-output.html` / Keep it from rotting | Scroll to maintenance and spotlight genuine repair output | scroll, spotlight, goto | 16s | “When the product changes, validation catches broken targets, and flow doctor can repair fingerprinted selectors before a customer sees the break.” | Genuine repair output and Flow Doctor link |
-| 6 | Landing / Make the next step obvious | Highlight live-demo and repository actions; point to GitHub | highlight, pointer | 14s | “Everything stays in your stack. Watch the live demo, inspect every line on GitHub, and use ScreenReel in your own product.” | Live-demo and GitHub CTAs |
+| 1 | Landing / Open-source product demos | Highlight badge and statement; point to Demo Lab | callout, callout, pointer, goto | 18s | “ScreenReel is a free, open-source demo recorder. Apache 2.0, no account, no backend, and nothing hosted for you to trust.” · “Record a walkthrough once, keep it as a file in your repository, and play it inside your own product. Let's build one.” | Open-source positioning and live-demo CTA |
+| 2 | `demo-lab.html` / Record by using the app | Type name; choose audience; toggle notes; move pacing | callout, type, set, toggle, lever | 16s | “This is the Demo Lab, a small test app. The tour names the demo, picks an audience, turns on presenter notes, and sets the pace. Each one is a real browser event, and Studio saves each one as an action you can edit.” | Demo brief acknowledges each change |
+| 3 | `demo-lab.html` / Emphasise real elements | Drag scene 03 above scene 02; highlight a scene; point to Generate | callout, drag, highlight, pointer, goto | 11s | “Drag a scene to change the order. To show something without clicking it, point at the real element, and it becomes a highlight in the flow. Then generate the outputs.” | Reordered scene list and visible preview |
+| 4 | `demo-lab-output.html` / Three useful outputs | Highlight live, share, and video cards on their words; then the readable flow | callout, highlight ×3, callout | 16s | “One flow, three outputs. It plays live inside your product, opens as a self-playing link, and renders to video.” · “All three come from the same JSON file, which you review and version next to your code.” | Three output cards and readable JSON |
+| 5 | `demo-lab-output.html` / Keep it from rotting | Scroll to maintenance and show the repair output | scroll, callout, goto | 9s | “When your product changes, flow doctor checks every target and repairs the selectors that moved, before a customer sees a broken demo.” | Repair output and Flow Doctor link |
+| 6 | Landing / Make the next step obvious | Highlight live-demo and repository actions; point to GitHub | callout, pointer | 7s | “That was ScreenReel, playing itself. Read every line on GitHub, and put it in your own product.” | Live-demo and GitHub CTAs |
 
-Total target duration: 90 seconds. Keep the narration conversational; the times are pacing targets, not hard waits.
+Total: about 77 seconds of narrated steps plus page loads, under the 90-second target.
+
+## Voice
+
+The tour is voiced with ElevenLabs (voice Matilda, `eleven_multilingual_v2`). Each info card's `narration` is its line, and the card plays `audio/landing/<step>.<hash>.mp3`. The card's `stepMs` and its actions' `atMs` come from the take's word timestamps: an action named by a word fires 0.45 s before the word. The landing mounts with `narration: { speech: false }`, so only the files play, and the chooser offers Autoplay first.
+
+To change a line, edit the card's `narration` in `screenreel.demo.json`, then run:
+
+```bash
+node scripts/voice-render.mjs --plan examples/action-showcase/audio/landing/voice-plan.json --dry-run
+node scripts/voice-render.mjs --plan examples/action-showcase/audio/landing/voice-plan.json
+```
+
+Only changed lines are generated again. The key comes from `ELEVENLABS_API_KEY`. The plan file (`voice-plan.json`) sets the voice and says which action lands on which word. In Guided mode, each card plays its line while it waits for Next, and the actions run after Next.
 
 ## Guided recording steps
 

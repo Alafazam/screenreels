@@ -4,8 +4,10 @@ Planned work, not yet built. Nothing here is available in a release.
 
 ## Pre-recorded AI-voice narration
 
-Live narration today uses the browser's built-in speech, which sounds robotic on most systems. The
-landing tour therefore ships muted. The plan: the author generates narration once, in Studio or
+Live narration uses the browser's built-in speech, which sounds robotic on most systems. The landing
+tour now plays ElevenLabs files instead, made by the repository script `scripts/voice-render.mjs`
+(see [the worksheet](landing-demo-recording-worksheet.md#voice)). What stays planned is making that
+a product feature: the author generates narration once, in Studio or
 through the CLI, with a high-quality AI voice, and ships the audio with the flow.
 
 - **Where it runs:** at authoring time only. A ScreenReel demo plays in the viewer's browser with

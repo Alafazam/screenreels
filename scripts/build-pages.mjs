@@ -24,6 +24,14 @@ for (const name of ['index.html', 'destination.html', 'showcase.html', 'showcase
   fs.copyFileSync(path.join(example, name), path.join(site, name));
 }
 fs.cpSync(path.join(root, 'dist/projector'), path.join(site, 'dist/projector'), { recursive: true });
+/* Narration files (scripts/voice-render.mjs). Only the MP3s ship; the word-timing sidecars and the
+   voice plan are authoring files. A file's name carries its content hash, so the CDN never serves
+   an old take under a new flow. */
+const NARRATION_DIR = 'audio/landing';
+fs.mkdirSync(path.join(site, NARRATION_DIR), { recursive: true });
+for (const name of fs.readdirSync(path.join(example, NARRATION_DIR)).filter((file) => file.endsWith('.mp3'))) {
+  fs.copyFileSync(path.join(example, NARRATION_DIR, name), path.join(site, NARRATION_DIR, name));
+}
 
 /* The loader copies its own query onto every runtime asset it pulls in, so the runtime key must
    cover the whole directory — hashing screenreel.js alone would not bust action-runtime.js or
@@ -84,6 +92,14 @@ const required = [
   'dist/projector/screenreel.css',
   '.nojekyll',
 ];
+// Every narration file a flow names must ship, or the tour plays a silent card.
+for (const flowFile of ['screenreel.demo.json', 'showcase.demo.json']) {
+  for (const flow of JSON.parse(fs.readFileSync(path.join(site, flowFile), 'utf8')).flows) {
+    for (const action of flow.scenes.flatMap((scene) => scene.actions)) {
+      if (action.narrationAudio) required.push(action.narrationAudio);
+    }
+  }
+}
 for (const name of required) {
   if (!fs.existsSync(path.join(site, name))) throw new Error(`Pages artifact is missing ${name}`);
 }
