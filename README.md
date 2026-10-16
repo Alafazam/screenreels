@@ -44,7 +44,7 @@ const projector = await ScreenReel.mount(document.querySelector('#demo-button'),
   timeScale: 1,     // pacing multiplier for every delay in the runtime
   cursor: 'dot',    // 'dot', 'arrow', or false to hide the agent cursor
   narration: true,  // speak each scene's talking points aloud; false to disable
-  // playback: { default: 'video' }, // how flows play: 'video', 'autoplay', 'guided', or 'ask'; see docs/playback.md
+  // playback: { default: 'video' }, // how flows play: 'video', 'clean', 'autoplay', 'guided', or 'ask'; see docs/playback.md
   dim: 0.45,        // background dimming behind highlights and callouts; false to disable
   pages: ['/dashboard', '/reports']  // optional: routes Studio offers when picking a scene's route
 });
@@ -77,7 +77,7 @@ Projector and Capture share one pointer implementation, so a live tour and a rec
 
 `timeScale` multiplies every deliberate delay in the runtime — manifest values, action defaults, and internal constants (countdown steps, flash pulses, reveal fades) that manifest rewriting cannot reach. Timeouts and scroll-settle limits are excluded: those are limits, not pacing. Defaults to `1`. Scene `dwellMs` falls back to `flow.defaults.dwellMs`, `settleMs` to `flow.defaults.settleMs`.
 
-A flow plays in one of three modes: `video` (hands-off, no info cards), `autoplay` (hands-off, cards held for their reading time), or `guided` (the viewer presses Next on each card), or `ask` shows a chooser. Each flow picks its own in `defaults.playback`; the mount's `playback` sets defaults, per-mode settings, and limits; `start(flowId, { mode })` picks one directly. See **[Playback modes](docs/playback.md)** and [Guided tours and onboarding](docs/guided-tours.md). The older `advance` and `chooser` options still work. The `<screenreel-projector>` element accepts `playback-mode="guided"` (and the older `advance="guided"`).
+A flow plays in one of four modes: `video` (hands-off, cards held for their reading time, a small pill), `clean` (Clean video: hands-off, the cards' words as captions, no cards), `autoplay` (hands-off, cards held for their reading time, the full pill), or `guided` (the viewer presses Next on each card), or `ask` shows a chooser. Each flow picks its own in `defaults.playback`; the mount's `playback` sets defaults, per-mode settings, and limits; `start(flowId, { mode })` picks one directly. See **[Playback modes](docs/playback.md)** and [Guided tours and onboarding](docs/guided-tours.md). The older `advance` and `chooser` options still work. The `<screenreel-projector>` element accepts `playback-mode="guided"` (and the older `advance="guided"`).
 
 See [Pacing and the cursor](docs/pacing-and-cursor.md).
 

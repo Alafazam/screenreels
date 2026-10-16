@@ -8,9 +8,10 @@ const resolve = ({ defaults, options, requested, canAsk, remembered } = {}) => P
 const settings = (mode, defaults, options) => P.resolveSettings(mode, P.flowConfig(flow(defaults)), P.mountConfig(options));
 
 test('each mode is a preset of the same settings', () => {
-  assert.deepEqual(P.MODES, ['video', 'autoplay', 'guided']);
+  assert.deepEqual(P.MODES, ['video', 'autoplay', 'guided', 'clean']);
   for (const mode of P.MODES) assert.deepEqual(Object.keys(P.PRESETS[mode]).sort(), Object.keys(P.FIELDS).sort(), mode);
-  assert.equal(P.PRESETS.video.callouts, 'off');
+  assert.equal(P.PRESETS.video.callouts, 'timed', 'video shows its cards, each held for its reading time');
+  assert.equal(P.PRESETS.clean.callouts, 'caption', 'clean video shows the words of a card as a caption, no card');
   assert.equal(P.PRESETS.autoplay.callouts, 'timed');
   assert.equal(P.PRESETS.guided.callouts, 'step');
   assert.deepEqual(P.PRESETS.guided.controls, []);
@@ -101,7 +102,7 @@ test('validation catches bad playback config', () => {
   assert.match(errors({ playback: { modes: ['ask'] } })[0], /unknown modes: ask .*"ask" goes in default/);
   assert.match(errors({ playback: { modes: [] } })[0], /non-empty/);
   assert.match(errors({ playback: { default: 'video', modes: ['guided'] } })[0], /"video" is not in defaults.playback.modes/);
-  assert.match(errors({ playback: { default: 'slideshow' } })[0], /must be video, autoplay, guided, ask/);
+  assert.match(errors({ playback: { default: 'slideshow' } })[0], /must be video, autoplay, guided, clean, ask/);
   assert.match(errors({ playback: { force: 'video' } })[0], /mount option/);
   assert.match(errors({ playback: { video: { callouts: 'popup' } } })[0], /callouts must be step, timed, caption, off/);
   assert.match(errors({ playback: { autoplay: { controls: ['rewind'] } } })[0], /unknown controls: rewind/);
@@ -121,6 +122,44 @@ test('validation warns when guided would play a scene with no info cards', () =>
   assert.deepEqual(warn({ playback: { default: 'guided', guided: { callouts: 'timed' } } }), [], 'guided without steps does not wait');
   assert.match(warn({ advance: 'guided', playback: { default: 'video' } }).find((line) => line.includes('disagrees')), /playback wins/);
   assert.deepEqual(warn({ advance: 'auto', playback: { default: 'video' } }), [], 'Studio writes autoplay as the older name for video');
+});
+
+test('clean video: a video with captions in place of cards', () => {
+  const clean = settings('clean', { playback: { default: 'clean' } });
+  assert.equal(clean.mode, 'clean');
+  assert.equal(clean.callouts, 'caption');
+  assert.deepEqual(clean.controls, ['play', 'sound', 'exit'], 'the small pill, as video');
+  assert.deepEqual([clean.startCard, clean.endCard, clean.progress, clean.narration, clean.keys, clean.notes], [true, true, true, true, false, false]);
+  const { callouts, ...cleanRest } = P.PRESETS.clean; const { callouts: videoCallouts, ...videoRest } = P.PRESETS.video;
+  assert.deepEqual(cleanRest, videoRest, 'clean video differs from video only in how cards play');
+  assert.equal(resolve({ defaults: { playback: { default: 'clean' } } }).mode, 'clean');
+  assert.equal(resolve({ requested: 'clean' }).mode, 'clean');
+  assert.equal(settings('clean', {}, { playback: { clean: { callouts: 'off' } } }).callouts, 'off', 'a host can override it like any mode');
+});
+
+test('video now shows cards; a host or flow that sets video callouts keeps its value', () => {
+  assert.equal(settings('video', { playback: { default: 'video' } }).callouts, 'timed');
+  assert.equal(settings('video', {}, { playback: { video: { callouts: 'off' } } }).callouts, 'off', 'host value kept');
+  assert.equal(settings('video', { playback: { video: { callouts: 'caption' } } }).callouts, 'caption', 'flow value kept');
+});
+
+test('clean is offered only where a list names it', () => {
+  assert.deepEqual(P.DEFAULT_MODES, ['guided', 'autoplay'], 'the default list does not grow');
+  assert.deepEqual(resolve({ defaults: { playback: { default: 'ask' } } }).offered, ['guided', 'autoplay']);
+  const four = { playback: { default: 'ask', modes: ['guided', 'autoplay', 'video', 'clean'] } };
+  assert.deepEqual(resolve({ defaults: four }).offered, ['guided', 'autoplay', 'video', 'clean']);
+  assert.deepEqual(resolve({ defaults: four, options: { playback: { modes: ['guided', 'autoplay', 'video'] } } }).offered, ['guided', 'autoplay', 'video'], 'a host that pins modes without clean does not show it');
+  assert.equal(resolve({ defaults: { playback: { default: 'clean' } }, options: { playback: { modes: ['guided', 'autoplay'] } } }).mode, 'autoplay', 'a host that excludes clean falls back');
+  assert.deepEqual(resolve({ defaults: { playback: { default: 'ask' } }, options: { playback: { modes: ['video', 'clean'] } } }).offered, ['video', 'clean'], 'a host list is the default for flows that list none');
+});
+
+test('clean validates like the other modes', () => {
+  const errors = (defaults) => P.validateFlowPlayback(flow(defaults)).errors;
+  assert.deepEqual(errors({ playback: { default: 'clean', modes: ['guided', 'clean'], clean: { callouts: 'off', progress: false } } }), []);
+  assert.match(errors({ playback: { default: 'clean', modes: ['guided'] } })[0], /"clean" is not in defaults.playback.modes/);
+  assert.match(errors({ playback: { clean: { callouts: 'popup' } } })[0], /defaults.playback.clean.callouts must be/);
+  assert.deepEqual(P.validateMountPlayback({ force: 'clean', modes: ['clean', 'video'], clean: { controls: ['play', 'exit'] } }), []);
+  assert.deepEqual(P.validateFlowPlayback(flow({ advance: 'auto', playback: { default: 'clean' } })).warnings, [], 'Studio writes autoplay as the older name for clean');
 });
 
 test('the shipped example flows have valid playback config', async () => {

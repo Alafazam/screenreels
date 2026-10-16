@@ -62,14 +62,15 @@ or narrow until it says one: an ambiguous selector is a scene that will not save
 joins the same coalesced sequence as everything else. On macOS Chrome, prefer ⌘; Ctrl+click is a
 right-click there.
 
-## Info cards: one flow, Guided, Autoplay, and Video
+## Info cards: one flow, Guided, Autoplay, Video, and Clean video
 
-An info card is a titled note beside an element, and it is what makes one flow work three ways
+An info card is a titled note beside an element, and it is what makes one flow work four ways
 (see [Playback modes](playback.md)):
 
 - **Guided:** each card waits until the viewer presses Next.
 - **Autoplay:** each card stays up for its autoplay time, and never less than it takes to read.
-- **Video:** cards are left out, or shown as captions; the cursor and actions carry the story.
+- **Video:** each card stays up for its reading time, as in Autoplay, with a smaller pill.
+- **Clean video:** no cards; each card's words show as a caption while the cursor and actions carry the story.
 
 Add one with **⇧⌘/⇧Ctrl+click** while recording, or with **Info card** in the editor toolbar and a
 click on the element. Its title starts as the element's own text. Type the card's words straight

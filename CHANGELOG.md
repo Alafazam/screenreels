@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Added: a fourth playback mode, **`clean` (Clean video)**. It plays by itself like `video`, with the same small pill (`play`, `sound`, `exit`), progress bar, start card and end card, but shows no info cards: the words of each card show as a caption (`callouts: 'caption'`) and the narration plays. The chooser label is "Clean video" and the hint is "Watch it like a video, with captions instead of cards." Hosts translate them with `labels.clean` and `labels.cleanHint` (`docs/playback.md#labels`).
+- Changed: **`video` now shows its info cards.** Its preset `callouts` changes from `'off'` to `'timed'`: each card holds for its reading time, as in `autoplay`, with the small pill. The chooser hint is now "Watch it like a video, with cards." A host or flow that sets `playback.video.callouts` keeps its value. To keep the old look, set `video: { callouts: 'off' }`, or offer `clean` for captions.
+- `clean` is offered only where a `modes` list names it. The default list (`['guided', 'autoplay']`, used when neither the flow nor the host lists modes) does not change, and a host whose `playback.modes` leaves out `clean` never shows it. To offer all four: `"modes": ["guided", "autoplay", "video", "clean"]`.
+- The chooser card scrolls inside the viewport (`max-height`) when its options are taller than the screen. Four options fit at 390 × 560 without a scroll.
+- Studio: Flow settings and **Play scene** list Clean video. Studio writes `defaults.advance: 'auto'` beside `clean`, as for `video`, so an older runtime still plays the flow.
+- `screenreel.schema.json` and `screenreel.d.ts` accept `clean` (`ScreenReelMode`, `defaults.playback.clean`, `ScreenReelLabels.clean` / `cleanHint`).
+
 ## 0.4.0
 
 - Fixed: **Esc** did nothing in `video` and `autoplay` (their `keys` is `false`), and did nothing in any mode while paused. Esc now ends the tour in every mode, playing or paused, with reason `'user'`, also from a host field and from the start or end card. A key the host already handled (`preventDefault()`), a modified key, and keys inside Studio are left alone. `keys` now covers only →, Enter and ← (`docs/playback.md#esc-and-exit`).

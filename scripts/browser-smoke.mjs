@@ -620,9 +620,10 @@ try {
   await inlinePage.waitForFunction(() => window.__choiceProjector.store.position() === 2 && !document.querySelector('.sr-choice-overlay'));
   await inlinePage.evaluate(() => { window.__choiceProjector.pause(); window.__choiceProjector.destroy(); document.getElementById('choice-demo').remove(); });
   // Playback modes (docs/playback.md): one host, one guide list, each flow picking how it plays.
-  // video: start card, no info cards, progress bar, end card; captions on request; autoplay: timed
-  // cards and a labelled pill; guided: "N of M" and Finish; ask: a chooser over the flow's own modes
-  // that remembers the viewer's pick.
+  // video: start card, timed info cards, progress bar, end card; captions on request; clean video:
+  // start card, captions and no info card, small pill, end card; autoplay: timed cards and a labelled
+  // pill; guided: "N of M" and Finish; ask: a chooser over the flow's own modes (all four when the
+  // flow lists them) that remembers the viewer's pick.
   const modes = await inlinePage.evaluate(async () => {
     const spot = document.createElement('div'); spot.id = 'pm-spot'; spot.textContent = 'Spot'; spot.style.cssText = 'position:fixed;left:200px;top:200px;width:120px;height:40px'; document.body.appendChild(spot);
     const target = document.createElement('button'); target.id = 'pm-demo'; document.body.appendChild(target);
@@ -631,6 +632,8 @@ try {
     const flows = [
       { id: 'film', name: 'Film', defaults: { dwellMs: 50, playback: { default: 'video' } }, scenes: scenes('film') },
       { id: 'captioned', name: 'Captioned', defaults: { dwellMs: 50, playback: { default: 'video', video: { callouts: 'caption', endCard: false } } }, scenes: scenes('cap') },
+      { id: 'clean', name: 'Clean', defaults: { dwellMs: 50, playback: { default: 'clean' } }, scenes: scenes('clean') },
+      { id: 'four', name: 'Four ways', defaults: { dwellMs: 50, playback: { default: 'ask', modes: ['guided', 'autoplay', 'video', 'clean'] } }, scenes: scenes('four') },
       { id: 'auto', name: 'Auto', defaults: { dwellMs: 50, playback: { default: 'autoplay' } }, scenes: scenes('auto') },
       { id: 'steps', name: 'Steps', defaults: { dwellMs: 50, playback: { default: 'guided' } }, scenes: scenes('steps') },
       { id: 'choose', name: 'Choose', defaults: { dwellMs: 50, playback: { default: 'ask', modes: ['video', 'guided'] } }, scenes: scenes('choose') },
@@ -663,6 +666,25 @@ try {
     await projector.start('captioned');
     result.caption = (await until(() => { const caption = root()?.querySelector('.sr-caption:not([hidden])'); return caption?.textContent; }));
     result.captionExit = (await exited).reason; result.captionCards = stopWatching();
+
+    // clean video: captions in place of cards, the small pill, start and end cards
+    started = once('start'); exited = once('exit'); stopWatching = sawCard();
+    await projector.start('clean'); result.cleanStart = (await started).mode;
+    result.cleanStartCard = (await until(() => root()?.querySelector('.sr-start-card')))?.textContent;
+    result.cleanCaption = (await until(() => { const caption = root()?.querySelector('.sr-caption:not([hidden])'); return caption?.textContent; }));
+    result.cleanPill = [...root().querySelectorAll('.sr-pill [data-cmd]')].map((button) => button.dataset.cmd);
+    endCard = await until(() => root()?.querySelector('.sr-end-card'));
+    result.cleanEnd = !!endCard?.querySelector('[data-card="replay"]');
+    endCard.querySelector('[data-card="close"]').click();
+    result.cleanExit = (await exited).reason; result.cleanCards = stopWatching();
+
+    // ask over four modes: one option each, in the flow's order, the whole chooser inside the viewport
+    projector.start('four');
+    const four = await until(() => root()?.querySelector('.sr-chooser-layer:not([hidden]) .sr-chooser'));
+    result.fourOffered = [...four.querySelectorAll('[data-choose]:not([data-choose=""])')].map((button) => `${button.dataset.choose}: ${button.querySelector('strong').textContent} / ${button.querySelector('span').textContent}`);
+    const box = four.getBoundingClientRect();
+    result.fourFits = box.top >= 0 && box.bottom <= innerHeight && four.scrollHeight <= four.clientHeight;
+    exited = once('exit'); projector.disable('user'); await exited;
 
     // autoplay
     exited = once('exit');
@@ -698,8 +720,10 @@ try {
     return result;
   });
   assert.deepEqual(modes, {
-    videoStart: 'video', videoStartCard: true, videoProgress: 'Scene 1 of 2 · First', videoPill: ['play', 'exit'], videoEnd: true, replayMode: 'video', replayStartCard: true, videoExit: 'complete', videoCards: false,
+    videoStart: 'video', videoStartCard: true, videoProgress: 'Scene 1 of 2 · First', videoPill: ['play', 'exit'], videoEnd: true, replayMode: 'video', replayStartCard: true, videoExit: 'complete', videoCards: true,
     caption: 'CardOne', captionExit: 'complete', captionCards: false,
+    cleanStart: 'clean', cleanStartCard: 'CleanClean video · 2 scenes', cleanCaption: 'CardOne', cleanPill: ['play', 'exit'], cleanEnd: true, cleanExit: 'complete', cleanCards: false,
+    fourOffered: ['guided: Guided / One step at a time. Press Next to continue.', 'autoplay: Autoplay / Plays by itself. Pause anytime.', 'video: Video / Watch it like a video, with cards.', 'clean: Clean video / Watch it like a video, with captions instead of cards.'], fourFits: true,
     autoCard: true, autoCardButtons: 0, autoPillText: ['Previous scene', 'Next scene'], autoExit: 'complete',
     guidedStartCard: false, guidedStep: '1 of 2', guidedPillHidden: true, guidedLast: 'Finish', guidedExit: 'complete',
     offered: ['video', 'guided'], preselected: 'guided',
@@ -829,10 +853,12 @@ try {
   await gestureTarget.click({ modifiers: [captureKey, 'Shift'] }); await authorPage.keyboard.up('Shift'); await authorPage.keyboard.up(captureKey);
   await authorPage.locator('.sr-action').nth(1).waitFor();
   assert.deepEqual(await authorPage.locator('.sr-action strong').allInnerTexts(), ['Info card', 'Info card'], '⇧⌘-click captures a second info card');
-  // Play scene previews any mode: Video leaves the info card out, so the scene completes with no card.
-  await authorPage.locator('[data-preview-mode="video"]').click(); await authorPage.getByText('Scene completed').waitFor({ state: 'hidden', timeout: 10000 });
-  await authorPage.locator('[data-play-scene]').click(); await authorPage.getByText('Scene completed').waitFor({ timeout: 10000 });
-  assert.equal(await authorFrame.locator('.sr-action-callout').count(), 0, 'video preview shows no info card');
+  // Play scene previews any mode: Clean video shows no info card (its words are a caption), so the scene completes with no card.
+  assert.deepEqual(await authorPage.locator('[data-preview-mode]').evaluateAll((buttons) => buttons.map((button) => button.dataset.previewMode)), ['guided', 'autoplay', 'video', 'clean']);
+  await authorPage.locator('[data-preview-mode="clean"]').click(); await authorPage.getByText('Scene completed').waitFor({ state: 'hidden', timeout: 10000 });
+  // Each caption stays up for its card's reading time, so the scene takes longer than with no cards.
+  await authorPage.locator('[data-play-scene]').click(); await authorPage.getByText('Scene completed').waitFor({ timeout: 30000 });
+  assert.equal(await authorFrame.locator('.sr-action-callout').count(), 0, 'clean video preview shows no info card');
   await authorPage.close();
   const darkContext = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1440, height: 900 } }); const darkPage = await darkContext.newPage(); await darkPage.goto(baseUrl, { waitUntil: 'domcontentloaded' }); const darkTrigger = darkPage.locator('#demo-button'); await darkTrigger.waitFor(); await darkPage.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed')); await darkTrigger.click(); await darkPage.locator('[data-choose="autoplay"]').click(); const lightPill = await visiblePill(darkPage); await darkPage.waitForFunction(() => getComputedStyle(document.documentElement).backgroundColor === 'rgb(255, 255, 255)'); assert.match(await lightPill.evaluate((node) => getComputedStyle(node).backgroundColor), /rgba?\(255, 255, 255/); await darkPage.locator('button[data-cmd="studio"]').click(); await darkPage.locator('.sr-studio').waitFor(); assert.equal(await darkPage.locator('.sr-studio').evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(247, 247, 248)'); await darkPage.screenshot({ path: path.join(output, 'studio-light-under-dark-os-1440x900.png') }); await darkContext.close();
   // Share mode: ?demo=play auto-plays with viewer chrome only, and analytics events fire with a

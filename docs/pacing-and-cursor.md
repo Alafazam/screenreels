@@ -44,12 +44,13 @@ Per-scene estimates show in Studio's scene table. For a real number, time it in 
 window — headless and backgrounded tabs throttle `requestAnimationFrame` and timers hard, so any
 measurement taken there is fiction.
 
-## Video, autoplay, or guided
+## Video, clean video, autoplay, or guided
 
 ```json
 "defaults": { "playback": { "default": "autoplay" } }  // each finished scene rests for dwellMs, then the next one plays
 "defaults": { "playback": { "default": "guided" } }    // each info card waits until the viewer presses Next
-"defaults": { "playback": { "default": "video" } }     // hands-off, no info cards
+"defaults": { "playback": { "default": "video" } }     // hands-off, info cards held for their reading time
+"defaults": { "playback": { "default": "clean" } }     // hands-off, captions instead of info cards
 ```
 
 Each mode can also set its own pace: `"guided": { "pace": 1.35 }` slows a guided run by a third

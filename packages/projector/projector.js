@@ -15,7 +15,8 @@ const DEFAULT_LABELS = {
   chooserHint: 'Take the tour at your pace, or sit back and watch.',
   guided: 'Guided', guidedHint: 'One step at a time. Press Next to continue.',
   autoplay: 'Autoplay', autoplayHint: 'Plays by itself. Pause anytime.',
-  video: 'Video', videoHint: 'Watch it like a video, without info cards.',
+  video: 'Video', videoHint: 'Watch it like a video, with cards.',
+  clean: 'Clean video', cleanHint: 'Watch it like a video, with captions instead of cards.',
   // The pill moves between scenes; the guided card's Next moves between steps (info cards).
   previousScene: 'Previous scene', nextScene: 'Next scene', nextStep: 'Next step', play: 'Play', pause: 'Pause', exit: 'Exit demo mode',
   sceneOf: (scene, total) => `Scene ${scene} of ${total}`,
@@ -31,7 +32,7 @@ if (!window.ScreenReelStepClock) throw new Error('ScreenReel: step-clock.js is n
 const SHARE_CONTROLS = ['count', 'play', 'sound', 'exit'];
 const GUIDED_SHARE_CONTROLS = ['count', 'prev', 'play', 'next', 'sound', 'exit'];
 const PILL_POSITIONS = ['right', 'center'];
-/* The start card (video and autoplay) and the end card stay up this long, scaled by timeScale. */
+/* The start card (video, clean video and autoplay) and the end card stay up this long, scaled by timeScale. */
 const START_CARD_MS = 1800;
 const END_CARD_MS = 4000;
 /* Older options, each named once per page with what replaces it (docs/playback.md#migrating). */
@@ -359,7 +360,7 @@ class Projector {
       layer.onclick = (clickEvent) => { const button = clickEvent.target.closest?.('[data-card]'); finish(button ? button.dataset.card : ''); };
     });
   }
-  /* Before the first scene of a run in video or autoplay: the flow's name and how it will play, so
+  /* Before the first scene of a run in video, clean video or autoplay: the flow's name and how it will play, so
      the viewer knows it has started. Any click skips it. */
   async showStartCard(scene) {
     const labels = this.labels(); const flow = this.store.activeFlow(); const scenes = this.current().scenes.length;
@@ -372,7 +373,7 @@ class Projector {
     const labels = this.labels(); const flow = this.store.activeFlow(); const scenes = this.current().scenes.length;
     return this.showCard(`<div class="sr-chooser sr-end-card" role="dialog" aria-labelledby="sr-end-title"><h2 id="sr-end-title">${esc(labels.finished)}: ${esc(this.displayText(flow.name))}</h2><p>${esc(labels.endHint(scenes))}</p><div class="sr-card-actions"><button type="button" class="sr-mode" data-card="replay">${esc(labels.replay)}</button><button type="button" class="sr-mode sr-mode--primary" data-card="close">${esc(labels.close)}</button></div></div>`, END_CARD_MS, scale);
   }
-  /* Caption-style callouts (video's optional captions): the card's words with no card, for as long
+  /* Caption-style callouts (clean video, or any mode set to `callouts: 'caption'`): the card's words with no card, for as long
      as the card would have stayed up. */
   renderCaption(action) {
     const title = this.displayText(action.title); const body = this.displayText(action.text);
@@ -547,7 +548,7 @@ class Projector {
     };
   }
   /* Start a flow at a scene: the entry point for hosts that launch tours themselves (onboarding,
-     a help menu). `mode` is 'video', 'autoplay', 'guided', or 'ask' (show the chooser); without it
+     a help menu). `mode` is 'video', 'clean', 'autoplay', 'guided', or 'ask' (show the chooser); without it
      the configuration decides (docs/playback.md#which-mode-plays). Throws on an unknown flow, mode,
      or position, or a mode the host's `playback.modes` excludes, rather than guessing. */
   async start(flowId, { position = 0, mode } = {}) {

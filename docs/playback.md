@@ -1,11 +1,12 @@
 # Playback modes
 
-Every flow answers one question: **how does it play?** ScreenReel has three answers and a way to
+Every flow answers one question: **how does it play?** ScreenReel has four answers and a way to
 ask:
 
 | Mode | The viewer… | Info cards | Start | Progress | End |
 |---|---|---|---|---|---|
-| `video` | watches, hands off | left out (or shown as captions) | title card | thin bar, "Scene N of M" | end card |
+| `video` | watches, hands off | shown, each held for its reading time; small pill | title card | thin bar, "Scene N of M" | end card |
+| `clean` (Clean video) | watches, hands off | no card: the words show as a caption; small pill | title card | thin bar, "Scene N of M" | end card |
 | `autoplay` | watches, hands off | shown, each held for its reading time | title card | thin bar + pill "1/3" | end card |
 | `guided` | presses Next on each card | shown, each waits for Next | the chooser or the first card | "N of M" on the card | **Finish** on the last card |
 | `ask` | picks one of the modes the flow offers | — | the chooser | — | — |
@@ -15,9 +16,13 @@ and can override any of its settings.
 
 ### What each mode looks like
 
-| `video` | `autoplay` | `guided` |
-|---|---|---|
-| ![Video: progress bar and a minimal pill](images/playback/video-progress.png) | ![Autoplay: a timed info card, the labelled pill and the progress bar](images/playback/autoplay-card.png) | ![Guided: a step card with 1 of 3, Skip tour and Next](images/playback/guided-step.png) |
+| `video` | `clean` | `autoplay` | `guided` |
+|---|---|---|---|
+| ![Video: progress bar and a minimal pill](images/playback/video-progress.png) | ![Clean video: the card's words as a caption above a minimal pill](images/playback/video-caption.png) | ![Autoplay: a timed info card, the labelled pill and the progress bar](images/playback/autoplay-card.png) | ![Guided: a step card with 1 of 3, Skip tour and Next](images/playback/guided-step.png) |
+
+`video` shows its info cards the same way `autoplay` does (each held for its reading time), with the
+small pill. In 0.4.0 and earlier, `video` left the cards out; a host or flow that wants that sets
+`video: { callouts: 'off' }`.
 
 `ask` shows a chooser with only the modes the flow offers:
 
@@ -25,16 +30,22 @@ and can override any of its settings.
 
 ## Quick examples
 
-**A video** — cursor and actions only, no cards:
+**A video** — cursor, actions, and the info cards, each held for its reading time:
 
 ```json
 { "id": "orders-film", "name": "Orders in 60 seconds", "defaults": { "playback": { "default": "video" } }, "scenes": [] }
 ```
 
-**A video with captions** — the cards' words appear as a caption, with no card:
+**A clean video** — the cards' words appear as a caption, with no card:
 
 ```json
-"defaults": { "playback": { "default": "video", "video": { "callouts": "caption" } } }
+"defaults": { "playback": { "default": "clean" } }
+```
+
+**A video with no cards and no captions** — cursor and actions only:
+
+```json
+"defaults": { "playback": { "default": "video", "video": { "callouts": "off" } } }
 ```
 
 **Autoplay with pop-ups** — cards show and move on by themselves:
@@ -53,6 +64,12 @@ and can override any of its settings.
 
 ```json
 "defaults": { "playback": { "default": "ask", "modes": ["guided", "video"] } }
+```
+
+**All four in the chooser** — `clean` shows only when a `modes` list names it:
+
+```json
+"defaults": { "playback": { "default": "ask", "modes": ["guided", "autoplay", "video", "clean"] } }
 ```
 
 **One guide list, each guide its own way.** The host mounts once and lets each flow decide:
@@ -95,18 +112,20 @@ Each mode sets every one of these. Override any of them per mode.
 
 ### The presets
 
-| | `video` | `autoplay` | `guided` |
-|---|---|---|---|
-| `callouts` | `'off'` | `'timed'` | `'step'` |
-| `controls` | `play`, `sound`, `exit` | `count`, `prev`, `play`, `next`, `sound`, `exit` | none (the card has them) |
-| `controlLabels` | no | yes | no |
-| `progress` | yes | yes | no ("N of M" is on the card) |
-| `startCard` | yes | yes | no |
-| `endCard` | yes | yes | no (the last card says **Finish**) |
-| `notes` | no | yes | no |
-| `narration`, `cursor`, `dim`, `shield` | yes | yes | yes |
-| `keys` | no | no | yes |
-| `pace` | `null` | `null` | `null` |
+| | `video` | `clean` | `autoplay` | `guided` |
+|---|---|---|---|---|
+| `callouts` | `'timed'` | `'caption'` | `'timed'` | `'step'` |
+| `controls` | `play`, `sound`, `exit` | `play`, `sound`, `exit` | `count`, `prev`, `play`, `next`, `sound`, `exit` | none (the card has them) |
+| `controlLabels` | no | no | yes | no |
+| `progress` | yes | yes | yes | no ("N of M" is on the card) |
+| `startCard` | yes | yes | yes | no |
+| `endCard` | yes | yes | yes | no (the last card says **Finish**) |
+| `notes` | no | no | yes | no |
+| `narration`, `cursor`, `dim`, `shield` | yes | yes | yes | yes |
+| `keys` | no | no | no | yes |
+| `pace` | `null` | `null` | `null` | `null` |
+
+`video` and `clean` differ only in `callouts`.
 
 `sound` shows only when narration is on and the browser can speak.
 
@@ -114,16 +133,18 @@ Each mode sets every one of these. Override any of them per mode.
 
 | Where | Shape | Use it for |
 |---|---|---|
-| Flow: `defaults.playback` | `{ modes, default, video, autoplay, guided }` | How this flow plays: the author's choice. |
-| Mount: `playback` | `{ modes, default, force, remember, video, autoplay, guided }` | The host's house style and limits. |
-| `projector.start(flowId, { mode })` | `'video'`, `'autoplay'`, `'guided'`, `'ask'` | One run, chosen by the host's own UI. |
-| Scene: `advance` | `'video'`, `'autoplay'`, `'guided'` | One scene in another mode (a countdown intro that plays through in a guided tour). |
+| Flow: `defaults.playback` | `{ modes, default, video, clean, autoplay, guided }` | How this flow plays: the author's choice. |
+| Mount: `playback` | `{ modes, default, force, remember, video, clean, autoplay, guided }` | The host's house style and limits. |
+| `projector.start(flowId, { mode })` | `'video'`, `'clean'`, `'autoplay'`, `'guided'`, `'ask'` | One run, chosen by the host's own UI. |
+| Scene: `advance` | `'video'`, `'clean'`, `'autoplay'`, `'guided'` | One scene in another mode (a countdown intro that plays through in a guided tour). |
 
 - `modes` — what the chooser offers, in order. On a flow, it defaults to `['guided', 'autoplay']`.
+  This default does not include `video` or `clean`: a mode shows in the chooser only when a list
+  names it, so a host that pins `modes` sees no new option when ScreenReel adds a mode.
   On the mount, it **restricts** every flow: the chooser offers only modes in both lists, a flow
   default outside it plays autoplay if allowed, else the first allowed mode, and `start()` throws on a mode outside it.
 - `default` — the mode, or `'ask'`. On the mount, it applies to flows that set none.
-- `video`, `autoplay`, `guided` — per-mode overrides of the settings above.
+- `video`, `clean`, `autoplay`, `guided` — per-mode overrides of the settings above.
 - `force` (mount only) — the mode every flow plays, or `'ask'` to always show the chooser.
 - `remember` (mount only) — keep each viewer's last chooser pick per flow, in local storage.
   `true` or `'preselect'` focuses it in the chooser; `'skip'` plays it without asking again
@@ -165,7 +186,7 @@ Then:
 
 **Start.** The viewer always sees that something began:
 - `guided`: the chooser, or the first card.
-- `video` and `autoplay`: a title card, then the pill's intro beat.
+- `video`, `clean` and `autoplay`: a title card, then the pill's intro beat.
 
 **Next and Back mean different things in different places:**
 - **The guided card's Next** moves to the next **step** (info card). It reads **Finish** on the
@@ -180,11 +201,11 @@ Then:
 step it holds the step in place and Play continues it; anywhere else Pause stops the scene (its
 changes are undone) and Play plays that scene again from its start. The pill shows Pause as soon as
 Play is pressed, while the stopped scene's cleanup finishes. **Space** presses Play/Pause in any mode
-whose pill shows it (`video`, `autoplay`), whatever `keys` says, except while typing in a field, with
+whose pill shows it (`video`, `clean`, `autoplay`), whatever `keys` says, except while typing in a field, with
 a modifier held, on a chooser or start/end card, or on the tour's own focused button (which Space
 activates itself). One enabled projector per page takes the key.
 
-<a id="esc-and-exit"></a>**Esc and Exit.** **Esc** ends the tour in every mode (`video`, `autoplay`, `guided`), while it
+<a id="esc-and-exit"></a>**Esc and Exit.** **Esc** ends the tour in every mode (`video`, `clean`, `autoplay`, `guided`), while it
 plays or is paused, with reason `'user'`, the same as the pill's ✕ and a card's Skip. It works when
 the focus is in a host field the tour types in, and on the start and end cards. On the chooser it
 closes the chooser, which also ends the tour. Esc is left alone when the host already handled it
@@ -202,7 +223,7 @@ layer: rings, ripples, dims and info cards are drawn under it, so none of them c
 
 **The end:**
 - `guided`: **Finish** on the last card.
-- `video` and `autoplay`: the end card. **Replay** starts the flow again in the same mode.
+- `video`, `clean` and `autoplay`: the end card. **Replay** starts the flow again in the same mode.
   **Close** ends the tour.
 
 | Start card | End card | Last guided card |
@@ -240,13 +261,12 @@ file and the step plays with the same timing.
 { "type": "type", "selector": "[data-demo-id='new-cycle-name']", "text": "SS-26 EOSS", "atMs": 2100 }
 ```
 
-**Autoplay and video** play the timeline:
+**Autoplay, video and clean video** play the timeline:
 - The card showing starts the step's clock and, with sound on, its file from the start. The card
   does not hold for `holdMs`: it, and the ring around its target (`highlight: true`), stay up for
   the **whole step** (until `stepMs`, or the next card), however many actions run meanwhile. With
-  `callouts: 'caption'` its caption stays until the step ends; with `'off'` there is no card, but
-  the clock and the file still run. (A flow that wants cards in video sets
-  `defaults.playback.video.callouts: 'timed'`.)
+  `callouts: 'caption'` (clean video) its caption stays until the step ends; with `'off'` there is
+  no card, but the clock and the file still run.
 - An action with `atMs` waits until the clock reaches it, then runs as usual. One that is already
   late runs at once, and the next is still measured from the card, so lateness never adds up.
 - **A gate ends the step.** The first action after a timed card that has no `atMs` (a `waitFor`,
@@ -343,7 +363,7 @@ Nothing breaks. The older options keep working and map onto the model. Each logs
 The new look starts when the mount or the flow uses `playback`. Note one change: the chooser's
 autoplay button is now `data-choose="autoplay"`, no longer `"auto"`.
 
-Studio writes both `defaults.playback` and `defaults.advance` (`video` → `'auto'`), so an older
+Studio writes both `defaults.playback` and `defaults.advance` (`video` and `clean` → `'auto'`), so an older
 runtime still plays a flow Studio saved.
 
 ## Checking it
@@ -364,7 +384,7 @@ In **Studio**, **Flow settings** sets:
 - the modes the chooser offers;
 - per mode: how info cards play, the start card, the progress bar, and the end card.
 
-**Play scene** previews the scene as Guided, Autoplay, or Video.
+**Play scene** previews the scene as Guided, Autoplay, Video, or Clean video.
 
 | Flow settings | Play scene preview modes |
 |---|---|
@@ -373,7 +393,16 @@ In **Studio**, **Flow settings** sets:
 ## Labels
 
 Every string is in `labels`, for translation:
-- **Chooser:** `video`, `videoHint`.
+- **Chooser:** one name and one hint per mode: `guided`, `guidedHint`, `autoplay`, `autoplayHint`,
+  `video`, `videoHint`, `clean`, `cleanHint`. The start card shows the same name.
+
+| Key | Default |
+|---|---|
+| `guided` / `guidedHint` | Guided / One step at a time. Press Next to continue. |
+| `autoplay` / `autoplayHint` | Autoplay / Plays by itself. Pause anytime. |
+| `video` / `videoHint` | Video / Watch it like a video, with cards. |
+| `clean` / `cleanHint` | Clean video / Watch it like a video, with captions instead of cards. |
+
 - **Pill:** `previousScene`, `nextScene`, `nextStep`, `play`, `pause`, `exit`.
 - **Progress bar:** `sceneOf(scene, total)`.
 - **Start card:** `startHint(mode, scenes)`.
