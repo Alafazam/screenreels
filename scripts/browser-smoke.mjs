@@ -81,8 +81,8 @@ try {
   await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
   // Both forced variants launch the same canonical six-scene dogfooding demo.
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
-  // The landing asks Autoplay or Guided; Autoplay (voiced) is the first, focused choice.
-  assert.deepEqual(await page.locator('.sr-chooser [data-choose]:not([data-choose=""])').evaluateAll((buttons) => buttons.map((button) => button.dataset.choose)), ['autoplay', 'guided']);
+  // The landing asks Autoplay, Video, or Guided; Autoplay (voiced) is the first, focused choice.
+  assert.deepEqual(await page.locator('.sr-chooser [data-choose]:not([data-choose=""])').evaluateAll((buttons) => buttons.map((button) => button.dataset.choose)), ['autoplay', 'video', 'guided']);
   assert.equal(await page.locator('.sr-mode--primary').getAttribute('data-choose'), 'autoplay');
   const firstNarration = page.waitForResponse((response) => /\/audio\/landing\/1a\.[0-9a-f]+\.mp3$/.test(response.url()), { timeout: 15000 });
   await page.locator('[data-choose="autoplay"]').click();
@@ -108,6 +108,19 @@ try {
   await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await visiblePill(page); assert.equal(await page.locator('.sr-count').innerText(), '6/6');
   await page.screenshot({ path: path.join(output, 'projector-complete-1280x720.png') });
+  // Video plays the same narration files as Autoplay: the first card's MP3 loads, the progress
+  // bar shows, and the small pill offers the speaker. A fresh page keeps this run's state apart.
+  const videoPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await videoPage.goto(`${baseUrl}?variant=repo-native`, { waitUntil: 'domcontentloaded' });
+  await videoPage.waitForFunction(() => document.querySelector('#demo-button')?.dataset.landingReady === 'true');
+  const videoNarration = videoPage.waitForResponse((response) => /\/audio\/landing\/1a\.[0-9a-f]+\.mp3$/.test(response.url()), { timeout: 20000 });
+  await videoPage.locator('#demo-button').click();
+  await videoPage.locator('[data-choose="video"]').click();
+  assert.ok((await videoNarration).ok(), 'Video mode must play the first card\'s narration file');
+  await videoPage.locator('.sr-progress').waitFor({ state: 'visible', timeout: 10000 });
+  assert.equal(await videoPage.locator('.sr-pill [data-cmd="sound"]').count(), 1);
+  await videoPage.screenshot({ path: path.join(output, 'projector-video-1280x720.png') });
+  await videoPage.close();
   await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' }); await visiblePill(page);
   await page.locator('button[data-cmd="studio"]').click(); const heading = page.getByRole('heading', { name: 'Studio flows', exact: true }); await heading.waitFor();

@@ -17,7 +17,7 @@ Total: about 77 seconds of narrated steps plus page loads, under the 90-second t
 
 ## Voice
 
-The tour is voiced with ElevenLabs (voice Matilda, `eleven_multilingual_v2`). Each info card's `narration` is its line, and the card plays `audio/landing/<step>.<hash>.mp3`. The card's `stepMs` and its actions' `atMs` come from the take's word timestamps: an action named by a word fires 0.45 s before the word. The landing mounts with `narration: { speech: false }`, so only the files play, and the chooser offers Autoplay first.
+The tour is voiced with ElevenLabs (voice Matilda, `eleven_multilingual_v2`). Each info card's `narration` is its line, and the card plays `audio/landing/<step>.<hash>.mp3`. The card's `stepMs` and its actions' `atMs` come from the take's word timestamps: an action named by a word fires 0.45 s before the word. The landing mounts with `narration: { speech: false }`, so only the files play. The chooser offers Autoplay (first and focused), Video, and Guided, and all three play the files.
 
 To change a line, edit the card's `narration` in `screenreel.demo.json`, then run:
 
