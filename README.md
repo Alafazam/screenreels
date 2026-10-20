@@ -13,23 +13,41 @@ No backend, account, analytics service, or model provider is required.
 
 ## Projector quick start
 
-Build and copy the browser distribution into your application:
+The Projector plays a flow live inside your app: it moves the cursor, clicks, types, and shows the cards and narration. Studio, where you record a flow, opens from it. If you only want a video, skip the Projector and use [Capture](#capture).
 
-```bash
-pnpm build
-node bin/screenreel.mjs projector install --out /path/to/app/public/vendor/screenreel
+**1. Add one script and the element.** No install is needed to try it:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/screenreel@0.4.0/dist/projector/screenreel.js" defer></script>
+
+<screenreel-projector project-id="my-app"></screenreel-projector>
 ```
 
-Add one script and the provided custom element:
+Without `flow-src`, the Projector starts with an empty "Blank demo".
+
+**2. Record a flow.** Click the ScreenReel button, open **Studio**, create a flow, and use your app. See [Recording a scene](docs/recording.md). Studio keeps the draft in this browser.
+
+**3. Save the flow in your repository.** In Studio, open the flow and click **Export**. Save the downloaded `<flow-name>.screenreel.json` with your app, for example as `/demos/my-demo.json`.
+
+**4. Serve it.** Point the element at the file. Every visitor now gets the same demo:
+
+```html
+<screenreel-projector project-id="my-app" flow-src="/demos/my-demo.json"></screenreel-projector>
+```
+
+Set `flow-src` only when the file exists: a missing file stops the Projector with "Unable to load ScreenReel flow (404)".
+
+**To self-host the Projector** (no third-party CDN), copy the same files into your app and change the script's `src`:
+
+```bash
+npx screenreel projector install            # copies to ./public/vendor/screenreel (change with --out)
+```
 
 ```html
 <script src="/vendor/screenreel/screenreel.js" defer></script>
-
-<screenreel-projector
-  project-id="acme-sales"
-  flow-src="/demos/sales-demo.json">
-</screenreel-projector>
 ```
+
+Pin the version in the CDN URL (`@0.4.0`), or self-host, so that a new release never changes a live demo without you.
 
 Or attach ScreenReel to an existing application button:
 

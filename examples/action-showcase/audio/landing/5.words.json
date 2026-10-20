@@ -1,0 +1,120 @@
+{
+  "hash": "6d54a418",
+  "text": "When your product changes, flow doctor checks every target and repairs the selectors that moved, before a customer sees a broken demo.",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "trimmedMs": 0,
+  "durationMs": 8255,
+  "words": [
+    {
+      "w": "When",
+      "s": 0,
+      "e": 0.174
+    },
+    {
+      "w": "your",
+      "s": 0.209,
+      "e": 0.313
+    },
+    {
+      "w": "product",
+      "s": 0.348,
+      "e": 0.673
+    },
+    {
+      "w": "changes,",
+      "s": 0.708,
+      "e": 1.335
+    },
+    {
+      "w": "flow",
+      "s": 1.509,
+      "e": 1.765
+    },
+    {
+      "w": "doctor",
+      "s": 1.823,
+      "e": 2.136
+    },
+    {
+      "w": "checks",
+      "s": 2.194,
+      "e": 2.485
+    },
+    {
+      "w": "every",
+      "s": 2.566,
+      "e": 2.81
+    },
+    {
+      "w": "target",
+      "s": 2.868,
+      "e": 3.239
+    },
+    {
+      "w": "and",
+      "s": 3.309,
+      "e": 3.448
+    },
+    {
+      "w": "repairs",
+      "s": 3.506,
+      "e": 3.878
+    },
+    {
+      "w": "the",
+      "s": 3.924,
+      "e": 3.994
+    },
+    {
+      "w": "selectors",
+      "s": 4.04,
+      "e": 4.516
+    },
+    {
+      "w": "that",
+      "s": 4.563,
+      "e": 4.69
+    },
+    {
+      "w": "moved,",
+      "s": 4.748,
+      "e": 5.201
+    },
+    {
+      "w": "before",
+      "s": 5.584,
+      "e": 5.898
+    },
+    {
+      "w": "a",
+      "s": 5.933,
+      "e": 5.956
+    },
+    {
+      "w": "customer",
+      "s": 6.014,
+      "e": 6.42
+    },
+    {
+      "w": "sees",
+      "s": 6.478,
+      "e": 6.676
+    },
+    {
+      "w": "a",
+      "s": 6.711,
+      "e": 6.745
+    },
+    {
+      "w": "broken",
+      "s": 6.792,
+      "e": 7.117
+    },
+    {
+      "w": "demo.",
+      "s": 7.175,
+      "e": 8.22
+    }
+  ]
+}

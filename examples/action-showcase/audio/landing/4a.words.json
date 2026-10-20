@@ -1,0 +1,105 @@
+{
+  "hash": "281826e2",
+  "text": "One flow, three outputs. It plays live inside your product, opens as a self-playing link, and renders to video.",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "modelId": "eleven_multilingual_v2",
+  "trimmedMs": 0,
+  "durationMs": 8255,
+  "words": [
+    {
+      "w": "One",
+      "s": 0,
+      "e": 0.255
+    },
+    {
+      "w": "flow,",
+      "s": 0.302,
+      "e": 0.731
+    },
+    {
+      "w": "three",
+      "s": 0.848,
+      "e": 1.091
+    },
+    {
+      "w": "outputs.",
+      "s": 1.138,
+      "e": 1.788
+    },
+    {
+      "w": "It",
+      "s": 2.299,
+      "e": 2.45
+    },
+    {
+      "w": "plays",
+      "s": 2.485,
+      "e": 2.728
+    },
+    {
+      "w": "live",
+      "s": 2.81,
+      "e": 3.135
+    },
+    {
+      "w": "inside",
+      "s": 3.17,
+      "e": 3.495
+    },
+    {
+      "w": "your",
+      "s": 3.529,
+      "e": 3.634
+    },
+    {
+      "w": "product,",
+      "s": 3.669,
+      "e": 4.18
+    },
+    {
+      "w": "opens",
+      "s": 4.563,
+      "e": 4.957
+    },
+    {
+      "w": "as",
+      "s": 5.004,
+      "e": 5.085
+    },
+    {
+      "w": "a",
+      "s": 5.143,
+      "e": 5.166
+    },
+    {
+      "w": "self-playing",
+      "s": 5.236,
+      "e": 5.793
+    },
+    {
+      "w": "link,",
+      "s": 5.851,
+      "e": 6.2
+    },
+    {
+      "w": "and",
+      "s": 6.351,
+      "e": 6.502
+    },
+    {
+      "w": "renders",
+      "s": 6.583,
+      "e": 6.931
+    },
+    {
+      "w": "to",
+      "s": 6.989,
+      "e": 7.047
+    },
+    {
+      "w": "video.",
+      "s": 7.105,
+      "e": 8.22
+    }
+  ]
+}

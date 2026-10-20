@@ -6,7 +6,8 @@ import { resolveChrome } from '../lib/config.mjs';
 
 const baseUrl = process.env.SCREENREEL_EXAMPLE_URL || 'http://127.0.0.1:4173/examples/action-showcase/';
 const output = path.resolve('./screenreel-output/browser-smoke'); fs.rmSync(output, { recursive: true, force: true }); fs.mkdirSync(output, { recursive: true });
-const browser = await chromium.launch({ executablePath: resolveChrome(), args: ['--hide-scrollbars'] });
+// Muted: the landing tour now plays narration files, and a test run must not talk out loud.
+const browser = await chromium.launch({ executablePath: resolveChrome(), args: ['--hide-scrollbars', '--mute-audio'] });
 /* Narration is on by default, so an unguarded run speaks every scene out loud through the machine's
    real voice — intolerable on a developer's laptop and pointless in CI. This drives the same
    start/end handshake the narrator listens for without handing the utterance to the engine, so
@@ -80,7 +81,10 @@ try {
   await page.waitForFunction(() => document.querySelector('#demo-button')?.hasAttribute('aria-pressed'));
   // Both forced variants launch the same canonical six-scene dogfooding demo.
   const trigger = page.locator('#demo-button'); await trigger.waitFor(); assert.equal(await trigger.count(), 1); assert.equal(await trigger.getAttribute('aria-pressed'), 'false'); await trigger.click();
-  // The landing asks Guided or Autoplay first; this pass checks Autoplay end to end.
+  // The landing asks Autoplay or Guided; Autoplay (voiced) is the first, focused choice.
+  assert.deepEqual(await page.locator('.sr-chooser [data-choose]:not([data-choose=""])').evaluateAll((buttons) => buttons.map((button) => button.dataset.choose)), ['autoplay', 'guided']);
+  assert.equal(await page.locator('.sr-mode--primary').getAttribute('data-choose'), 'autoplay');
+  const firstNarration = page.waitForResponse((response) => /\/audio\/landing\/1a\.[0-9a-f]+\.mp3$/.test(response.url()), { timeout: 15000 });
   await page.locator('[data-choose="autoplay"]').click();
   const pill = await visiblePill(page); assert.equal(await pill.count(), 1);
   const validation = await page.evaluate(() => window.ScreenReel.validateScene()); assert.equal(validation.ok, true); assert.equal(validation.sceneId, 'open-source-hook');
@@ -88,11 +92,12 @@ try {
   await page.locator('.sr-glow-box').waitFor({ state: 'visible', timeout: 9000 });
   // The agent cursor must be live during playback: the Projector supplies moveCursor to the
   // executor, so a missing node means the cursor call sites have gone back to being no-ops.
-  await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 15000 }); // first appears at scene 1's pointer, after its callout
-  // The landing tour mounts with narration: false until it has a better voice, so the pill offers
-  // no speaker there. narrator.js still loads: other hosts keep narration on by default.
+  await page.locator('#__screenreelCursor').waitFor({ state: 'visible', timeout: 30000 }); // first appears at scene 1's pointer, on the word "build" in the second narrated card
+  // The landing tour narrates from its committed ElevenLabs files only (narration: { speech: false }):
+  // the first card's file loads, and the pill offers the speaker. narrator.js still loads for other hosts.
+  assert.ok((await firstNarration).ok(), 'the first card\'s narration file must load');
   assert.equal(await page.locator('.sr-pill [data-cmd="capture"]').count(), 0);
-  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').count(), 0);
+  assert.equal(await page.locator('.sr-pill [data-cmd="sound"]').count(), 1);
   assert.equal(await page.evaluate(() => Boolean(window.__screenreelNarrator?.available())), true);
   await page.screenshot({ path: path.join(output, 'projector-1280x720.png') });
   await page.waitForURL(/demo-lab\.html$/, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -100,7 +105,7 @@ try {
   await page.waitForURL(/demo-lab-output\.html$/, { waitUntil: 'domcontentloaded', timeout: 35000 });
   await visiblePill(page);
   await page.locator('[data-demo-id="doctor-output"]').waitFor({ state: 'visible', timeout: 15000 });
-  await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await visiblePill(page); assert.equal(await page.locator('.sr-count').innerText(), '6/6');
   await page.screenshot({ path: path.join(output, 'projector-complete-1280x720.png') });
   await page.waitForURL(/\/action-showcase\/(index\.html)?$/, { waitUntil: 'domcontentloaded', timeout: 25000 });
