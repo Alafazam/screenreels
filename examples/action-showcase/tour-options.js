@@ -7,12 +7,13 @@ window.SCREENREEL_LANDING_TOUR = Object.freeze({
   flow: { src: 'screenreel.demo.json' },
   loop: false,
   pages: ['./', 'demo-lab.html', 'demo-lab-output.html', 'showcase-heal.html'],
-  // The viewer picks Autoplay (the default: voiced, with actions timed to the words) or Guided (a
-  // card per step, Next to continue). Autoplay is listed first, so it is the focused choice.
-  // The overrides keep the tour's compact look: no start card, progress bar, or end card.
+  // The viewer picks Autoplay (the default: voiced, with actions timed to the words), Video (the
+  // same timing with a title card, progress bar, end card, and a small pill), or Guided (a card per
+  // step, Next to continue). Autoplay is listed first, so it is the focused choice. The Autoplay
+  // overrides keep its compact look: no start card, progress bar, or end card.
   playback: {
     force: 'ask',
-    modes: ['autoplay', 'guided'],
+    modes: ['autoplay', 'video', 'guided'],
     // Guided needs no pill: its controls live in the card. Studio stays in the bar here because it
     // is the product this site sells.
     autoplay: { controls: ['count', 'prev', 'play', 'next', 'sound', 'studio', 'exit'], controlLabels: false, progress: false, startCard: false, endCard: false },
