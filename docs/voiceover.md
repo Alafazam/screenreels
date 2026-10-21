@@ -105,8 +105,10 @@ highlight, click, or scroll they describe instead of arriving as one paragraph u
 ```
 
 Live, each line *replaces* whatever is still speaking: a queue would drift behind the picture, and
-the point is that the words match what is on screen. In a captured video there is no per-action audio
-timeline, so the lines are joined onto the scene's line and spoken over the clip. Variables are
+the point is that the words match what is on screen. In a captured video spoken by the voice
+provider there is no per-action audio timeline, so the lines are joined onto the scene's line and
+spoken over the clip. (Info cards with narration files keep their timing in a captured video; see
+[Narration files in the captured video](#narration-files-in-the-captured-video).) Variables are
 interpolated in action lines too.
 
 In Studio, every action row carries a **speaker button** that opens just that line — tinted when a
@@ -181,7 +183,36 @@ names the flow, the voice, and which action lands on which word, as in
 `ELEVENLABS_API_KEY`, checks the account's character quota first, and generates only changed lines.
 `--dry-run` shows what it would generate without calling the API.
 
-Capture does not play these files yet: a captured video still uses the voice provider below.
+<a id="narration-files-in-the-captured-video"></a>
+### Narration files in the captured video
+
+Capture plays the same files, with the same timing, so a recorded MP4 sounds like the live tour:
+
+```bash
+npx screenreel record --voice --config examples/action-showcase/screenreel.landing.config.mjs
+```
+
+- **Timed steps.** Capture plays a timed card the way Autoplay does. The card shows and stays up
+  for its step, and each action with `atMs` runs at its time. The first action without `atMs`
+  waits for the step to end. A step ends at `stepMs`, or when its file ends, but never more than
+  1.5 s later.
+- **The audio track.** Before each take, Capture downloads each card's `narrationAudio` from the
+  running app (the URL the browser plays) and measures it. After the take, it writes
+  `<clips>/<scene>.narration.json` with the time each card showed in the clip. `assemble` puts each
+  file at that time, with silence elsewhere, in the usual AAC 48 kHz stereo shape.
+- **No TTS engine.** A scene voiced from files never calls the voice provider. A scene without files
+  in the same reel still uses it.
+- **Overruns.** A file that is still playing when the next card shows is cut there, as in the live
+  tour, and you get a warning. A last file that ends after the clip follows `overflow` (below).
+- **Re-capture after changing a file.** `assemble` reads the files and times from the last capture.
+  If a scene's cards have files but it has no `.narration.json`, `assemble` warns and uses the
+  voice provider.
+
+`pnpm test:browser` runs `scripts/capture-sync.mjs`, which records a fixture and measures the MP4:
+the voice and an action must each land within 120 ms of their planned times.
+
+To record one flow of a file with several flows, set `flow` in the config (for example
+`flow: 'guided-tour'`).
 
 ## When narration is longer than its clip
 
