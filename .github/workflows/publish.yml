@@ -44,9 +44,22 @@ jobs:
             echo "Release tag $GITHUB_REF_NAME does not match package.json version ($expected)."
             exit 1
           fi
+      # npm publish --dry-run fails when this version is already on npm, which is true on main
+      # between releases. In that case, pack only, so the run still checks the package contents.
       - name: Dry run
         if: github.event_name == 'workflow_dispatch'
-        run: npm publish --dry-run
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          # Prints the version if it is published, and nothing if it is not. A registry error
+          # also gives nothing; publish --dry-run then fails loudly on its own.
+          published="$(npm view "$name@$version" version 2>/dev/null || true)"
+          if [ -n "$published" ] && [ "$published" = "$version" ]; then
+            echo "::notice::$name@$version is already on npm. Packing only. Bump the version to dry-run a publish."
+            npm pack --dry-run
+          else
+            npm publish --dry-run
+          fi
       - name: Publish
         if: github.event_name == 'release'
         run: npm publish --provenance --access public
