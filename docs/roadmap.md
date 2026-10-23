@@ -32,6 +32,7 @@ want to record their own voice with the microphone instead.
 ## Also planned
 
 - Capture reads a flow's [playback mode](playback.md), so a `clean` flow records captions in place of
-  info cards and a `video` or `autoplay` flow records its cards. Today Capture plays every callout as autoplay.
+  info cards and a `video` or `autoplay` flow records its cards. Today Capture plays every callout as autoplay,
+  timed steps and their narration files included.
 - Split `screenreel.d.ts` so the global `Window.ScreenReel` augmentation is opt-in.
 - Scenes without a `route`, for shell-wide guides that play on whatever page is open.

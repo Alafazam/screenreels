@@ -255,6 +255,71 @@ Capture runs actions in sequence, ignores `atMs` and `stepMs`, and speaks
 
 Recommendation: ship the live tour first. Decide on the video after you hear the live result.
 
+### Phase 2 plan: the narrated MP4
+
+> Status: built (branch `feat/narrated-capture`). Phase 1 is live. This
+> phase takes the "correct" option above.
+
+**Goal.** `screenreel record --voice` makes an MP4 with the same ElevenLabs takes and the same
+word timing as the live tour. It plays the committed MP3s, so it makes no TTS call and uses no
+characters.
+
+**1. Capture plays timed steps on the scene clock.** The Capture adapter
+(`packages/capture/inject-adapter.js`) uses the same rules as the Projector, through the same
+shared code (`ScreenReelStepClock.planSteps` and `createStepClock`, and the action runtime's
+`persist`, `skipHold`, `retain` and `noDim` options):
+
+- A card with `stepMs` starts a step. The card shows and stays up for the whole step. The page is
+  not dimmed while the step's actions run.
+- Each following action with `atMs` waits until its time on the step clock, then runs. A late
+  action runs at once, and lateness does not add up.
+- The first action without `atMs` (a `goto`, for example) is a gate. The step plays to its end
+  first.
+- A step ends at `stepMs`, or when its audio ends, but never more than 1.5 s
+  (`AUDIO_OVERRUN_CAP_MS`) past `stepMs`. Capture knows each file's length before the take, so it
+  waits exactly as the live tour does.
+- Each card reports the moment it shows (`Date.now()` in the page) through a Playwright binding.
+  The binding survives a navigation, so a scene that ends in `goto` still reports.
+
+Capture also infers `endsInNavigation` when a scene's last action is `goto`, so the landing scenes
+need no extra field.
+
+**2. The MP3s go on the clip's audio track.** Before the take, Capture downloads each card's
+`narrationAudio` from the running app (the same URL the browser plays) and reads its length with
+ffprobe. After the take, it writes `<clip>.narration.json` with each file and its offset into the
+clip: the card's show time minus the first screencast frame's time (both are wall-clock times on the
+same machine). `assemble` then builds the scene's audio with ffmpeg: each file is delayed to its
+offset (`adelay`), the files are mixed, and silence fills the rest (`apad`). The output uses the
+existing audio shape: AAC, 48 kHz, stereo, one stream per part. So title cards and silent scenes
+still stitch safely. A scene with narration files uses only the files. A scene without them uses
+the voice provider as before.
+
+**3. A file that runs long.** If a file would still be playing when the next card starts, it is cut
+at that card, as in the live tour (the next card's audio replaces it), and assemble warns. If the
+last file ends after the clip, `voice.overflow` decides: `'extend'` (the default) freezes the last
+frame until the voice ends, and `'truncate'` cuts the audio at the clip's end. Both warn with the
+scene and the overrun. The pure planner (`lib/narration-track.mjs`) makes all these decisions, and
+unit tests cover them.
+
+**4. Tests that prove sync.**
+
+- **Unit:** the planner (offsets, overlap cut, extend, truncate, no files). The adapter's timed
+  run on a fake page with the real step clock checks that the card is at 0, actions are at `atMs`,
+  the gate waits for the step's end, the audio overrun is capped, and each card is reported.
+- **End to end** (`scripts/capture-sync.mjs`, in `pnpm test:browser`, so CI runs it): a fixture
+  page with one timed card, a 440 Hz tone that starts 500 ms into its file, and an action at
+  `atMs: 1500` that turns the page red. The test records it, assembles with voice, and measures
+  the MP4. The tone must start within 120 ms of card time + 500 ms (ffmpeg `silencedetect`), and
+  the first red frame must be within 120 ms of card time + 1500 ms. The output has exactly one
+  AAC 48 kHz stereo stream.
+- **The landing film:** `screenreel record --voice --config
+  examples/action-showcase/screenreel.landing.config.mjs` records the six landing scenes, and a
+  contact sheet confirms the cards and actions. That config is new and records only the landing
+  flow.
+
+**Out of scope:** Capture's other playback-mode settings (start and end cards, Clean video's
+captions). Capture already draws its own title cards.
+
 ## Open questions
 
 1. One voice track for both variants: yes or no?
